@@ -1,0 +1,100 @@
+# =====================
+# Build output
+# =====================
+target/
+build/
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# =====================
+# Maven
+# =====================
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# =====================
+# Logs
+# =====================
+*.log
+logs/
+spring.log
+
+# =====================
+# Environment & secrets
+# =====================
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# =====================
+# Docker
+# =====================
+docker-compose.override.yml
+
+# =====================
+# IntelliJ IDEA
+# =====================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# =====================
+# Eclipse / STS
+# =====================
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# =====================
+# NetBeans
+# =====================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# =====================
+# VS Code
+# =====================
+.vscode/
+
+# =====================
+# OS artifacts
+# =====================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =====================
+# JaCoCo coverage reports
+# =====================
+target/site/jacoco/
+jacoco.exec
+
+# =====================
+# TestContainers
+# =====================
+.testcontainers.properties
+
+# =====================
+# Ollama / local AI
+# =====================
+*.gguf
+*.bin
+models/

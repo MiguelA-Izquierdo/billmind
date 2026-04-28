@@ -1,0 +1,20 @@
+# Compiled output
+target/
+
+# Secrets
+.env
+.env.*
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Maven wrapper binary
+.mvn/wrapper/maven-wrapper.jar

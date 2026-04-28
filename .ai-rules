@@ -1,0 +1,20 @@
+# Project Universal Standards (The "Common Law")
+
+## 1. Language & Documentation
+- **Code:** All classes, methods, variables, and database schemas must be in **English**.
+- **Comments:** Javadoc and internal comments must be in **Spanish**.
+- **Agent Output:** Explanations for the human user must be in **Spanish**.
+
+## 2. Code Style (The "Look & Feel")
+- **Indentation:** 4 spaces (no tabs).
+- **Naming:** - Classes: PascalCase.
+  - Methods/Variables: camelCase.
+  - Constants: UPPER_SNAKE_CASE.
+- **Max Method Length:** Try to keep methods under 20 lines.
+
+## 3. Error Handling Standard
+- Use custom Domain Exceptions (no genéricas).
+- Always log errors in the Infrastructure layer, never in the Domain.
+
+## 4. Git & Commits
+- Every code generation should suggest a commit message in the format: `feat(scope): description` or `fix(scope): description`.

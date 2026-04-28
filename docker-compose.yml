@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: billmind-postgres
+    environment:
+      POSTGRES_DB: billmind
+      POSTGRES_USER: billmind
+      POSTGRES_PASSWORD: billmind
+    ports:
+      - "5432:5432"
+    volumes:
+      - billmind_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U billmind -d billmind"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  billmind_pgdata:
