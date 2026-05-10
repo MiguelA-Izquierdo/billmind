@@ -1,4 +1,7 @@
 services:
+
+  # ── Infrastructure (always started) ──────────────────────────────────────────
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: billmind-postgres
@@ -16,5 +19,49 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Local AI (profile: local-ai) ─────────────────────────────────────────────
+  # Start with: docker-compose --profile local-ai up -d
+  # Required when LLM_PROVIDER=ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: billmind-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    profiles:
+      - local-ai
+
+  # Pulls the minimum required models on first start.
+  # all-minilm  — embeddings (always required when using Ollama for vectors)
+  # llama3      — chat/classification (required when LLM_PROVIDER=ollama)
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: billmind-ollama-setup
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Pulling all-minilm (embeddings)...' &&
+        ollama pull all-minilm &&
+        echo 'Pulling llama3 (chat)...' &&
+        ollama pull llama3 &&
+        echo 'Models ready.'
+      "
+    restart: "no"
+    profiles:
+      - local-ai
+
 volumes:
   billmind_pgdata:
+  ollama_data:

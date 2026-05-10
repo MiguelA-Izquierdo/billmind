@@ -1,125 +1,142 @@
 # CLAUDE.md — BillMind
 
-Instrucciones de comportamiento para Claude Code. Para decisiones de arquitectura y puntos de extensión: `@docs/ARCHITECTURE.md`.
+> Developer tooling configuration for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Analogous to `.editorconfig` for LLM-assisted development — not part of the application runtime. For architecture decisions and extension points, see `@docs/ARCHITECTURE.md`. For the long-term roadmap, see `@docs/PLAN.md`.
 
 ---
 
-## Descripción del Proyecto
+## Project Description
 
-**BillMind** es una API REST en Spring Boot 3.2.5 + Java 21 + LangChain4j 0.33.0 que recibe facturas PDF, las fragmenta en chunks semánticos, genera embeddings con AllMiniLM-L6-v2 (local via Ollama) y los almacena en PostgreSQL 16 + pgVector (HNSW, 384 dim).
+**BillMind** is a Spring Boot 3.5.0 + Java 21 + LangChain4j 0.36.2 REST API. It ingests utility invoice PDFs, extracts structured fields, splits them into semantic chunks, generates embeddings with AllMiniLM-L6-v2 (local via Ollama) and stores them in PostgreSQL 16 + pgVector (HNSW, 384 dim).
 
-**Estado actual:** módulo `invoice/` funcional. Módulos `comparison/` y `market/` son scaffolding futuro.
+The product lets an anonymous visitor upload an invoice and (a) compare it against an aggregated anonymous invoice corpus and current market data, and (b) chat about it. User accounts are out of scope for Phase 1 — the frontend generates a UUID per session and sends it as `X-Session-Id`. Auth lands in Milestone 7 (Phase 2).
+
+**Current state:** the `invoice/` module is partially functional (PDF ingestion + classification + chunking + vectorization). The `comparison/`, `market/` and future `assistant/` modules are scaffolding. See `docs/PLAN.md` for the full roadmap.
 
 ---
 
-## Arquitectura
+## Architecture
 
 Hexagonal Architecture (Ports & Adapters) + DDD:
 
 ```
-src/main/java/com/demo/billmind/
+src/main/java/dev/izquierdo/billmind/
 ├── _shared/                          # Cross-cutting concerns
-│   ├── application/service/          # PropertyExtractorService
+│   ├── application/                  # CommandBus, PropertyExtractorService
 │   ├── domain/
 │   │   ├── event/                    # DomainEvent, BaseDomainEvent, DomainEventPublisher
 │   │   ├── exceptions/               # ValidationErrorsException
 │   │   └── model/                    # PaginatedResult<T>
 │   └── infrastructure/
-│       ├── GlobalExceptionHandler    # @ControllerAdvice centralizado
+│       ├── GlobalExceptionHandler    # Centralized @ControllerAdvice
 │       ├── dto/                      # ErrorResponseDTO, SuccessResponseDTO
 │       └── event/                    # SpringDomainEventPublisher
 │
-├── invoice/                          # Bounded Context: Gestión de Facturas
+├── invoice/                          # Bounded Context: invoice ingestion & vectorization
 │   ├── domain/
-│   │   ├── model/                    # Invoice, InvoiceChunk, InvoiceReference
-│   │   └── port/                     # InvoiceParser, InvoiceVectorRepository
-│   ├── application/usecase/          # UploadInvoiceUseCase
+│   │   ├── model/                    # Invoice, InvoiceChunk, InvoiceClassification, ...
+│   │   └── port/                     # InvoiceParser, InvoiceClassifier, InvoiceChunkRepository, ...
+│   ├── application/usecase/          # UploadInvoiceUseCase, ...
 │   └── infrastructure/
-│       ├── adapter/                  # PdfInvoiceParser, PgVectorInvoiceRepository
+│       ├── adapter/                  # PdfInvoiceParser, PgVectorInvoiceRepository, classifier/
 │       ├── config/                   # LangChain4jConfig, ApplicationUseCaseConfig
-│       └── controller/               # InvoiceController + dto/InvoiceUploadResponse
+│       └── controller/               # InvoiceController
 │
-├── comparison/                       # Módulo futuro
-└── market/                           # Módulo futuro
+├── assistant/                        # Bounded Context: conversational RAG (Milestone 3)
+├── comparison/                       # Bounded Context: comparison agent (Milestone 5)
+└── market/                           # Bounded Context: market rate ingestion (Milestone 4)
 ```
 
-### Reglas (NUNCA violar)
+### Rules (NEVER violate)
 
 ```
 Infrastructure → Application → Domain
 ```
 
-El paquete `domain/` no puede importar: Spring, JPA, LangChain4j, Lombok, Jackson. Solo `java.*`.
+The `domain/` package must NOT import: Spring, JPA, LangChain4j, Lombok, Jackson. Only `java.*`.
 
 ---
 
-## Convenciones del Código
+## Code Conventions
 
-**Idioma:** código en inglés, comentarios/Javadoc en español, mensajes de error al usuario en español.
+**Language convention** (split — full table in `memory/feedback_language.md`):
 
-**Estilo:**
-- Indentación: 4 espacios — Clases: `PascalCase` — Métodos/variables: `camelCase` — Constantes: `UPPER_SNAKE_CASE`
-- Métodos máximo 20 líneas
-- DTOs como `record` de Java 21
-- Constructor injection obligatoria (nunca `@Autowired` en campos)
+| Artifact | Language |
+|---|---|
+| Source code, identifiers, code comments, Javadoc | English |
+| Commit messages, PR descriptions | English |
+| Project docs (`README.md`, `CLAUDE.md`, `docs/*.md`) | English |
+| LLM **system prompts** (instructions, rules, output format) | English, ending with an explicit "respond in Spanish" instruction |
+| Few-shot examples / invoice source text passed to the LLM as data | Spanish (domain data — never translated) |
+| Assistant chat responses returned to the end user (generated by LLM) | Spanish |
+| Hardcoded API error messages that reach the end user | Spanish |
+| Internal logs, technical exception messages | English |
 
-**Errores:**
-- Excepciones de dominio propias (nunca `RuntimeException` genérica)
-- Logging solo en capa de infraestructura
-- `GlobalExceptionHandler` centraliza todas las respuestas de error
+**Style:**
+- Indentation: 4 spaces — Classes: `PascalCase` — Methods/variables: `camelCase` — Constants: `UPPER_SNAKE_CASE`
+- Methods max 20 lines
+- DTOs as Java 21 `record`
+- Constructor injection only (never `@Autowired` on fields)
 
-**Git Commits:**
+**Errors:**
+- Custom domain exceptions (never raw `RuntimeException`)
+- Logging only in the infrastructure layer
+- `GlobalExceptionHandler` centralizes all error responses
+
+**Git commits:**
 ```
-feat|fix|refactor|test|security|docs(scope): descripción breve
+feat|fix|refactor|test|security|docs(scope): brief description
 ```
-Scopes: `invoice`, `comparison`, `market`, `shared`, `config`, `api`, `architecture`
+Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api`, `architecture`, `eval`, `security`
 
 ---
 
 ## Tests
 
-| Capa | Tipo | Anotaciones |
+| Layer | Type | Annotations |
 |---|---|---|
-| `domain/` | Unit test | Solo `@Test` |
-| `application/usecase/` | Unit test con Mockito | `@ExtendWith(MockitoExtension.class)` |
+| `domain/` | Pure unit test | `@Test` only |
+| `application/usecase/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` |
 | `infrastructure/adapter/` | Integration test | `@SpringBootTest` + TestContainers |
 | `infrastructure/controller/` | Integration test | `@SpringBootTest` + `@AutoConfigureMockMvc` |
 
-- Naming: `should[Estado]When[Condición]()` o `given[Ctx]_when[Acción]_then[Resultado]()`
-- Tests de integración con sufijo `*IT.java`
-- Nunca mockear la clase bajo test
-- Siempre probar happy path + casos nulos + edge cases
+- Naming: `should[State]When[Condition]()` or `given[Ctx]_when[Action]_then[Result]()`
+- Integration tests suffixed `*IT.java`
+- Never mock the class under test
+- Always cover happy path + null cases + edge cases
 
 ---
 
-## Seguridad
+## Security
 
-1. Nunca hardcodear credenciales — siempre `@Value("${propiedad}")`
-2. Validar archivos PDF subidos: MIME type real, tamaño máximo, nombre sanitizado
-3. Nunca concatenar input de usuario en queries SQL — usar JPA/parámetros preparados
-4. Nunca concatenar input de usuario en system prompts de LLM (Prompt Injection)
-5. CORS nunca usar `*` en producción con endpoints autenticados
-6. Logs no deben contener contenido de facturas, tokens JWT ni credenciales
+1. Never hardcode credentials — always `@Value("${property}")`
+2. Validate uploaded PDFs: real MIME type, max size, sanitized filename
+3. Never concatenate user input into SQL queries — use JPA / prepared parameters
+4. Never concatenate user input into LLM system prompts (prompt injection). Use the sandwich pattern: instructions → delimited data → instructions
+5. CORS must never use `*` in production with authenticated endpoints
+6. Logs must not contain invoice content, JWT tokens, or credentials
+7. PII (IBAN, DNI, postal address, full name, phone) must be redacted before persisting `Invoice` and `InvoiceChunk` rows — the aggregated corpus is treated as a public-by-design dataset
 
 ---
 
-## Respuestas de la API
+## API Response Format
 
 ```json
 { "status": "success", "data": { ... } }
-{ "status": "error", "message": "...", "errors": { "campo": "mensaje" } }
+{ "status": "error", "message": "...", "errors": { "field": "message" } }
 ```
+
+User-facing `message` strings are in Spanish.
 
 ---
 
-## Agentes Disponibles (`.agents/`)
+## Available Agents (`.agents/`)
 
-| Agente | Archivo | Cuándo invocarlo |
+| Agent | File | When to invoke |
 |---|---|---|
-| Arquitecto | `architect.md` | Diseñar nuevas funcionalidades o módulos DDD |
-| Desarrollador | `developer.md` | Implementar Use Cases, Adapters, Controllers |
-| Experto de Dominio | `domain-expert.md` | Validar naming, lenguaje ubicuo, reglas de negocio |
-| Tester | `tester.md` | Escribir tests o validar cobertura |
-| Seguridad | `security.md` | Auditar código nuevo, endpoints, manejo de archivos |
+| Architect | `architect.md` | Designing new features or DDD modules |
+| Developer | `developer.md` | Implementing Use Cases, Adapters, Controllers |
+| Domain Expert | `domain-expert.md` | Validating naming, ubiquitous language, business rules |
+| Tester | `tester.md` | Writing tests or validating coverage |
+| Security | `security.md` | Auditing new code, endpoints, file handling |
 
-**Flujo para nuevas features:** Arquitecto → Experto de Dominio → Desarrollador → Tester → Seguridad
+**Flow for new features:** Architect → Domain Expert → Developer → Tester → Security

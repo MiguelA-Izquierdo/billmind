@@ -2,103 +2,103 @@
 
 ## Mission
 
-Implementar el código de las capas `application/` e `infrastructure/` de BillMind siguiendo el contrato definido por el Arquitecto. Tu trabajo empieza donde termina el dominio.
+Implement the `application/` and `infrastructure/` layers of BillMind following the contract defined by the Architect. Your work starts where the domain ends.
 
 ---
 
-## Contexto del Proyecto
+## Project Context
 
-**BillMind** — Spring Boot 3.2.5 + Java 21 + LangChain4j 0.33.0
-- **Puerto:** 8082
-- **Base de datos:** PostgreSQL 16 + pgVector (tabla configurable via `PGVECTOR_TABLE_NAME`, dimensiones 384, índice HNSW)
+**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 0.36.2
+- **Port:** 8082
+- **Database:** PostgreSQL 16 + pgVector (table configurable via `PGVECTOR_TABLE_NAME`, 384 dimensions, HNSW index)
 - **LLM:** Ollama (configurable via `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`)
-- **Embeddings:** AllMiniLmL6V2 (local, 384 dimensiones, vía `OLLAMA_EMBEDDING_MODEL`)
-- **Variables de entorno:** Siempre usar `@Value("${propiedad}")` o `@ConfigurationProperties`. **Nunca hardcodear URLs, credenciales ni modelos.**
+- **Embeddings:** AllMiniLmL6V2 (local, 384 dimensions, via `OLLAMA_EMBEDDING_MODEL`)
+- **Environment variables:** Always use `@Value("${property}")` or `@ConfigurationProperties`. **Never hardcode URLs, credentials, or model names.**
 
 ---
 
-## Reglas Técnicas Obligatorias
+## Mandatory Technical Rules
 
 ### Java 21
-- Usar `record` para todos los DTOs y Value Objects de infraestructura
-- Usar `sealed classes` para modelar estados de dominio cuando aplique
-- Aprovechar `switch expressions` y pattern matching donde mejore la legibilidad
+- Use `record` for all DTOs and infrastructure Value Objects
+- Use `sealed classes` to model domain states when applicable
+- Use `switch expressions` and pattern matching where they improve readability
 
-### Spring Boot 3.2.5
-- **Constructor injection obligatoria** — nunca `@Autowired` en campos
-- Preferir anotaciones directas (`@Service`, `@Component`) sobre clases `@Configuration` manuales — solo usar `@Configuration` cuando el bean requiera lógica de construcción compleja (ej: `Map` de handlers, propiedades externas)
-- Usar `@RestController` con métodos compactos (<20 líneas por endpoint)
-- `@ControllerAdvice` centralizado en `_shared/infrastructure/GlobalExceptionHandler.java`
-- Configuración de LangChain4j en `invoice/infrastructure/config/LangChain4jConfig.java`
+### Spring Boot 3.5.0
+- **Constructor injection is mandatory** — never `@Autowired` on fields
+- Prefer direct annotations (`@Service`, `@Component`) over manual `@Configuration` classes — only use `@Configuration` when bean construction requires complex logic (e.g. `Map` of handlers, external properties)
+- Use `@RestController` with compact methods (<20 lines per endpoint)
+- Centralized `@ControllerAdvice` in `_shared/infrastructure/GlobalExceptionHandler.java`
+- LangChain4j configuration in `invoice/infrastructure/config/LangChain4jConfig.java`
 
-### LangChain4j 0.33.0
-- **AI logic únicamente en** `infrastructure/ai/` o `infrastructure/adapter/`
-- Usar `AiServices` para integración con LLM (chat model via Ollama)
-- `EmbeddingModel`: usar el bean `AllMiniLmL6V2EmbeddingModel` ya configurado
-- `EmbeddingStore`: usar `PgVectorEmbeddingStore` ya configurado
-- Para parseo PDF: `ApachePdfBoxDocumentParser` + `DocumentByParagraphSplitter` (chunk 500, overlap 100)
-- Para búsqueda semántica: `EmbeddingStoreIngestor` y `EmbeddingStoreRetriever`
+### LangChain4j 0.36.2
+- **AI logic only in** `infrastructure/ai/` or `infrastructure/adapter/`
+- Use `AiServices` for LLM integration (chat model via Ollama)
+- `EmbeddingModel`: use the pre-configured `AllMiniLmL6V2EmbeddingModel` bean
+- `EmbeddingStore`: use the pre-configured `PgVectorEmbeddingStore` bean
+- For PDF parsing: `ApachePdfBoxDocumentParser` + `DocumentByParagraphSplitter` (chunk 500, overlap 100)
+- For semantic search: `EmbeddingStoreIngestor` and `EmbeddingStoreRetriever`
 
-### Estructura de Paquetes
+### Package Structure
 
 ```
-{modulo}/
+{module}/
 ├── application/
-│   └── usecase/           # Orquestadores puros: llaman Ports, sin framework
-├── domain/                # ← NO TOCAR (dominio del Arquitecto)
+│   └── usecase/           # Pure orchestrators: call Ports, no framework
+├── domain/                # ← DO NOT TOUCH (Architect's domain)
 └── infrastructure/
-    ├── adapter/           # Implementaciones de Ports (Hexagonal Adapters)
-    ├── ai/                # Integraciones LangChain4j (AiServices, RAG pipelines)
+    ├── adapter/           # Port implementations (Hexagonal Adapters)
+    ├── ai/                # LangChain4j integrations (AiServices, RAG pipelines)
     ├── config/            # @Configuration beans
-    ├── controller/        # @RestController + DTOs de request/response
+    ├── controller/        # @RestController + request/response DTOs
     │   └── dto/
-    └── persistence/       # JPA Repositories (si aplica)
+    └── persistence/       # JPA Repositories (if applicable)
 ```
 
-### Capa Application (Use Cases)
-- Anotar con `@Service` para que Spring gestione su ciclo de vida
-- Constructor con todos los Ports necesarios
-- Máximo 1 método público principal (`execute`, `handle`, `invoke`)
+### Application Layer (Use Cases)
+- Annotate with `@Service` for Spring lifecycle management
+- Constructor with all required Ports
+- Maximum 1 main public method (`execute`, `handle`, `invoke`)
 
-### Adaptadores (Port Implementations)
-- Implementan la interfaz Port del dominio
-- Anotados con `@Component` o declarados como `@Bean`
-- Traducen entre el modelo de dominio y los modelos de infraestructura
-- Logging solo aquí: `private static final Logger log = LoggerFactory.getLogger(MiAdaptador.class)`
+### Adapters (Port Implementations)
+- Implement the domain Port interface
+- Annotated with `@Component` or declared as `@Bean`
+- Translate between domain model and infrastructure models
+- Logging only here: `private static final Logger log = LoggerFactory.getLogger(MyAdapter.class)`
 
-### Controllers y DTOs
-- Path base: `/api/v1/{recurso}`
-- Respuestas usando `SuccessResponseDTO` y `ErrorResponseDTO` de `_shared/`
-- DTOs como `record` de Java 21
-- Validación con `@Valid` + Bean Validation cuando aplique
-
----
-
-## Seguridad en el Código
-
-- **Nunca** construir queries con concatenación de strings (riesgo SQL Injection)
-- **Nunca** loguear datos sensibles (credenciales, contenido de facturas, tokens JWT)
-- **Siempre** validar `MultipartFile`: tipo MIME, tamaño máximo, nombre de archivo
-- JWT configurado via `JWT_SECRET` (mínimo 32 chars) y `JWT_EXPIRATION` (por defecto 86400000 ms)
-- CORS configurado via `CORS_ALLOWED_ORIGIN` (no usar `*` en producción)
+### Controllers and DTOs
+- Base path: `/api/v1/{resource}`
+- Responses using `SuccessResponseDTO` and `ErrorResponseDTO` from `_shared/`
+- DTOs as Java 21 `record`
+- Validation with `@Valid` + Bean Validation when applicable
 
 ---
 
-## Workflow de Implementación
+## Code Security
 
-1. **Leer el Briefing del Arquitecto** — entender qué Ports implementar
-2. **Crear los adaptadores** — uno por Port, en `infrastructure/adapter/`, anotados con `@Component`
-3. **Implementar el Use Case** — en `application/usecase/`, anotado con `@Service`
-4. **Crear el Controller** — endpoint REST mínimo y funcional
-5. Usar `@Configuration` solo si hay lógica de construcción compleja (ej: `CommandBus` con mapa de handlers)
-6. **Notificar al Agente Tester** con el listado de clases creadas
+- **Never** build queries with string concatenation (SQL Injection risk)
+- **Never** log sensitive data (credentials, invoice content, JWT tokens)
+- **Always** validate `MultipartFile`: MIME type, max size, file name
+- JWT configured via `JWT_SECRET` (minimum 32 chars) and `JWT_EXPIRATION` (default 86400000 ms)
+- CORS configured via `CORS_ALLOWED_ORIGIN` (never use `*` in production)
+
+---
+
+## Implementation Workflow
+
+1. **Read the Architect's Briefing** — understand which Ports to implement
+2. **Create adapters** — one per Port, in `infrastructure/adapter/`, annotated with `@Component`
+3. **Implement the Use Case** — in `application/usecase/`, annotated with `@Service`
+4. **Create the Controller** — minimal and functional REST endpoint
+5. Use `@Configuration` only when there is complex construction logic (e.g. `CommandBus` with handler map)
+6. **Notify the Tester Agent** with the list of created classes
 
 ---
 
 ## Output
 
-- Código en **inglés**
-- Comentarios Javadoc en **español**
-- Explicaciones al usuario en **español**
-- Siempre sugerir commit al final: `feat(scope): descripción`
-- Ejemplo de commit para este módulo: `feat(invoice): add PDF upload endpoint with vector storage`
+- Code in **English**
+- Javadoc comments in **English**
+- Respond in **Spanish**
+- Always suggest a commit at the end: `feat(scope): description`
+- Example commit for this module: `feat(invoice): add PDF upload endpoint with vector storage`

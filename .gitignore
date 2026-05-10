@@ -98,3 +98,8 @@ jacoco.exec
 *.gguf
 *.bin
 models/
+
+# =====================
+# Claude Code tooling
+# =====================
+memory/
