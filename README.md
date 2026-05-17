@@ -2,7 +2,7 @@
 
 > **Are you overpaying on your utility bills?** BillMind ingests your invoices, understands them semantically, and will soon tell you exactly how much you're being overcharged — and who offers a better deal.
 
-An AI-powered REST API for utility invoice intelligence: PDF ingestion, hybrid AI classification, semantic vectorization, and (coming soon) price comparison against real market data.
+An AI-powered REST API for utility invoice intelligence: PDF ingestion, hybrid AI classification, LLM-powered structured extraction, and (coming soon) price comparison against real market data.
 
 Built with **Spring Boot 3.5.0**, **Java 21**, and **LangChain4j 0.36.2**. Supports both **fully local AI** (Ollama, zero cloud dependencies) and **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env variable — your choice.
 
@@ -21,7 +21,8 @@ PDF invoice
                   and provider company; rejects non-supply documents
     │
     ▼
-3. VECTORIZE    — splits into semantic chunks → 384-dim embeddings → PostgreSQL + pgVector (HNSW)
+3. EXTRACT      — LangChain4j AiServices extracts structured fields (price/kWh, contracted power,
+                  billing period, totals); PII redacted before persisting
     │
     ▼
 4. COMPARE  *   — cross-references your rates against current market data; LLM evaluates overpayment
@@ -84,11 +85,11 @@ Infrastructure → Application → Domain
 |---|---|
 | Java | 21 |
 | Spring Boot | 3.5.0 |
-| LangChain4j | 0.36.2 |
+| LangChain4j | 1.0.0 (BOM) |
 | Ollama (local LLM + embeddings) | — |
 | AllMiniLM-L6-v2 (embeddings, 384 dim) | via LangChain4j |
 | PostgreSQL | 16 |
-| pgVector extension (HNSW index) | — |
+| pgVector extension (IVFFlat index) | — |
 | Apache PDFBox | via LangChain4j |
 | JUnit 5 + Mockito | via Spring Boot |
 | TestContainers | 1.21.0 |
@@ -101,27 +102,47 @@ Infrastructure → Application → Domain
 ```
 src/main/java/dev/izquierdo/billmind/
 ├── _shared/                    # Cross-cutting concerns
-│   ├── application/            # CommandBus, PropertyExtractorService
+│   ├── application/            # CommandBus, QueryBus
 │   ├── domain/                 # DomainEvent, DomainEventPublisher, exceptions
-│   └── infrastructure/         # GlobalExceptionHandler, response DTOs
-│
-├── invoice/                    # Bounded Context: ingestion & vectorization  [Active]
-│   ├── domain/
-│   │   ├── model/              # Invoice, InvoiceChunk, InvoiceClassification, InvoiceType
-│   │   └── port/               # InvoiceParser, InvoiceClassifier, InvoiceChunkRepository
-│   ├── application/
-│   │   ├── usecase/            # UploadInvoiceUseCase
-│   │   └── command/            # UploadInvoiceCommand, UploadInvoiceCommandHandler
 │   └── infrastructure/
-│       ├── adapter/            # PdfInvoiceParser, PgVectorInvoiceRepository
-│       │   └── classifier/     # HybridInvoiceClassifier, KeywordClassifier, LlmClassifier
-│       ├── config/             # LangChain4jConfig, per-provider chat model beans
-│       └── controller/         # InvoiceController
+│       ├── dto/                # ErrorResponseDTO, SuccessResponseDTO
+│       ├── llm/                # TimedChatLanguageModel, ModelPricingRegistry
+│       ├── session/            # SessionContext, SessionFilter, SessionService
+│       └── GlobalExceptionHandler
 │
-├── assistant/                  # Bounded Context: conversational RAG        [Roadmap]
-├── comparison/                 # Bounded Context: price comparison agent     [Roadmap]
-└── market/                     # Bounded Context: market rate ingestion      [Roadmap]
+├── invoice/                    # Bounded Context: ingestion, extraction & persistence  [Active]
+│   ├── domain/
+│   │   ├── model/              # Invoice, InvoiceClassification, InvoiceType, InvoiceFields, ...
+│   │   └── port/               # InvoiceParser, InvoiceClassifier, InvoiceFieldExtractor,
+│   │                           # InvoiceRepository, PiiRedactor
+│   ├── application/
+│   │   ├── usecase/            # UploadInvoiceUseCase, GetInvoiceUseCase, GetSessionInvoicesUseCase
+│   │   ├── command/            # UploadInvoiceCommand, UploadInvoiceCommandHandler
+│   │   └── query/              # GetInvoiceQuery, GetSessionInvoicesQuery, handlers
+│   └── infrastructure/
+│       ├── adapter/
+│       │   ├── classifier/     # HybridInvoiceClassifier, KeywordClassifier, LlmInvoiceClassifier
+│       │   ├── fieldextractor/ # LlmInvoiceFieldExtractor, ExtractionPromptBuilder
+│       │   └── pii/            # HybridPiiRedactor, PiiPatterns
+│       ├── config/             # LangChain4jConfig, ChatModelRolesConfig, per-provider beans
+│       ├── controller/         # InvoiceController
+│       └── persistence/        # InvoiceEntity, JpaInvoiceRepository
+│
+├── assistant/                  # Bounded Context: conversational RAG        [Roadmap M3]
+├── comparison/                 # Bounded Context: price comparison agent     [Roadmap M5]
+└── market/                     # Bounded Context: market rate ingestion      [Roadmap M4]
 ```
+
+---
+
+## Observability
+
+Logs and in-process metrics are the current observability story for Phase 1 (single-instance deployment).
+
+- **Logs** — infrastructure layer only; no invoice content, no PII, no credentials ever logged. `[PII]` prefix on all redaction-related lines for easy filtering.
+- **LLM observability** — every LLM call is logged with operation, provider, model, latency and token counts (where the provider supports it). Micrometer replaces log-based metrics at Milestone 6.
+
+Full reference (log levels, key log lines, validation thresholds, Micrometer roadmap) → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
 ---
 
@@ -147,4 +168,5 @@ cp .env.example .env
 - Full configuration reference → [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - API reference → [`docs/API.md`](docs/API.md)
 - Test guide → [`docs/TESTING.md`](docs/TESTING.md)
+- Observability → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)
 - Roadmap → [`docs/PLAN.md`](docs/PLAN.md)

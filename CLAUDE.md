@@ -6,11 +6,11 @@
 
 ## Project Description
 
-**BillMind** is a Spring Boot 3.5.0 + Java 21 + LangChain4j 0.36.2 REST API. It ingests utility invoice PDFs, extracts structured fields, splits them into semantic chunks, generates embeddings with AllMiniLM-L6-v2 (local via Ollama) and stores them in PostgreSQL 16 + pgVector (HNSW, 384 dim).
+**BillMind** is a Spring Boot 3.5.0 + Java 21 + LangChain4j 1.0.0 REST API. It ingests utility invoice PDFs, extracts structured fields, and stores them in PostgreSQL 16. A regulatory knowledge base (CNMC, REE, BOE documents) is stored in pgVector (IVFFlat, 384 dim — HNSW not yet in `langchain4j-pgvector:1.0.0-beta5`) with AllMiniLM-L6-v2 embeddings (local ONNX) and used for RAG in the chat assistant.
 
-The product lets an anonymous visitor upload an invoice and (a) compare it against an aggregated anonymous invoice corpus and current market data, and (b) chat about it. User accounts are out of scope for Phase 1 — the frontend generates a UUID per session and sends it as `X-Session-Id`. Auth lands in Milestone 7 (Phase 2).
+The product lets an anonymous visitor upload an invoice and (a) compare it against current market data and (b) chat about it. The chat uses dual context: the user's full invoice text passed directly to the LLM + semantic retrieval from the regulatory knowledge base. User accounts are out of scope for Phase 1 — the frontend generates a UUID per session and sends it as `X-Session-Id`. Auth lands in Milestone 7 (Phase 2).
 
-**Current state:** the `invoice/` module is partially functional (PDF ingestion + classification + chunking + vectorization). The `comparison/`, `market/` and future `assistant/` modules are scaffolding. See `docs/PLAN.md` for the full roadmap.
+**Current state:** Milestones 0 and 1 are complete. The `invoice/` module handles the full pipeline: PDF ingestion, hybrid classification, LLM-powered structured field extraction (electricity, gas, water, telecom), PII redaction, and persistence. Session infrastructure (`sessions` table, `X-Session-Id` filter) and `GET /invoices` endpoints are in place. The `comparison/`, `market/` and `assistant/` modules are scaffolding. Next: Milestone 2 (regulatory knowledge base + hybrid retrieval). See `docs/PLAN.md` for the full roadmap.
 
 ---
 
@@ -21,25 +21,44 @@ Hexagonal Architecture (Ports & Adapters) + DDD:
 ```
 src/main/java/dev/izquierdo/billmind/
 ├── _shared/                          # Cross-cutting concerns
-│   ├── application/                  # CommandBus, PropertyExtractorService
+│   ├── application/
+│   │   ├── command/                  # Command, CommandBus, CommandHandler
+│   │   └── query/                    # Query, QueryBus, QueryHandler
 │   ├── domain/
 │   │   ├── event/                    # DomainEvent, BaseDomainEvent, DomainEventPublisher
 │   │   ├── exceptions/               # ValidationErrorsException
 │   │   └── model/                    # PaginatedResult<T>
 │   └── infrastructure/
 │       ├── GlobalExceptionHandler    # Centralized @ControllerAdvice
+│       ├── command/                  # SimpleCommandBus
 │       ├── dto/                      # ErrorResponseDTO, SuccessResponseDTO
-│       └── event/                    # SpringDomainEventPublisher
+│       ├── event/                    # SpringDomainEventPublisher
+│       ├── health/                   # StartupReadinessChecker, OllamaHealthIndicator
+│       ├── llm/                      # TimedChatLanguageModel (implements ChatModel), ModelPricingRegistry, LlmResponseJsonSanitizer
+│       ├── persistence/              # SessionEntity, SessionJpaRepository
+│       ├── query/                    # SimpleQueryBus
+│       └── session/                  # SessionContext, SessionFilter, SessionService
 │
-├── invoice/                          # Bounded Context: invoice ingestion & vectorization
+├── invoice/                          # Bounded Context: invoice ingestion & structured extraction
 │   ├── domain/
-│   │   ├── model/                    # Invoice, InvoiceChunk, InvoiceClassification, ...
-│   │   └── port/                     # InvoiceParser, InvoiceClassifier, InvoiceChunkRepository, ...
-│   ├── application/usecase/          # UploadInvoiceUseCase, ...
+│   │   ├── model/                    # Invoice, InvoiceClassification, InvoiceType, InvoiceFields, ...
+│   │   ├── port/                     # InvoiceParser, InvoiceClassifier, InvoiceFieldExtractor,
+│   │   │                             # InvoiceRepository, PiiRedactor
+│   │   └── exceptions/               # InvoiceNotFoundException, NotASupplyInvoiceException, ...
+│   ├── application/
+│   │   ├── command/                  # UploadInvoiceCommand, UploadInvoiceCommandHandler
+│   │   ├── query/                    # GetInvoiceQuery, GetSessionInvoicesQuery, handlers
+│   │   └── usecase/                  # UploadInvoiceUseCase, GetInvoiceUseCase, GetSessionInvoicesUseCase
 │   └── infrastructure/
-│       ├── adapter/                  # PdfInvoiceParser, PgVectorInvoiceRepository, classifier/
-│       ├── config/                   # LangChain4jConfig, ApplicationUseCaseConfig
-│       └── controller/               # InvoiceController
+│       ├── adapter/
+│       │   ├── classifier/           # HybridInvoiceClassifier, KeywordClassifier, LlmInvoiceClassifier
+│       │   ├── fieldextractor/       # LlmInvoiceFieldExtractor, ExtractionPromptBuilder
+│       │   ├── pii/                  # HybridPiiRedactor, PiiPatterns
+│       │   └── PdfInvoiceParser      # PDF bytes → plain text (implements InvoiceParser port)
+│       ├── config/                   # chat/ (ChatModelRolesConfig, per-provider beans)
+│       ├── controller/               # InvoiceController
+│       │   └── dto/                  # InvoiceResponse, InvoiceUploadResponse
+│       └── persistence/              # InvoiceEntity, JpaInvoiceRepository
 │
 ├── assistant/                        # Bounded Context: conversational RAG (Milestone 3)
 ├── comparison/                       # Bounded Context: comparison agent (Milestone 5)
@@ -90,6 +109,35 @@ Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api
 
 ---
 
+## LangChain4j 1.x Conventions
+
+**Version management:** All LangChain4j modules are managed via `langchain4j-bom:1.0.0` in `<dependencyManagement>`. Do not add explicit versions to individual `dev.langchain4j` dependencies — the BOM resolves them (integrations like starters and pgvector ship as `1.0.0-beta5`; core modules like `langchain4j-open-ai` are at `1.0.0` final).
+
+**HTTP client:** `langchain4j-open-ai:1.0.0` brings in `langchain4j-http-client-jdk` as a transitive dep. This conflicts with the `SpringRestClientBuilderFactory` from the Spring Boot starter. The JDK client is excluded from `langchain4j-open-ai` in `pom.xml`. Never re-add it.
+
+**Core interface: `ChatModel`** (package `dev.langchain4j.model.chat`):
+- `ChatLanguageModel` was the 0.x name — it no longer exists in 1.x.
+- Implement `doChat(ChatRequest request)` to create a custom model (e.g. `TimedChatLanguageModel`).
+- Call `model.chat(String prompt)` → returns `String` directly (convenience method).
+- Call `model.chat(List<ChatMessage>)` → returns `ChatResponse`.
+- `ChatRequest` lives in `dev.langchain4j.model.chat.request`, `ChatResponse` in `dev.langchain4j.model.chat.response`.
+- `TokenUsage` is still in `dev.langchain4j.model.output.TokenUsage`; access via `chatResponse.tokenUsage()`.
+- `generate()` is removed — always use `chat()`.
+
+**Role beans pattern** (`ChatModelRolesConfig`):
+- `fastChatModel` — low-latency tasks (classification, PII).
+- `smartChatModel` — quality-sensitive tasks (field extraction, RAG).
+- Both are `TimedChatLanguageModel` wrappers injected with `@Qualifier`.
+- The underlying provider bean is named `chatLanguageModel` — keep that name so Spring resolves it by parameter name when multiple `ChatModel` beans exist in context.
+
+**`TimedChatLanguageModel` wrapping pattern:** When wrapping a `ChatModel` for instrumentation, override `chat(ChatRequest)` (not `doChat(ChatRequest)`, not `chat(List<ChatMessage>)`) and call `delegate.chat(request)`. The call chain from callers is: `chat(String)` → default `ChatModel.chat(ChatRequest)` → our override → `delegate.chat(request)`. Provider models override `chat(ChatRequest)` internally to convert `DefaultChatRequestParameters` → provider-specific params (e.g. `OpenAiChatRequestParameters`) before calling `doChat()`. Bypassing that step by calling `delegate.doChat(request)` directly causes a `ClassCastException`. `chat(List<ChatMessage>)` is NOT reached from `chat(String)` — overriding it is dead code. `doChat()` must still be implemented as a passthrough since the interface declares it abstract.
+
+**`PgVectorEmbeddingStore` (IVFFlat):** `langchain4j-pgvector:1.0.0-beta5` requires both `.useIndex(boolean)` **and** `.indexListSize(int)` — omitting `indexListSize` throws `indexListSize must be greater than zero, but is: null` at startup even when `useIndex=false`. Always supply both. Default `indexListSize=100` (IVFFlat `lists` parameter; tune to `sqrt(row_count)` in production). Configured via `pgvector.use-index` and `pgvector.index-list-size` properties.
+
+**Testing mocks:** Mock `ChatModel` with Mockito. Stub `delegate.doChat(any(ChatRequest.class))`. Build responses with `ChatResponse.builder().aiMessage(AiMessage.from("...")).build()`. `ChatRequest` requires at least one message — use `ChatRequest.builder().messages(UserMessage.from("test")).build()`.
+
+---
+
 ## Tests
 
 | Layer | Type | Annotations |
@@ -114,16 +162,18 @@ Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api
 4. Never concatenate user input into LLM system prompts (prompt injection). Use the sandwich pattern: instructions → delimited data → instructions
 5. CORS must never use `*` in production with authenticated endpoints
 6. Logs must not contain invoice content, JWT tokens, or credentials
-7. PII (IBAN, DNI, postal address, full name, phone) must be redacted before persisting `Invoice` and `InvoiceChunk` rows — the aggregated corpus is treated as a public-by-design dataset
+7. PII (IBAN, DNI, postal address, full name, phone) must be redacted before persisting `Invoice` rows — the aggregated corpus is treated as a public-by-design dataset
 
 ---
 
 ## API Response Format
 
 ```json
-{ "status": "success", "data": { ... } }
-{ "status": "error", "message": "...", "errors": { "field": "message" } }
+{ "success": true,  "status": 200, "message": "...", "data": { ... } }
+{ "success": false, "status": 400, "message": "...", "errors": { "field": { "code": "message" } } }
 ```
+
+`data` is omitted when `null`. `errors` is omitted when there are no field-level details.
 
 User-facing `message` strings are in Spanish.
 

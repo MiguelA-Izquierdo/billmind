@@ -9,14 +9,14 @@ Design BillMind's architecture following **Domain-Driven Design (DDD)** and **He
 ## Project Context
 
 **BillMind** is a Spring Boot 3.5.0 + Java 21 application that:
-- Ingests PDF invoices
-- Splits them into chunks and generates embeddings via LangChain4j (AllMiniLM-L6-v2, 384 dimensions)
-- Stores in PostgreSQL with pgVector (HNSW index)
+- Ingests PDF invoices: parsing, hybrid classification (keyword + LLM), structured field extraction, PII redaction
+- Persists invoices in PostgreSQL 16
+- Hosts a regulatory knowledge base (CNMC, REE, BOE) in pgVector (HNSW, 384 dim, AllMiniLM-L6-v2) for RAG
 - Exposes a REST API on port 8082
-- Future modules: `comparison/` and `market/`
+- Scaffolded modules: `assistant/`, `comparison/`, `market/`
 
 **Project stack:**
-- `langchain4j 0.36.2` (core, ollama, pgvector, pdfbox, allminilm)
+- `langchain4j 1.0.0` (BOM-managed; core/openai at 1.0.0 final, integrations at 1.0.0-beta5)
 - `spring-boot 3.5.0`, `spring-data-jpa`, `spring-web`
 - `postgresql`, `testcontainers 1.21.0`, `lombok`, `jacoco`
 
@@ -85,7 +85,7 @@ Before delivering any design, verify:
 - [ ] Are business rules in the domain? → **OK**
 - [ ] Are Value Objects immutable? → **OK**
 - [ ] Is every Port in `domain/port/`? → **OK**
-- [ ] Do future modules `comparison/` and `market/` have their `package-info.java`? → **OK**
+- [ ] Do scaffolded modules `assistant/`, `comparison/`, `market/` have their `package-info.java`? → **OK**
 
 ---
 
@@ -94,10 +94,17 @@ Before delivering any design, verify:
 | Technical Term | Business Meaning |
 |---|---|
 | `Invoice` | PDF invoice uploaded to the system |
-| `InvoiceChunk` | Semantic fragment of an invoice |
-| `InvoiceReference` | Source metadata (page, section) |
-| `InvoiceParser` | Document parsing port |
-| `InvoiceVectorRepository` | Vector storage port |
+| `InvoiceClassification` | Result of classifying an invoice: type + issuing company |
+| `InvoiceType` | Enum: `LUZ`, `GAS`, `AGUA`, `TELCO`, `OTRO` |
+| `InvoiceFields` | Structured fields extracted from the invoice (sealed hierarchy per type) |
+| `InvoiceParser` | Port: PDF bytes → plain text |
+| `InvoiceClassifier` | Port: plain text → `InvoiceClassification` |
+| `InvoiceFieldExtractor` | Port: redacted text + type → `InvoiceFields` |
+| `InvoiceRepository` | Port: invoice persistence |
+| `PiiRedactor` | Port: removes personal data from extracted text |
+| `KnowledgeDocument` | Regulatory PDF stored in the knowledge base (CNMC, REE, BOE) |
+| `KnowledgeChunk` | Fragment of a `KnowledgeDocument` stored as a vector embedding (384 dim, AllMiniLM-L6-v2) |
+| `KnowledgeSearchRepository` | Port: semantic similarity search in the knowledge base → `List<KnowledgeChunk>` |
 
 ---
 

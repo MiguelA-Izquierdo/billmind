@@ -1,7 +1,10 @@
 package dev.izquierdo.billmind.invoice.domain.model;
 
+import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,7 +15,7 @@ class InvoiceTest {
     @Test
     void shouldCreateInvoiceSuccessfully() {
         UUID id = UUID.randomUUID();
-        Invoice invoice = new Invoice(id, "factura_enero.pdf");
+        Invoice invoice = Invoice.builder(id, "factura_enero.pdf").build();
 
         assertThat(invoice.getId()).isEqualTo(id);
         assertThat(invoice.getFileName()).isEqualTo("factura_enero.pdf");
@@ -20,15 +23,98 @@ class InvoiceTest {
 
     @Test
     void shouldThrowWhenIdIsNull() {
-        assertThatThrownBy(() -> new Invoice(null, "factura_enero.pdf"))
+        assertThatThrownBy(() -> Invoice.builder(null, "factura_enero.pdf").build())
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("Invoice ID cannot be null");
     }
 
     @Test
     void shouldThrowWhenFileNameIsNull() {
-        assertThatThrownBy(() -> new Invoice(UUID.randomUUID(), null))
+        assertThatThrownBy(() -> Invoice.builder(UUID.randomUUID(), null).build())
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("File name cannot be null");
+    }
+
+    @Test
+    void shouldThrowWhenFileNameIsBlank() {
+        assertThatThrownBy(() -> Invoice.builder(UUID.randomUUID(), "   ").build())
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldSetUploadedAtOnCreation() {
+        Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf").build();
+        assertThat(invoice.getUploadedAt()).isNotNull();
+    }
+
+    @Test
+    void shouldEnrichWithClassification() {
+        Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf").build();
+        InvoiceClassification classification = new InvoiceClassification(InvoiceType.LUZ, "IBERDROLA");
+
+        Invoice enriched = invoice.withClassification(classification);
+
+        assertThat(enriched.getSupplyType()).isEqualTo(InvoiceType.LUZ);
+        assertThat(enriched.getProvider()).isEqualTo("IBERDROLA");
+    }
+
+    @Test
+    void shouldBeImmutableWhenEnriched() {
+        Invoice original = Invoice.builder(UUID.randomUUID(), "factura.pdf").build();
+
+        original.withClassification(new InvoiceClassification(InvoiceType.GAS, "NATURGY"));
+
+        assertThat(original.getSupplyType()).isNull();
+        assertThat(original.getProvider()).isNull();
+    }
+
+    @Test
+    void shouldPreserveIdAndFileNameAfterClassification() {
+        UUID id = UUID.randomUUID();
+        Invoice invoice = Invoice.builder(id, "factura_luz.pdf").build();
+
+        Invoice enriched = invoice.withClassification(new InvoiceClassification(InvoiceType.LUZ, "ENDESA"));
+
+        assertThat(enriched.getId()).isEqualTo(id);
+        assertThat(enriched.getFileName()).isEqualTo("factura_luz.pdf");
+    }
+
+    @Test
+    void shouldEnrichWithSessionId() {
+        UUID sessionId = UUID.randomUUID();
+        Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf").build();
+
+        Invoice withSession = invoice.withSessionId(sessionId);
+
+        assertThat(withSession.getSessionId()).isEqualTo(sessionId);
+        assertThat(invoice.getSessionId()).isNull();
+    }
+
+    @Test
+    void shouldEnrichWithExtractedData() {
+        Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf")
+                .supplyType(InvoiceType.LUZ)
+                .build();
+        ElectricityFields fields = new ElectricityFields(
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31),
+                new BigDecimal("45.50"), new BigDecimal("405"), new BigDecimal("0.14"), new BigDecimal("3.3"));
+
+        Invoice enriched = invoice.withExtractedData(fields, "texto redactado");
+
+        assertThat(enriched.getFields()).isEqualTo(fields);
+        assertThat(enriched.getRawTextRedacted()).isEqualTo("texto redactado");
+    }
+
+    @Test
+    void shouldBeImmutableWhenEnrichedWithExtractedData() {
+        Invoice original = Invoice.builder(UUID.randomUUID(), "factura.pdf").build();
+        ElectricityFields fields = new ElectricityFields(
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31),
+                new BigDecimal("45.50"), null, null, null);
+
+        original.withExtractedData(fields, "texto");
+
+        assertThat(original.getFields()).isNull();
+        assertThat(original.getRawTextRedacted()).isNull();
     }
 }

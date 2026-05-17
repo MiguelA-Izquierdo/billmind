@@ -1,4 +1,4 @@
-package dev.izquierdo.billmind.invoice.infrastructure.config;
+package dev.izquierdo.billmind._shared.infrastructure.config;
 
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -11,9 +11,6 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class LangChain4jConfig {
-
-    private static final String VECTOR_TABLE = "vector_store";
-    private static final int VECTOR_DIMENSIONS = 384;
 
     @Value("${spring.datasource.host}")
     private String dbHost;
@@ -30,6 +27,20 @@ public class LangChain4jConfig {
     @Value("${spring.datasource.password}")
     private String password;
 
+    @Value("${pgvector.table-name}")
+    private String vectorTable;
+
+    @Value("${pgvector.dimensions}")
+    private int vectorDimensions;
+
+    // langchain4j-pgvector:1.0.0-beta5 only supports IVFFlat via useIndex(boolean).
+    // HNSW is not available in this release; set to false to skip index creation entirely.
+    @Value("${pgvector.use-index:true}")
+    private boolean useIndex;
+
+    @Value("${pgvector.index-list-size:100}")
+    private int indexListSize;
+
     @Bean
     public EmbeddingModel embeddingModel() {
         return new AllMiniLmL6V2EmbeddingModel();
@@ -43,8 +54,10 @@ public class LangChain4jConfig {
                 .database(dbName)
                 .user(username)
                 .password(password)
-                .table(VECTOR_TABLE)
-                .dimension(VECTOR_DIMENSIONS)
+                .table(vectorTable)
+                .dimension(vectorDimensions)
+                .useIndex(useIndex)
+                .indexListSize(indexListSize)
                 .build();
     }
 }

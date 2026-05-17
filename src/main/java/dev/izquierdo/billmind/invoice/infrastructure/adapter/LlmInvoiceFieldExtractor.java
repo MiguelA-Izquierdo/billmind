@@ -1,0 +1,255 @@
+package dev.izquierdo.billmind.invoice.infrastructure.adapter;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitizer;
+import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
+import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
+import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
+import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind.invoice.domain.model.fields.GasFields;
+import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
+import dev.izquierdo.billmind.invoice.domain.model.fields.TelecomFields;
+import dev.izquierdo.billmind.invoice.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
+import dev.izquierdo.billmind.invoice.infrastructure.adapter.fieldextractor.ExtractionPromptBuilder;
+import dev.izquierdo.billmind.invoice.infrastructure.adapter.fieldextractor.InvoiceFieldsValidator;
+import dev.langchain4j.model.chat.ChatModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+
+@Component
+public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
+
+    private static final Logger log = LoggerFactory.getLogger(LlmInvoiceFieldExtractor.class);
+
+    // Instruction blocks only — invoice text is injected separately by ExtractionPromptBuilder.
+
+    private static final String ELECTRICITY_INSTRUCTIONS =
+            "Extract fields from the electricity invoice delimited below.\n" +
+            "Output ONLY valid JSON matching this schema (no prose, no markdown fences):\n" +
+            "{\"billingPeriodStart\":\"YYYY-MM-DD\",\"billingPeriodEnd\":\"YYYY-MM-DD\"," +
+            "\"totalAmount\":0.00,\"consumptionKwh\":0.0,\"pricePerKwh\":0.000,\"contractedPowerKw\":0.0}\n" +
+            "ISO-8601 dates. Dot decimal separator. Null for any missing field.\n\n" +
+            "Input: IBERDROLA Periodo 01/01/2024 al 31/01/2024 320 kWh 0,1823 €/kWh 3,3 kW Total 67,20 €\n" +
+            "Output: {\"billingPeriodStart\":\"2024-01-01\",\"billingPeriodEnd\":\"2024-01-31\"," +
+            "\"totalAmount\":67.20,\"consumptionKwh\":320.0,\"pricePerKwh\":0.1823,\"contractedPowerKw\":3.3}";
+
+    private static final String GAS_INSTRUCTIONS =
+            "Extract fields from the gas invoice delimited below.\n" +
+            "Output ONLY valid JSON matching this schema (no prose, no markdown fences):\n" +
+            "{\"billingPeriodStart\":\"YYYY-MM-DD\",\"billingPeriodEnd\":\"YYYY-MM-DD\"," +
+            "\"totalAmount\":0.00,\"consumptionM3\":0.0,\"consumptionKwh\":0.0,\"pricePerKwh\":0.000}\n" +
+            "ISO-8601 dates. Dot decimal separator. Null for any missing field.\n\n" +
+            "Input: NATURGY Periodo 01/02/2024 al 28/02/2024 87 m³ 984 kWh 0,0712 €/kWh Total 89,34 €\n" +
+            "Output: {\"billingPeriodStart\":\"2024-02-01\",\"billingPeriodEnd\":\"2024-02-28\"," +
+            "\"totalAmount\":89.34,\"consumptionM3\":87.0,\"consumptionKwh\":984.0,\"pricePerKwh\":0.0712}";
+
+    private static final String WATER_INSTRUCTIONS =
+            "Extract fields from the water invoice delimited below.\n" +
+            "Output ONLY valid JSON matching this schema (no prose, no markdown fences):\n" +
+            "{\"billingPeriodStart\":\"YYYY-MM-DD\",\"billingPeriodEnd\":\"YYYY-MM-DD\"," +
+            "\"totalAmount\":0.00,\"consumptionM3\":0.0,\"pricePerM3\":0.000,\"sewageCharge\":0.00}\n" +
+            "ISO-8601 dates. Dot decimal separator. sewageCharge = saneamiento line item, null if absent.\n\n" +
+            "Input: AGUAS MADRID Periodo 01/03/2024 al 31/05/2024 18 m³ 0,8234 €/m³ Saneamiento 12,40 € Total 39,21 €\n" +
+            "Output: {\"billingPeriodStart\":\"2024-03-01\",\"billingPeriodEnd\":\"2024-05-31\"," +
+            "\"totalAmount\":39.21,\"consumptionM3\":18.0,\"pricePerM3\":0.8234,\"sewageCharge\":12.40}";
+
+    private static final String TELECOM_INSTRUCTIONS = buildTelecomInstructions();
+
+    private static String buildTelecomInstructions() {
+        return telecomSchema()
+                + telecomLineDetection()
+                + telecomLineClassification()
+                + telecomBundleInference()
+                + telecomAmounts()
+                + telecomStreamingServices()
+                + telecomFewShot();
+    }
+
+    private static final String JSON_REPAIR_INSTRUCTIONS =
+            "The text below is malformed JSON. Return ONLY the corrected JSON — no prose, no markdown.";
+
+    // Registry: add a new InvoiceType here without touching extract().
+    private record ExtractionConfig(String instructions, Class<? extends InvoiceFields> fieldType) {}
+
+    private static final Map<InvoiceType, ExtractionConfig> CONFIGS = Map.of(
+            InvoiceType.LUZ,   new ExtractionConfig(ELECTRICITY_INSTRUCTIONS, ElectricityFields.class),
+            InvoiceType.GAS,   new ExtractionConfig(GAS_INSTRUCTIONS,         GasFields.class),
+            InvoiceType.AGUA,  new ExtractionConfig(WATER_INSTRUCTIONS,       WaterFields.class),
+            InvoiceType.TELCO, new ExtractionConfig(TELECOM_INSTRUCTIONS,     TelecomFields.class)
+    );
+
+    private final ChatModel              chatModel;
+    private final ObjectMapper           objectMapper;
+    private final ExtractionPromptBuilder promptBuilder;
+    private final LlmResponseJsonSanitizer jsonSanitizer;
+    private final InvoiceFieldsValidator  validator;
+
+    public LlmInvoiceFieldExtractor(
+            @Qualifier("smartChatModel") ChatModel chatModel,
+            ObjectMapper objectMapper,
+            ExtractionPromptBuilder promptBuilder,
+            LlmResponseJsonSanitizer jsonSanitizer,
+            InvoiceFieldsValidator validator) {
+        this.chatModel     = chatModel;
+        this.objectMapper  = objectMapper;
+        this.promptBuilder = promptBuilder;
+        this.jsonSanitizer = jsonSanitizer;
+        this.validator     = validator;
+    }
+
+    @Override
+    public InvoiceFields extract(String invoiceText, InvoiceType type) {
+        ExtractionConfig config = CONFIGS.get(type);
+        if (config == null) throw new IllegalArgumentException("No extraction config for: " + type);
+
+        MDC.put(TimedChatLanguageModel.MDC_OPERATION, "field-extraction");
+        MDC.put(TimedChatLanguageModel.MDC_TYPE, type.name());
+        try {
+            String prompt  = promptBuilder.build(config.instructions(), invoiceText);
+            long   startNs = System.nanoTime();
+            log.info("Field extraction started [type={}]", config.fieldType().getSimpleName());
+
+            String rawResponse;
+            try {
+                rawResponse = chatModel.chat(prompt);
+            } catch (RuntimeException e) {
+                throw new LlmServiceUnavailableException(e);
+            }
+            log.debug("LLM response [type={}]: {}", config.fieldType().getSimpleName(), rawResponse);
+
+            InvoiceFields parsed;
+            try {
+                parsed = parse(rawResponse, config.fieldType());
+            } catch (InvoiceFieldExtractionException e) {
+                log.warn("JSON parse failed [type={}] — retrying with repair", config.fieldType().getSimpleName());
+                parsed = repairAndParse(rawResponse, config.fieldType());
+            }
+
+            validator.validate(parsed);
+            log.info("Field extraction succeeded [type={}, latencyMs={}]",
+                    config.fieldType().getSimpleName(), elapsedMs(startNs));
+            return parsed;
+        } finally {
+            MDC.remove(TimedChatLanguageModel.MDC_OPERATION);
+            MDC.remove(TimedChatLanguageModel.MDC_TYPE);
+        }
+    }
+
+    private InvoiceFields repairAndParse(String malformed, Class<? extends InvoiceFields> fieldType) {
+        MDC.put(TimedChatLanguageModel.MDC_OPERATION, "json-repair");
+        String safe = malformed.replace(">>>", "").replace("<<<", "");
+        String repairPrompt = JSON_REPAIR_INSTRUCTIONS + "\n<<<\n" + safe + "\n>>>\nCorrected:";
+        String repaired;
+        try {
+            repaired = chatModel.chat(repairPrompt);
+        } catch (RuntimeException e) {
+            throw new LlmServiceUnavailableException(e);
+        }
+        log.debug("Repair response [type={}]: {}", fieldType.getSimpleName(), repaired);
+        try {
+            return parse(repaired, fieldType);
+        } catch (Exception ex) {
+            log.error("Field extraction failed after repair [type={}]", fieldType.getSimpleName(), ex);
+            throw new InvoiceFieldExtractionException(ex);
+        }
+    }
+
+    private InvoiceFields parse(String response, Class<? extends InvoiceFields> fieldType) {
+        try {
+            return objectMapper.readValue(jsonSanitizer.sanitize(response), fieldType);
+        } catch (Exception e) {
+            throw new InvoiceFieldExtractionException(e);
+        }
+    }
+
+    private static long elapsedMs(long startNs) {
+        return (System.nanoTime() - startNs) / 1_000_000;
+    }
+
+    private static String telecomSchema() {
+        return "Extract fields from the telecom invoice delimited below.\n"
+                + "Output ONLY valid JSON matching this schema (no prose, no markdown fences):\n"
+                + "{\"billingPeriodStart\":\"YYYY-MM-DD\",\"billingPeriodEnd\":\"YYYY-MM-DD\","
+                + "\"totalAmount\":0.00,\"contractedSpeedMbps\":0,\"mobileDataGb\":0,"
+                + "\"includedMobileLines\":0,\"mobileLineCount\":0,\"monthlyFee\":0.00,"
+                + "\"lines\":[{\"lineType\":\"FIBRA|MOVIL|DISPOSITIVO|SERVICIO\",\"planName\":\"...\",\"baseAmount\":0.00,\"discount\":0.00}],"
+                + "\"streamingServices\":[{\"platform\":\"...\",\"tier\":\"...\"}]}\n\n";
+    }
+
+    private static String telecomLineDetection() {
+        return "=== LINE DETECTION ===\n"
+                + "Priority 1: [TELÉFONO] token alone on a line → separator between entries. Strip it from output.\n"
+                + "Priority 2 (no tokens): each distinct product/service name followed by its own billing period and amount is a separate line entry.\n\n";
+    }
+
+    private static String telecomLineClassification() {
+        return "=== LINE CLASSIFICATION ===\n"
+                + "FIBRA: internet/broadband (keywords: FIBRA, ADSL, INTERNET, or speed units Mb/MB/Mbps).\n"
+                + "MOVIL: explicit mobile line entry (keywords when the entry stands alone: DUO, ADICIONAL, PRINCIPAL, LINEA, TARIFA, GO, O2, or preceded by [TELÉFONO]).\n"
+                + "DISPOSITIVO: device installment — any CUOTA MENSUAL, FINANCIACIÓN, or named product (phone model, appliance).\n"
+                + "SERVICIO: add-on billed as a separate line (streaming service, fixed fee not covered above).\n\n";
+    }
+
+    private static String telecomBundleInference() {
+        return "=== CONVERGENT BUNDLE INFERENCE ===\n"
+                + "A FIBRA line whose planName contains any mobile indicator (ILIMITADOS, ILIMITADO, SINFÍN, SINFIN, DATOS, DUO, GO, INFINITA, MOVIL, MÓVIL, or a GB quantity) implicitly includes 1 mobile line.\n"
+                + "includedMobileLines = total count of FIBRA/bundle entries that contain a mobile indicator (normally 0 or 1).\n"
+                + "mobileLineCount = (count of lines with lineType MOVIL) + includedMobileLines.\n\n";
+    }
+
+    private static String telecomAmounts() {
+        return "=== AMOUNTS ===\n"
+                + "lines[].baseAmount: when two amounts appear (e.g. '60,33€ 73,00€') take the FIRST (smaller, pre-IVA). Comma → dot.\n"
+                + "lines[].discount: pre-IVA discount, negative (0.00 if none).\n"
+                + "mobileDataGb: null when plan includes ILIMITADOS, ILIMITADO or SINFÍN; otherwise extract integer GB.\n"
+                + "totalAmount: total invoice (all charges). monthlyFee: recurring telecom only (excludes DISPOSITIVO installments).\n\n";
+    }
+
+    private static String telecomStreamingServices() {
+        return "=== STREAMING SERVICES ===\n"
+                + "Scan ALL plan names. Normalize platform: NETFLIX→NETFLIX, DISNEY+→DISNEY_PLUS, MAX→MAX, APPLE TV+→APPLE_TV_PLUS, FILMIN→FILMIN.\n"
+                + "tier (strict enum — pick the closest match, no other values allowed):\n"
+                + "  CON ANUNCIOS — if text contains ANUNCIOS or ADS\n"
+                + "  PREMIUM       — if text contains PREMIUM\n"
+                + "  ESTÁNDAR      — if text contains ESTÁNDAR, ESTANDAR or STANDARD\n"
+                + "  BÁSICO        — if text contains BÁSICO, BASICO or BASIC\n"
+                + "  null          — if no tier keyword found\n"
+                + "Empty array [] if no streaming platform found.\n\n";
+    }
+
+    private static String telecomFewShot() {
+        return "ISO-8601 dates. Dot decimal separator. Integer fields: integer or null. Null for missing scalar fields.\n\n"
+                + "Input: [TELÉFONO] - [TELÉFONO]\n"
+                + "FIBRA 600Mb + LA SINFÍN GB ILIMITADOS + NETFLIX CON ANUNCIOS + DISNEY+ ANUNCIOS\n"
+                + "01 Abr - 30 Abr 60,33€ 73,00€\n"
+                + "Descuento 01 Abr - 30 Abr-33,22€-40,20€\n"
+                + "[TELÉFONO]\n"
+                + "LA DUO ADICIONAL 01 Abr - 30 Abr 7,44€ 9,00€\n"
+                + "DESCUENTO 01 Abr - 30 Abr-2,48€-3,00€\n"
+                + "[TELÉFONO]\n"
+                + "LA DUO PRINCIPAL 01 Abr - 30 Abr 5,79€ 7,00€\n"
+                + "DESCUENTO 01 Abr - 30 Abr-4,96€-6,00€\n"
+                + "CUOTA MENSUAL (22/24) - XIAOMI SMART AIR FRYER 6,5L 01 Abr - 30 Abr 2,50€ 3,03€\n"
+                + "Total 35,40€\n"
+                + "Output: {\"billingPeriodStart\":\"2024-04-01\",\"billingPeriodEnd\":\"2024-04-30\","
+                + "\"totalAmount\":37.93,\"contractedSpeedMbps\":600,\"mobileDataGb\":null,"
+                + "\"includedMobileLines\":1,\"mobileLineCount\":3,\"monthlyFee\":34.90,"
+                + "\"lines\":["
+                + "{\"lineType\":\"FIBRA\",\"planName\":\"FIBRA 600Mb + LA SINFÍN GB ILIMITADOS + NETFLIX CON ANUNCIOS + DISNEY+ ANUNCIOS\",\"baseAmount\":60.33,\"discount\":-33.22},"
+                + "{\"lineType\":\"MOVIL\",\"planName\":\"LA DUO ADICIONAL\",\"baseAmount\":7.44,\"discount\":-2.48},"
+                + "{\"lineType\":\"MOVIL\",\"planName\":\"LA DUO PRINCIPAL\",\"baseAmount\":5.79,\"discount\":-4.96},"
+                + "{\"lineType\":\"DISPOSITIVO\",\"planName\":\"CUOTA MENSUAL (22/24) - XIAOMI SMART AIR FRYER 6,5L\",\"baseAmount\":2.50,\"discount\":0.00}"
+                + "],"
+                + "\"streamingServices\":["
+                + "{\"platform\":\"NETFLIX\",\"tier\":\"CON ANUNCIOS\"},"
+                + "{\"platform\":\"DISNEY_PLUS\",\"tier\":\"CON ANUNCIOS\"}"
+                + "]}";
+    }
+}

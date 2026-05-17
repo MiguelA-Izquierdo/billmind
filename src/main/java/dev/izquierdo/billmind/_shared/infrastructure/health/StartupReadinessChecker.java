@@ -3,7 +3,8 @@ package dev.izquierdo.billmind._shared.infrastructure.health;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,8 +20,9 @@ import java.sql.Statement;
 import java.time.Duration;
 
 @Component
-@Slf4j
 public class StartupReadinessChecker {
+
+    private static final Logger log = LoggerFactory.getLogger(StartupReadinessChecker.class);
 
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -135,7 +137,7 @@ public class StartupReadinessChecker {
                     "Run: ollama pull " + ollamaChatModel);
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Could not retrieve Ollama model list: " + e.getMessage(), e);
+            throw new IllegalStateException("Could not retrieve Ollama model list (" + e.getClass().getSimpleName() + ")", e);
         }
     }
 

@@ -8,11 +8,11 @@ Implement the `application/` and `infrastructure/` layers of BillMind following 
 
 ## Project Context
 
-**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 0.36.2
+**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 1.0.0
 - **Port:** 8082
 - **Database:** PostgreSQL 16 + pgVector (table configurable via `PGVECTOR_TABLE_NAME`, 384 dimensions, HNSW index)
-- **LLM:** Ollama (configurable via `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`)
-- **Embeddings:** AllMiniLmL6V2 (local, 384 dimensions, via `OLLAMA_EMBEDDING_MODEL`)
+- **LLM:** Multi-provider (configurable via `LLM_PROVIDER`, `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, etc.)
+- **Embeddings:** `AllMiniLmL6V2EmbeddingModel` — local ONNX, 384 dimensions, not configurable via environment variable
 - **Environment variables:** Always use `@Value("${property}")` or `@ConfigurationProperties`. **Never hardcode URLs, credentials, or model names.**
 
 ---
@@ -29,15 +29,16 @@ Implement the `application/` and `infrastructure/` layers of BillMind following 
 - Prefer direct annotations (`@Service`, `@Component`) over manual `@Configuration` classes — only use `@Configuration` when bean construction requires complex logic (e.g. `Map` of handlers, external properties)
 - Use `@RestController` with compact methods (<20 lines per endpoint)
 - Centralized `@ControllerAdvice` in `_shared/infrastructure/GlobalExceptionHandler.java`
-- LangChain4j configuration in `invoice/infrastructure/config/LangChain4jConfig.java`
 
-### LangChain4j 0.36.2
-- **AI logic only in** `infrastructure/ai/` or `infrastructure/adapter/`
-- Use `AiServices` for LLM integration (chat model via Ollama)
+### LangChain4j 1.0.0
+- **AI logic only in** `infrastructure/adapter/`
+- Use the imperative `ChatModel` API (`chatModel.chat(prompt)`) — **do not use `AiServices`**
+- Role beans: inject `@Qualifier("fastChatModel")` for classification/PII, `@Qualifier("smartChatModel")` for extraction/RAG
 - `EmbeddingModel`: use the pre-configured `AllMiniLmL6V2EmbeddingModel` bean
 - `EmbeddingStore`: use the pre-configured `PgVectorEmbeddingStore` bean
-- For PDF parsing: `ApachePdfBoxDocumentParser` + `DocumentByParagraphSplitter` (chunk 500, overlap 100)
-- For semantic search: `EmbeddingStoreIngestor` and `EmbeddingStoreRetriever`
+- For PDF text extraction (invoice pipeline): use `PdfInvoiceParser` (port `InvoiceParser`) — returns raw text, no chunking
+- For knowledge base ingestion (M2+): `ApachePdfBoxDocumentParser` + `DocumentByParagraphSplitter` (chunk 500, overlap 100) + `EmbeddingStoreIngestor`
+- For knowledge base retrieval (M2+): `EmbeddingStoreRetriever` backed by `PgVectorEmbeddingStore`
 
 ### Package Structure
 
@@ -65,6 +66,31 @@ Implement the `application/` and `infrastructure/` layers of BillMind following 
 - Annotated with `@Component` or declared as `@Bean`
 - Translate between domain model and infrastructure models
 - Logging only here: `private static final Logger log = LoggerFactory.getLogger(MyAdapter.class)`
+
+### Logging & Observability
+
+Full reference: [`docs/OBSERVABILITY.md`](../docs/OBSERVABILITY.md). Key rules when implementing any adapter:
+
+**Log levels:**
+| Level | When |
+|---|---|
+| `DEBUG` | Normal operation details (chars processed, path taken) |
+| `INFO` | Business events (classification result, provider selected) |
+| `WARN` | Recoverable failure — LLM error, fallback triggered, invalid response |
+| `ERROR` | Unrecoverable — let `GlobalExceptionHandler` handle it |
+
+**What to never log:**
+- Invoice content or any text extracted from user files
+- PII fragments (IBAN, DNI, names, addresses)
+- Exception messages that may carry input fragments — log `e.getClass().getSimpleName()` instead
+- JWT tokens or credentials
+
+**Conventions:**
+- Use a short `[MODULE]` prefix on WARN/DEBUG lines involving sensitive operations (e.g. `[PII]`) for easy log filtering.
+- Sensitive operations that call an LLM should log input **length**, never input **content**.
+
+**LLM observability:**
+All LLM calls go through `TimedChatLanguageModel` (decorator wrapping `ChatModel.doChat()`), which logs operation, provider, model, latency and token counts automatically. No additional instrumentation needed in adapters.
 
 ### Controllers and DTOs
 - Base path: `/api/v1/{resource}`

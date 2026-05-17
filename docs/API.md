@@ -9,11 +9,31 @@ Base URL: `http://localhost:8082` (configurable via `SERVER_PORT`)
 All responses follow a consistent envelope:
 
 ```json
-{ "status": "success", "data": { ... } }
-{ "status": "error",   "message": "...", "errors": { "field": "message" } }
+// Success
+{ "success": true,  "status": 200, "message": "...", "data": { ... } }
+
+// Error (with field-level detail)
+{ "success": false, "status": 400, "message": "...", "errors": { "field": { "code": "message" } } }
+
+// Error (no field detail)
+{ "success": false, "status": 404, "message": "..." }
 ```
 
+`data` is omitted when `null`. `errors` is omitted when there are no field-level details.
+
 User-facing `message` strings are in Spanish.
+
+---
+
+## Authentication
+
+Phase 1 is anonymous. Every request must include an `X-Session-Id` header with a client-generated UUID. The backend correlates resources (invoices, conversations) to that UUID without authenticating it.
+
+| Header | Example | Description |
+|---|---|---|
+| `X-Session-Id` | `550e8400-e29b-41d4-a716-446655440000` | Client-generated UUID identifying the visitor session |
+
+Missing or malformed `X-Session-Id` returns `400 Bad Request`.
 
 ---
 
@@ -21,7 +41,7 @@ User-facing `message` strings are in Spanish.
 
 ### POST /api/v1/invoices/upload
 
-Upload a utility invoice PDF. The API classifies it, splits it into semantic chunks, generates embeddings, and persists everything to the vector store.
+Upload a utility invoice PDF. The API validates the file, extracts text, classifies the document (supply type + provider company), extracts structured fields (billing period, consumption, rates, totals), redacts PII, and persists the invoice to the database.
 
 **Request**
 
@@ -33,18 +53,14 @@ Content-Type: multipart/form-data
 |---|---|---|---|
 | `file` | PDF file | Yes | Utility invoice (electricity, gas, water, telecoms) |
 
-**Headers**
-
-| Header | Example | Description |
-|---|---|---|
-| `X-Session-Id` | `550e8400-e29b-41d4-a716-446655440000` | Client-generated UUID. Correlates uploads to a visitor session (no auth required in Phase 1). |
-
 **Responses**
 
-`201 Created` — invoice accepted and vectorized:
+`201 Created` — invoice accepted and persisted:
 ```json
 {
-  "status": "success",
+  "success": true,
+  "status": 201,
+  "message": "Factura subida y procesada correctamente.",
   "data": {
     "invoiceId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "fileName": "factura_luz.pdf"
@@ -52,27 +68,35 @@ Content-Type: multipart/form-data
 }
 ```
 
-`415 Unsupported Media Type` — file is not a PDF:
+`400 Bad Request` — file is not a PDF (validation fails in `UploadInvoiceCommand`):
 ```json
 {
-  "status": "error",
-  "message": "El archivo debe ser un PDF válido."
+  "success": false,
+  "status": 400,
+  "message": "Validation failed",
+  "errors": {
+    "file": {
+      "invalidFormat": "El archivo debe ser un PDF válido"
+    }
+  }
 }
 ```
 
 `422 Unprocessable Entity` — document is not a recognised supply invoice:
 ```json
 {
-  "status": "error",
-  "message": "El documento no es una factura de suministro reconocida."
+  "success": false,
+  "status": 422,
+  "message": "El archivo no parece ser una factura de suministro del hogar (electricidad, gas, agua o telecomunicaciones)"
 }
 ```
 
 `500 Internal Server Error` — unexpected failure:
 ```json
 {
-  "status": "error",
-  "message": "Ha ocurrido un error interno. Por favor, inténtalo de nuevo."
+  "success": false,
+  "status": 500,
+  "message": "Se ha producido un error interno en el servidor"
 }
 ```
 
@@ -82,6 +106,88 @@ Content-Type: multipart/form-data
 curl -X POST http://localhost:8082/api/v1/invoices/upload \
   -H "X-Session-Id: 550e8400-e29b-41d4-a716-446655440000" \
   -F "file=@factura_luz.pdf"
+```
+
+---
+
+### GET /api/v1/invoices
+
+Returns all invoices uploaded in the current session.
+
+**Responses**
+
+`200 OK`:
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "Facturas obtenidas correctamente",
+  "data": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+      "fileName": "factura_luz.pdf",
+      "supplyType": "LUZ",
+      "provider": "IBERDROLA",
+      "uploadedAt": "2025-05-14T10:23:00Z"
+    }
+  ]
+}
+```
+
+`supplyType` values: `LUZ`, `GAS`, `AGUA`, `TELCO`, `OTRO`.
+
+**Example**
+
+```bash
+curl http://localhost:8082/api/v1/invoices \
+  -H "X-Session-Id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+---
+
+### GET /api/v1/invoices/{id}
+
+Returns a single invoice. Only responds if the `X-Session-Id` header matches the session that uploaded the invoice.
+
+**Path parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `id` | UUID | Invoice ID returned by the upload endpoint |
+
+**Responses**
+
+`200 OK`:
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "Factura obtenida correctamente",
+  "data": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "fileName": "factura_luz.pdf",
+    "supplyType": "LUZ",
+    "provider": "IBERDROLA",
+    "uploadedAt": "2025-05-14T10:23:00Z"
+  }
+}
+```
+
+`404 Not Found` — invoice does not exist or belongs to a different session:
+```json
+{
+  "status": "error",
+  "message": "Factura no encontrada."
+}
+```
+
+**Example**
+
+```bash
+curl http://localhost:8082/api/v1/invoices/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
+  -H "X-Session-Id: 550e8400-e29b-41d4-a716-446655440000"
 ```
 
 ---

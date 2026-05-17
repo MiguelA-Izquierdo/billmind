@@ -2,7 +2,6 @@ package dev.izquierdo.billmind._shared.infrastructure;
 
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
-import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.slf4j.Logger;
@@ -12,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
@@ -30,7 +30,7 @@ public class GlobalExceptionHandler {
         logException(ex);
         ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "A null value was encountered"
+                "Se ha producido un error interno en el servidor"
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
@@ -40,20 +40,11 @@ public class GlobalExceptionHandler {
         logException(ex);
         ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Internal server error"
+                "Se ha producido un error interno en el servidor"
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
-
-    @ExceptionHandler(NotASupplyInvoiceException.class)
-    public ResponseEntity<ErrorResponseDTO> handleNotASupplyInvoiceException(NotASupplyInvoiceException ex) {
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.UNPROCESSABLE_ENTITY.value(),
-                ex.getMessage()
-        );
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);
-    }
 
     @ExceptionHandler(ValidationErrorsException.class)
     public ResponseEntity<ErrorResponseDTO> handleValidationErrorsException(ValidationErrorsException ex) {
@@ -75,6 +66,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(),
+                        "El archivo supera el tamaño máximo permitido (5 MB)")
+        );
+    }
+
     @ExceptionHandler(MultipartException.class)
     public ResponseEntity<ErrorResponseDTO> handleMultipartException(MultipartException ex) {
         ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
@@ -92,17 +91,17 @@ public class GlobalExceptionHandler {
         if (cause instanceof InvalidFormatException invalidFormatEx && !invalidFormatEx.getPath().isEmpty()) {
             String fieldName = invalidFormatEx.getPath().get(0).getFieldName();
             Map<String, String> fieldErrors = new HashMap<>();
-            fieldErrors.put("invalid", "Expected a number, but got: " + invalidFormatEx.getValue());
+            fieldErrors.put("invalid", "Se esperaba un número, pero se recibió: " + invalidFormatEx.getValue());
             errors.put(fieldName, fieldErrors);
         } else {
             Map<String, String> generalErrors = new HashMap<>();
-            generalErrors.put("invalid", "Invalid request format.");
+            generalErrors.put("invalid", "El formato de la petición no es válido.");
             errors.put("body", generalErrors);
         }
 
         ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
                 HttpStatus.BAD_REQUEST.value(),
-                "Validation failed",
+                "Error de validación en la petición",
                 errors
         );
 

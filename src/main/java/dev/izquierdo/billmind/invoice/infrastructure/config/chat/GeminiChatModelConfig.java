@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.invoice.infrastructure.config.chat;
 
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,7 +23,7 @@ public class GeminiChatModelConfig {
     private String model;
 
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
+    public ChatModel chatLanguageModel() {
         return OpenAiChatModel.builder()
                 .baseUrl(GEMINI_BASE_URL)
                 .apiKey(apiKey)

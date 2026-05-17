@@ -1,9 +1,10 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier;
 
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitizer;
+import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
+import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,32 +15,23 @@ public class LlmResponseParser {
     private static final Logger log = LoggerFactory.getLogger(LlmResponseParser.class);
 
     private final ObjectMapper objectMapper;
+    private final LlmResponseJsonSanitizer jsonSanitizer;
 
-    public LlmResponseParser(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public LlmResponseParser(ObjectMapper objectMapper, LlmResponseJsonSanitizer jsonSanitizer) {
+        this.objectMapper  = objectMapper;
+        this.jsonSanitizer = jsonSanitizer;
     }
 
     public InvoiceClassification parse(String response) {
         try {
-            String json    = extractJson(response);
-            JsonNode node  = objectMapper.readTree(json);
+            JsonNode node    = objectMapper.readTree(jsonSanitizer.sanitize(response));
             InvoiceType type = parseType(node.path("tipo").asText("OTRO"));
             String company   = node.path("compania").asText("").trim();
             return new InvoiceClassification(type, company);
         } catch (Exception e) {
-            log.warn("No se pudo parsear la respuesta del LLM, clasificando como OTRO. Respuesta: {}", response);
+            log.warn("Failed to parse LLM classification response, defaulting to OTRO. Response: {}", response);
             return new InvoiceClassification(InvoiceType.OTRO, "");
         }
-    }
-
-    private String extractJson(String raw) {
-        String cleaned = raw.replace("```json", "").replace("```", "").strip();
-        int start = cleaned.indexOf('{');
-        int end   = cleaned.lastIndexOf('}') + 1;
-        if (start == -1 || end == 0) {
-            throw new IllegalArgumentException("No se encontró JSON en la respuesta del LLM");
-        }
-        return cleaned.substring(start, end);
     }
 
     private InvoiceType parseType(String rawType) {

@@ -44,7 +44,8 @@ No API key required. Requires Ollama running locally or via `docker-compose --pr
 | Variable | Default | Description |
 |---|---|---|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_CHAT_MODEL` | `llama3` | Chat/classification model |
+| `OLLAMA_CHAT_MODEL` | `llama3.2` | Chat/classification model |
+| `OLLAMA_TIMEOUT_SECONDS` | `240` | Request timeout in seconds (increase for slow hardware) |
 
 Pull models before starting (if running Ollama outside Docker):
 
@@ -74,14 +75,15 @@ ollama pull llama3       # chat — required when LLM_PROVIDER=ollama
 | Variable | Example | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | `AIza...` | Google AI API key |
-| `GEMINI_MODEL` | `gemini-1.5-pro` | Model name |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Model name |
 
 ### Groq
 
-| Variable | Example | Description |
+| Variable | Default / Example | Description |
 |---|---|---|
 | `GROQ_API_KEY` | `gsk_...` | Groq API key |
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | Model name |
+| `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Groq OpenAI-compatible endpoint |
 
 ---
 
@@ -91,7 +93,7 @@ ollama pull llama3       # chat — required when LLM_PROVIDER=ollama
 |---|---|---|
 | `PGVECTOR_TABLE_NAME` | `vector_store` | Table name for vector storage |
 | `PGVECTOR_DIMENSIONS` | `384` | Embedding dimensions — must match the model (`all-minilm` → 384) |
-| `PGVECTOR_INDEX_TYPE` | `HNSW` | Index algorithm (`HNSW` recommended for production) |
+| `PGVECTOR_USE_INDEX` | `true` | Create an IVFFlat index on startup (`false` skips index creation). HNSW is not yet supported by `langchain4j-pgvector:1.0.0-beta5`. |
 
 ---
 

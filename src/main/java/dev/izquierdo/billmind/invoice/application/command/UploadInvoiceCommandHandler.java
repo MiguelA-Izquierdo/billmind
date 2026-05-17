@@ -23,7 +23,9 @@ public class UploadInvoiceCommandHandler implements CommandHandler<UploadInvoice
 
     @Override
     public void handle(UploadInvoiceCommand command) {
-        Invoice invoice = new Invoice(command.invoiceId(), command.fileName());
+        Invoice invoice = Invoice.builder(command.invoiceId(), command.fileName())
+                .sessionId(command.sessionId())
+                .build();
         uploadInvoiceUseCase.upload(invoice, command.fileContent());
     }
 }

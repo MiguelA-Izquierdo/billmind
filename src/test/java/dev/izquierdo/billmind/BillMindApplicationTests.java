@@ -1,6 +1,9 @@
 package dev.izquierdo.billmind;
 
 import dev.izquierdo.billmind._shared.infrastructure.health.StartupReadinessChecker;
+import dev.izquierdo.billmind._shared.infrastructure.persistence.SessionJpaRepository;
+import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
+import dev.izquierdo.billmind.invoice.infrastructure.persistence.InvoiceJpaRepository;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import org.junit.jupiter.api.Test;
@@ -24,6 +27,15 @@ class BillMindApplicationTests {
 
     @MockBean
     StartupReadinessChecker startupReadinessChecker;
+
+    @MockBean
+    InvoiceJpaRepository invoiceJpaRepository;
+
+    @MockBean
+    SessionJpaRepository sessionJpaRepository;
+
+    @MockBean
+    InvoiceFieldExtractor invoiceFieldExtractor;
 
     @Test
     void contextLoads() {
