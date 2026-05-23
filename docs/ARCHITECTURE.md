@@ -7,7 +7,7 @@ Reference for sessions where modules are designed or extended. Use with `@CLAUDE
 ## Design Decisions
 
 1. **UUID generated in the controller** — strict CQRS: commands return no value (`CommandBus.dispatch()` returns `void`).
-2. **AllMiniLM-L6-v2** local via Ollama — no external API, 384 dimensions, fast.
+2. **AllMiniLM-L6-v2** via local ONNX runtime (bundled in the jar) — no external API, 384 dimensions, fast. Ollama is not involved in embeddings.
 3. **IVFFlat** as the pgVector index — only index type supported by `langchain4j-pgvector:1.0.0-beta5`. HNSW is the target for a future upgrade when available in the LangChain4j release.
 4. **Chunk size 500, overlap 100** — configurable if better parameters emerge.
 5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. The embedding model (AllMiniLM-L6-v2) is always local ONNX regardless of provider. See *LLM Provider Strategy* section below.
@@ -36,7 +36,7 @@ Invoice text is **not** vectorized. The pgVector store holds the regulatory know
 
 ## LLM Provider Strategy
 
-The `ChatLanguageModel` bean is selected at startup via `LLM_PROVIDER`. All providers implement the same LangChain4j `ChatLanguageModel` interface — no application code changes when switching.
+The `ChatModel` bean is selected at startup via `LLM_PROVIDER`. All providers implement the same LangChain4j `ChatModel` interface — no application code changes when switching.
 
 | `LLM_PROVIDER` | Provider | Required env vars | Default model |
 |---|---|---|---|

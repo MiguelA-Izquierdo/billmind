@@ -53,11 +53,11 @@ class TimedChatLanguageModelTest {
     @Test
     void shouldReturnDelegateResponse() {
         ChatResponse expected = ChatResponse.builder().aiMessage(AiMessage.from("answer")).build();
-        when(delegate.doChat(any(ChatRequest.class))).thenReturn(expected);
+        when(delegate.chat(any(ChatRequest.class))).thenReturn(expected);
 
         TimedChatLanguageModel model = new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o");
 
-        assertThat(model.doChat(EMPTY_REQUEST)).isSameAs(expected);
+        assertThat(model.chat(EMPTY_REQUEST)).isSameAs(expected);
     }
 
     @Test
@@ -66,9 +66,9 @@ class TimedChatLanguageModelTest {
                 .aiMessage(AiMessage.from("ok"))
                 .tokenUsage(new TokenUsage(500, 100))
                 .build();
-        when(delegate.doChat(any(ChatRequest.class))).thenReturn(response);
+        when(delegate.chat(any(ChatRequest.class))).thenReturn(response);
 
-        new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o").doChat(EMPTY_REQUEST);
+        new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o").chat(EMPTY_REQUEST);
 
         assertThat(lastLog())
             .contains("costUsd=")
@@ -82,19 +82,19 @@ class TimedChatLanguageModelTest {
                 .aiMessage(AiMessage.from("ok"))
                 .tokenUsage(new TokenUsage(500, 100))
                 .build();
-        when(delegate.doChat(any(ChatRequest.class))).thenReturn(response);
+        when(delegate.chat(any(ChatRequest.class))).thenReturn(response);
 
-        new TimedChatLanguageModel(delegate, "fast", "ollama", "llama3.2").doChat(EMPTY_REQUEST);
+        new TimedChatLanguageModel(delegate, "fast", "ollama", "llama3.2").chat(EMPTY_REQUEST);
 
         assertThat(lastLog()).doesNotContain("costUsd=");
     }
 
     @Test
     void shouldLogProviderRoleAndModel() {
-        when(delegate.doChat(any(ChatRequest.class)))
+        when(delegate.chat(any(ChatRequest.class)))
                 .thenReturn(ChatResponse.builder().aiMessage(AiMessage.from("ok")).build());
 
-        new TimedChatLanguageModel(delegate, "smart", "anthropic", "claude-sonnet-4-6").doChat(EMPTY_REQUEST);
+        new TimedChatLanguageModel(delegate, "smart", "anthropic", "claude-sonnet-4-6").chat(EMPTY_REQUEST);
 
         assertThat(lastLog())
             .contains("role=smart")
@@ -104,31 +104,31 @@ class TimedChatLanguageModelTest {
 
     @Test
     void shouldRethrowExceptionFromDelegate() {
-        when(delegate.doChat(any(ChatRequest.class))).thenThrow(new RuntimeException("timeout"));
+        when(delegate.chat(any(ChatRequest.class))).thenThrow(new RuntimeException("timeout"));
 
         TimedChatLanguageModel model = new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o");
 
-        assertThatThrownBy(() -> model.doChat(EMPTY_REQUEST))
+        assertThatThrownBy(() -> model.chat(EMPTY_REQUEST))
             .isInstanceOf(RuntimeException.class)
             .hasMessage("timeout");
     }
 
     @Test
     void shouldLogErrorWhenDelegateFails() {
-        when(delegate.doChat(any(ChatRequest.class))).thenThrow(new IllegalStateException("bad request"));
+        when(delegate.chat(any(ChatRequest.class))).thenThrow(new IllegalStateException("bad request"));
 
         TimedChatLanguageModel model = new TimedChatLanguageModel(delegate, "smart", "anthropic", "claude-sonnet-4-6");
-        try { model.doChat(EMPTY_REQUEST); } catch (Exception ignored) {}
+        try { model.chat(EMPTY_REQUEST); } catch (Exception ignored) {}
 
         assertThat(lastLog()).contains("error=IllegalStateException");
     }
 
     @Test
     void shouldLogLatency() {
-        when(delegate.doChat(any(ChatRequest.class)))
+        when(delegate.chat(any(ChatRequest.class)))
                 .thenReturn(ChatResponse.builder().aiMessage(AiMessage.from("ok")).build());
 
-        new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o").doChat(EMPTY_REQUEST);
+        new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o").chat(EMPTY_REQUEST);
 
         assertThat(lastLog()).containsPattern("latency=\\d+ms");
     }

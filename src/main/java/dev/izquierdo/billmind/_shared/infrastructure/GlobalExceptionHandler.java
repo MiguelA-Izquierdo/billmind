@@ -2,6 +2,8 @@ package dev.izquierdo.billmind._shared.infrastructure;
 
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
+import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
+import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.slf4j.Logger;
@@ -45,6 +47,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
+
+    @ExceptionHandler(NotASupplyInvoiceException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNotASupplyInvoiceException(NotASupplyInvoiceException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
+        );
+    }
+
+    @ExceptionHandler(UnsupportedSupplyTypeException.class)
+    public ResponseEntity<ErrorResponseDTO> handleUnsupportedSupplyTypeException(UnsupportedSupplyTypeException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
+        );
+    }
 
     @ExceptionHandler(ValidationErrorsException.class)
     public ResponseEntity<ErrorResponseDTO> handleValidationErrorsException(ValidationErrorsException ex) {

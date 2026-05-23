@@ -73,14 +73,14 @@ Every `ChatModel` bean is wrapped with `TimedChatLanguageModel` (Decorator patte
 | `fastChatModel` | `fast` | Low-latency tasks: classification, PII redaction |
 | `smartChatModel` | `smart` | Quality-sensitive tasks: field extraction, RAG, reasoning |
 
-Both beans are instances of `TimedChatLanguageModel(delegate, role, provider, model)`. On every `generate()` call the decorator:
+Both beans are instances of `TimedChatLanguageModel(delegate, role, provider, model)`. On every `chat()` call the decorator:
 
 1. Resolves the **operation** name — reads `MDC.get("llm.operation")` if set by the caller; otherwise walks the stack trace and picks the first frame inside `dev.izquierdo.billmind` that is not the decorator itself (e.g. `LlmInvoiceFieldExtractor.extract`). Callers never need to manage MDC unless they want an explicit label.
 2. Delegates to the real model.
 3. Logs a single structured `INFO` line with all fields (see format below).
 4. Re-throws any exception unchanged after logging the error class.
 
-`TimedChatLanguageModel` overrides `doChat(ChatRequest)` and delegates via `delegate.doChat(request)`, bypassing the listener layer (acceptable since no listeners are registered on provider beans).
+`TimedChatLanguageModel` overrides `chat(ChatRequest)` and delegates via `delegate.chat(request)`. `doChat(ChatRequest)` is also implemented as a passthrough (required since the interface declares it abstract), but it is never reached from the `chat(String)` → `chat(ChatRequest)` call chain.
 
 ### Log format
 

@@ -4,6 +4,7 @@ import dev.izquierdo.billmind._shared.infrastructure.health.StartupReadinessChec
 import dev.izquierdo.billmind._shared.infrastructure.persistence.SessionJpaRepository;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
 import dev.izquierdo.billmind.invoice.infrastructure.persistence.InvoiceJpaRepository;
+import dev.izquierdo.billmind.market.infrastructure.persistence.ElectricityRateJpaRepository;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,9 @@ class BillMindApplicationTests {
 
     @MockBean
     InvoiceFieldExtractor invoiceFieldExtractor;
+
+    @MockBean
+    ElectricityRateJpaRepository marketRateJpaRepository;
 
     @Test
     void contextLoads() {

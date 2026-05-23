@@ -10,7 +10,7 @@ Implement the `application/` and `infrastructure/` layers of BillMind following 
 
 **BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 1.0.0
 - **Port:** 8082
-- **Database:** PostgreSQL 16 + pgVector (table configurable via `PGVECTOR_TABLE_NAME`, 384 dimensions, HNSW index)
+- **Database:** PostgreSQL 16 + pgVector (table configurable via `PGVECTOR_TABLE_NAME`, 384 dimensions, IVFFlat index — HNSW not yet supported by `langchain4j-pgvector:1.0.0-beta5`)
 - **LLM:** Multi-provider (configurable via `LLM_PROVIDER`, `OLLAMA_BASE_URL`, `OPENAI_API_KEY`, etc.)
 - **Embeddings:** `AllMiniLmL6V2EmbeddingModel` — local ONNX, 384 dimensions, not configurable via environment variable
 - **Environment variables:** Always use `@Value("${property}")` or `@ConfigurationProperties`. **Never hardcode URLs, credentials, or model names.**
@@ -48,8 +48,7 @@ Implement the `application/` and `infrastructure/` layers of BillMind following 
 │   └── usecase/           # Pure orchestrators: call Ports, no framework
 ├── domain/                # ← DO NOT TOUCH (Architect's domain)
 └── infrastructure/
-    ├── adapter/           # Port implementations (Hexagonal Adapters)
-    ├── ai/                # LangChain4j integrations (AiServices, RAG pipelines)
+    ├── adapter/           # Port implementations + LangChain4j adapters (no AiServices)
     ├── config/            # @Configuration beans
     ├── controller/        # @RestController + request/response DTOs
     │   └── dto/
@@ -90,7 +89,7 @@ Full reference: [`docs/OBSERVABILITY.md`](../docs/OBSERVABILITY.md). Key rules w
 - Sensitive operations that call an LLM should log input **length**, never input **content**.
 
 **LLM observability:**
-All LLM calls go through `TimedChatLanguageModel` (decorator wrapping `ChatModel.doChat()`), which logs operation, provider, model, latency and token counts automatically. No additional instrumentation needed in adapters.
+All LLM calls go through `TimedChatLanguageModel` (decorator overriding `chat(ChatRequest)`), which logs operation, provider, model, latency and token counts automatically. No additional instrumentation needed in adapters.
 
 ### Controllers and DTOs
 - Base path: `/api/v1/{resource}`

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BillMind — Tarifas de Mercado</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0f1117;
+    --surface: #1a1d27;
+    --surf2:   #222637;
+    --border:  #2e3248;
+    --text:    #e2e4f0;
+    --muted:   #8b8fa8;
+    --accent:  #6c6ff5;
+    --elec:    #f5a623;
+    --gas:     #4ecdc4;
+    --water:   #45b7d1;
+    --tel:     #a78bfa;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; overflow-x: hidden; }
+
+  /* ── Header ── */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: -.5px; }
+  .logo span { color: var(--text); }
+  .session-label { color: var(--muted); font-size: 12px; margin-left: auto; }
+  .hdr-btn { background: var(--surf2); border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all .15s; white-space: nowrap; }
+  .hdr-btn:hover { border-color: var(--accent); color: var(--text); }
+  #delete-btn { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.35); color: #f87171; font-weight: 600; }
+  #delete-btn:hover { background: rgba(239,68,68,.2); border-color: #f87171; }
+  #delete-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Filters ── */
+  .filters { padding: 20px 32px 0; display: flex; gap: 8px; }
+  .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 7px 18px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; display: flex; align-items: center; gap: 7px; position: relative; }
+  .filter-btn:not(.disabled):hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { color: #fff; }
+  .filter-btn[data-type="LUZ"].active   { background: var(--elec); border-color: var(--elec); }
+  .filter-btn[data-type="GAS"].active   { background: var(--gas); border-color: var(--gas); color: #0f1117; }
+  .filter-btn[data-type="AGUA"].active  { background: var(--water); border-color: var(--water); color: #0f1117; }
+  .filter-btn[data-type="TELCO"].active { background: var(--tel); border-color: var(--tel); }
+  .filter-btn .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .filter-btn[data-type="LUZ"] .dot   { background: var(--elec); }
+  .filter-btn[data-type="GAS"] .dot   { background: var(--gas); }
+  .filter-btn[data-type="AGUA"] .dot  { background: var(--water); }
+  .filter-btn[data-type="TELCO"] .dot { background: var(--tel); }
+  .filter-btn.disabled { cursor: not-allowed; opacity: .45; }
+  .filter-btn.disabled .soon { font-size: 9px; background: var(--surf2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); margin-left: 2px; }
+
+  /* ── Stats ── */
+  .stats { padding: 16px 32px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 20px; display: flex; flex-direction: column; gap: 2px; min-width: 120px; }
+  .stat-value { font-size: 22px; font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+  /* ── Main ── */
+  .main { padding: 0 32px 48px; }
+  .company-block { margin-bottom: 32px; }
+  .company-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .company-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; flex-shrink: 0; }
+  .company-name { font-size: 17px; font-weight: 600; }
+  .company-count { background: var(--surf2); border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; font-size: 12px; color: var(--muted); }
+
+  /* ── Cards ── */
+  .rates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .rate-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: border-color .15s, transform .1s, box-shadow .15s; position: relative; overflow: hidden; }
+  .rate-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; }
+  .rate-card[data-type="LUZ"]::before   { background: var(--elec); }
+  .rate-card[data-type="GAS"]::before   { background: var(--gas); }
+  .rate-card[data-type="AGUA"]::before  { background: var(--water); }
+  .rate-card[data-type="TELCO"]::before { background: var(--tel); }
+  .rate-card:hover { border-color: #444763; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px; }
+  .tariff-name { font-size: 15px; font-weight: 600; flex: 1; }
+  .supply-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
+  [data-type="LUZ"] .supply-badge   { background: rgba(245,166,35,.15); color: var(--elec); }
+  [data-type="GAS"] .supply-badge   { background: rgba(78,205,196,.15); color: var(--gas); }
+  [data-type="AGUA"] .supply-badge  { background: rgba(69,183,209,.15); color: var(--water); }
+  [data-type="TELCO"] .supply-badge { background: rgba(167,139,250,.15); color: var(--tel); }
+
+  .price-main { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+  [data-type="LUZ"] .price-main   { color: var(--elec); }
+  [data-type="GAS"] .price-main   { color: var(--gas); }
+  [data-type="AGUA"] .price-main  { color: var(--water); }
+  [data-type="TELCO"] .price-main { color: var(--tel); }
+  .price-unit { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+  .card-details { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .detail-item { display: flex; flex-direction: column; gap: 2px; }
+  .detail-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .detail-value { font-size: 13px; font-weight: 500; }
+
+  .card-footer { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .pill { border-radius: 6px; padding: 2px 8px; font-size: 11px; border: 1px solid var(--border); background: var(--surf2); }
+  .pill.vigente { background: rgba(52,211,153,.1); border-color: rgba(52,211,153,.3); color: #34d399; }
+  .pill.expirada { color: var(--muted); }
+  .history-hint { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .history-hint .count { background: var(--surf2); border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; font-weight: 600; }
+
+  /* ── History drawer ── */
+  .drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; }
+  .drawer-overlay.open { display: block; }
+  .drawer { position: fixed; top: 0; right: -480px; width: 460px; max-width: 95vw; height: 100vh; background: var(--surface); border-left: 1px solid var(--border); z-index: 201; display: flex; flex-direction: column; transition: right .25s cubic-bezier(.4,0,.2,1); overflow: hidden; }
+  .drawer.open { right: 0; }
+  .drawer-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; }
+  .drawer-title { flex: 1; }
+  .drawer-title h2 { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+  .drawer-title p { font-size: 12px; color: var(--muted); }
+  .drawer-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+  .drawer-close:hover { color: var(--text); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  .history-table { width: 100%; border-collapse: collapse; }
+  .history-table th { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); text-align: left; padding: 0 8px 10px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .history-table td { padding: 10px 8px; border-bottom: 1px solid rgba(46,50,72,.5); font-size: 13px; vertical-align: middle; }
+  .history-table tr:last-child td { border-bottom: none; }
+  .history-table tr.current-row td { background: rgba(108,111,245,.06); }
+  .history-table tr.current-row td:first-child { border-left: 2px solid var(--accent); }
+  .current-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; background: rgba(108,111,245,.2); color: var(--accent); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+  .price-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .delta { font-size: 11px; margin-left: 4px; }
+  .delta.up { color: #f87171; }
+  .delta.down { color: #34d399; }
+  .delta.same { color: var(--muted); }
+
+  /* ── Confirm modal ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; max-width: 380px; width: 90%; }
+  .modal h3 { font-size: 16px; margin-bottom: 10px; }
+  .modal p { color: var(--muted); font-size: 13px; margin-bottom: 24px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-cancel  { background: var(--surf2); border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .modal-confirm { background: #ef4444; border: 1px solid #ef4444; color: #fff; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .modal-confirm:hover { background: #dc2626; }
+
+  /* ── States ── */
+  .state-box { text-align: center; padding: 64px 32px; color: var(--muted); }
+  .state-box .icon { font-size: 48px; margin-bottom: 12px; }
+  .state-box p { font-size: 15px; }
+  .state-box.error p { color: #f87171; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Bill<span>Mind</span></div>
+  <span class="session-label" id="session-label"></span>
+  <button class="hdr-btn" onclick="loadRates()">↺ Recargar</button>
+  <button class="hdr-btn" id="delete-btn" onclick="openConfirm()">🗑 Eliminar registros</button>
+</header>
+
+<!-- Delete confirm modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>¿Eliminar todas las tarifas?</h3>
+    <p>Esta acción borrará <strong>todos los registros</strong> de la tabla <code>market_rates</code>. No se puede deshacer.</p>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeConfirm()">Cancelar</button>
+      <button class="modal-confirm" onclick="confirmDelete()">Sí, eliminar todo</button>
+    </div>
+  </div>
+</div>
+
+<!-- History drawer -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">
+      <h2 id="drawer-title">Histórico</h2>
+      <p id="drawer-subtitle"></p>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<div class="filters" id="filters">
+  <button class="filter-btn active" data-type="LUZ"><span class="dot"></span> Electricidad</button>
+  <button class="filter-btn disabled" data-type="GAS"><span class="dot"></span> Gas <span class="soon">Próximamente</span></button>
+  <button class="filter-btn disabled" data-type="AGUA"><span class="dot"></span> Agua <span class="soon">Próximamente</span></button>
+  <button class="filter-btn disabled" data-type="TELCO"><span class="dot"></span> Telecom <span class="soon">Próximamente</span></button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="main" id="main">
+  <div class="state-box"><div class="spinner"></div><p>Cargando tarifas…</p></div>
+</div>
+
+<script>
+const TODAY = new Date().toISOString().slice(0, 10);
+const supplyLabels = { LUZ: 'Electricidad', GAS: 'Gas', AGUA: 'Agua', TELCO: 'Telecom' };
+
+function getSessionId() {
+  let id = localStorage.getItem('billmind-session-id');
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem('billmind-session-id', id); }
+  return id;
+}
+const SESSION_ID = getSessionId();
+document.getElementById('session-label').textContent = 'Sesión: ' + SESSION_ID.slice(0, 8) + '…';
+
+// allRates: todos los registros en bruto (con histórico)
+// tariffGroups: Map<key, [rates ordenados por receivedAt desc]>
+let allRates = [];
+let tariffGroups = new Map();
+let activeFilter = 'LUZ';
+
+// ── Colors ────────────────────────────────────────────────
+const PALETTE = [
+  ['#1b3d6f','#4a9eff'], ['#1d4a1d','#4cd94c'], ['#4a1d1d','#ff6b6b'],
+  ['#2a1d4a','#a78bfa'], ['#1d3a4a','#00b7d4'], ['#1d3a2a','#34d399'],
+  ['#3a2a1d','#fb923c'], ['#2a1d2a','#f472b6'],
+];
+const companyColorMap = {};
+let colorIdx = 0;
+function colorFor(c) {
+  if (!companyColorMap[c]) companyColorMap[c] = PALETTE[colorIdx++ % PALETTE.length];
+  return companyColorMap[c];
+}
+
+// ── Group by tariff (company + supplyType + tariffName) ───
+function buildGroups(rates) {
+  const map = new Map();
+  for (const r of rates) {
+    const key = `${r.company}||${r.supplyType}||${r.tariffName}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(r);
+  }
+  // Sort each group newest first
+  for (const [, list] of map) list.sort((a, b) => (b.receivedAt ?? '').localeCompare(a.receivedAt ?? ''));
+  return map;
+}
+
+// ── Fetch ─────────────────────────────────────────────────
+async function loadRates() {
+  document.getElementById('main').innerHTML = '<div class="state-box"><div class="spinner"></div><p>Cargando tarifas…</p></div>';
+  document.getElementById('stats').innerHTML = '';
+  try {
+    const res = await fetch('/api/v1/market-rates', { headers: { 'X-Session-Id': SESSION_ID } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const body = await res.json();
+    allRates = body.data ?? [];
+    tariffGroups = buildGroups(allRates);
+    render(activeFilter);
+  } catch (err) {
+    document.getElementById('main').innerHTML =
+      `<div class="state-box error"><div class="icon">⚠️</div><p>No se pudieron cargar las tarifas: ${err.message}</p></div>`;
+  }
+}
+
+// ── Render ────────────────────────────────────────────────
+function render(filter) {
+  activeFilter = filter;
+
+  // Latest record per tariff for this supply type
+  const currentRates = [];
+  for (const [, list] of tariffGroups) {
+    if (list[0].supplyType === filter) currentRates.push(list[0]);
+  }
+
+  renderStats(filter);
+
+  const byCompany = {};
+  for (const r of currentRates) {
+    if (!byCompany[r.company]) byCompany[r.company] = [];
+    byCompany[r.company].push(r);
+  }
+
+  const main = document.getElementById('main');
+  if (!Object.keys(byCompany).length) {
+    main.innerHTML = '<div class="state-box"><div class="icon">📭</div><p>No hay tarifas registradas para este tipo de suministro.</p></div>';
+    return;
+  }
+
+  main.innerHTML = Object.entries(byCompany).map(([company, rs]) => {
+    const [bg, fg] = colorFor(company);
+    const initials = company.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    return `
+      <div class="company-block">
+        <div class="company-header">
+          <div class="company-avatar" style="background:${bg};color:${fg}">${initials}</div>
+          <div class="company-name">${company}</div>
+          <span class="company-count">${rs.length} tarifa${rs.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="rates-grid">${rs.map(r => renderCard(r)).join('')}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderStats(filter) {
+  const uniqueTariffs = [...tariffGroups.values()].filter(l => l[0].supplyType === filter);
+  const totalRecords  = uniqueTariffs.reduce((s, l) => s + l.length, 0);
+  const companies     = new Set(uniqueTariffs.map(l => l[0].company)).size;
+  const vigentes      = uniqueTariffs.filter(l => isVigente(l[0])).length;
+
+  document.getElementById('stats').innerHTML = [
+    { value: uniqueTariffs.length, label: 'Tarifas únicas' },
+    { value: companies,            label: 'Compañías' },
+    { value: totalRecords,         label: 'Registros totales' },
+    { value: vigentes,             label: 'Vigentes' },
+  ].map(s => `<div class="stat"><span class="stat-value">${s.value}</span><span class="stat-label">${s.label}</span></div>`).join('');
+}
+
+function renderCard(r) {
+  const key = `${r.company}||${r.supplyType}||${r.tariffName}`;
+  const history = tariffGroups.get(key) ?? [r];
+  const isTelecom = r.supplyType === 'TELCO';
+  const isMulti   = r.pricePerKwh == null;
+
+  let priceHtml;
+  if (isTelecom) {
+    priceHtml = `${fmt(r.contractedPowerPrice)} <span class="price-unit">€/mes</span>`;
+  } else if (isMulti) {
+    const parts = [
+      r.pricePerKwhValle != null ? `<span class="price-unit">V </span>${fmt(r.pricePerKwhValle)}` : null,
+      r.pricePerKwhLlano != null ? `<span class="price-unit">L </span>${fmt(r.pricePerKwhLlano)}` : null,
+      r.pricePerKwhPunta != null ? `<span class="price-unit">P </span>${fmt(r.pricePerKwhPunta)}` : null,
+    ].filter(Boolean).join(' <span style="color:var(--border);font-weight:300"> / </span> ');
+    priceHtml = `${parts} <span class="price-unit">€/kWh</span>`;
+  } else {
+    priceHtml = `${fmt(r.pricePerKwh)} <span class="price-unit">€/kWh</span>`;
+  }
+
+  const details = [
+    !isTelecom && r.contractedPowerPrice != null
+      ? `<div class="detail-item"><span class="detail-label">Potencia P1</span><span class="detail-value">${fmt(r.contractedPowerPrice)} €/kW·día</span></div>` : '',
+    r.contractedPowerPriceP2 != null
+      ? `<div class="detail-item"><span class="detail-label">Potencia P2</span><span class="detail-value">${fmt(r.contractedPowerPriceP2)} €/kW·día</span></div>` : '',
+    r.region
+      ? `<div class="detail-item"><span class="detail-label">Región</span><span class="detail-value">${r.region}</span></div>` : '',
+    `<div class="detail-item"><span class="detail-label">Fuente</span><span class="detail-value">${r.source}</span></div>`,
+  ].filter(Boolean).join('');
+
+  const vigente = isVigente(r);
+  const keyEsc = key.replace(/'/g, "\\'");
+
+  return `
+    <div class="rate-card" data-type="${r.supplyType}" onclick="openDrawer('${keyEsc}')">
+      <div class="card-top">
+        <div class="tariff-name">${r.tariffName}</div>
+        <span class="supply-badge">${supplyLabels[r.supplyType] ?? r.supplyType}</span>
+      </div>
+      <div class="price-main">${priceHtml}</div>
+      <div class="card-details">${details}</div>
+      <div class="card-footer">
+        <span class="pill ${vigente ? 'vigente' : 'expirada'}">${vigente ? '● Vigente' : 'Expirada'}</span>
+        <span class="history-hint">Ver histórico <span class="count">${history.length}</span></span>
+      </div>
+    </div>`;
+}
+
+function isVigente(r) {
+  return r.validFrom <= TODAY && (!r.validTo || r.validTo >= TODAY);
+}
+
+// ── History drawer ────────────────────────────────────────
+function openDrawer(key) {
+  const history = tariffGroups.get(key);
+  if (!history) return;
+  const latest = history[0];
+  document.getElementById('drawer-title').textContent = latest.tariffName;
+  document.getElementById('drawer-subtitle').textContent = latest.company + ' · ' + (supplyLabels[latest.supplyType] ?? latest.supplyType);
+
+  const isTelecom = latest.supplyType === 'TELCO';
+  const isMulti   = latest.pricePerKwh == null && !isTelecom;
+
+  const rows = history.map((r, i) => {
+    const prev = history[i + 1];
+    const isCurrent = i === 0;
+
+    let priceCell, deltaHtml = '';
+    if (isTelecom) {
+      const delta = prev ? Number(r.contractedPowerPrice) - Number(prev.contractedPowerPrice) : null;
+      deltaHtml = fmtDelta(delta);
+      priceCell = `${fmt(r.contractedPowerPrice)} ${deltaHtml}`;
+    } else if (isMulti) {
+      const dV = prev ? Number(r.pricePerKwhValle) - Number(prev.pricePerKwhValle) : null;
+      const dP = prev ? Number(r.pricePerKwhPunta) - Number(prev.pricePerKwhPunta) : null;
+      priceCell = [
+        r.pricePerKwhValle != null ? `V: ${fmt(r.pricePerKwhValle)} ${fmtDelta(dV)}` : null,
+        r.pricePerKwhLlano != null ? `L: ${fmt(r.pricePerKwhLlano)}` : null,
+        r.pricePerKwhPunta != null ? `P: ${fmt(r.pricePerKwhPunta)} ${fmtDelta(dP)}` : null,
+      ].filter(Boolean).join(' / ');
+    } else {
+      const delta = prev ? Number(r.pricePerKwh) - Number(prev.pricePerKwh) : null;
+      deltaHtml = fmtDelta(delta);
+      priceCell = `${fmt(r.pricePerKwh)} ${deltaHtml}`;
+    }
+
+    return `
+      <tr class="${isCurrent ? 'current-row' : ''}">
+        <td>${fmtDatetime(r.receivedAt)}${isCurrent ? '<span class="current-tag">actual</span>' : ''}</td>
+        <td class="price-cell">${priceCell}</td>
+        ${!isTelecom ? `<td>${r.contractedPowerPrice != null ? fmt(r.contractedPowerPrice) : '—'}</td>` : ''}
+      </tr>`;
+  }).join('');
+
+  const priceHeader = isTelecom ? 'Precio/mes' : isMulti ? 'V / L / P (€/kWh)' : '€/kWh';
+  document.getElementById('drawer-body').innerHTML = `
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Fecha ingesta</th>
+          <th>${priceHeader}</th>
+          ${!isTelecom ? '<th>Potencia P1</th>' : ''}
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function fmt(val) {
+  if (val == null) return '—';
+  return Number(val).toFixed(6).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
+}
+
+function fmtDelta(delta) {
+  if (delta === null || delta === undefined || isNaN(delta)) return '';
+  if (delta > 0)  return `<span class="delta up">▲ ${fmt(Math.abs(delta))}</span>`;
+  if (delta < 0)  return `<span class="delta down">▼ ${fmt(Math.abs(delta))}</span>`;
+  return `<span class="delta same">= sin cambio</span>`;
+}
+
+function fmtDate(d) {
+  if (!d) return 'sin límite';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function fmtDatetime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Filters ───────────────────────────────────────────────
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn || btn.classList.contains('disabled')) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render(btn.dataset.type);
+});
+
+// ── Delete ────────────────────────────────────────────────
+function openConfirm()  { document.getElementById('modal').classList.add('open'); }
+function closeConfirm() { document.getElementById('modal').classList.remove('open'); }
+
+async function confirmDelete() {
+  closeConfirm();
+  const btn = document.getElementById('delete-btn');
+  btn.disabled = true;
+  btn.textContent = 'Eliminando…';
+  try {
+    const res = await fetch('/api/v1/market-rates', { method: 'DELETE', headers: { 'X-Session-Id': SESSION_ID } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    allRates = [];
+    tariffGroups = new Map();
+    render(activeFilter);
+  } catch (err) {
+    document.getElementById('main').innerHTML =
+      `<div class="state-box error"><div class="icon">⚠️</div><p>Error al eliminar: ${err.message}</p></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑 Eliminar registros';
+  }
+}
+
+loadRates();
+</script>
+</body>
+</html>

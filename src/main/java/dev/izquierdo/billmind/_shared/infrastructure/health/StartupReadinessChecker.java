@@ -3,6 +3,8 @@ package dev.izquierdo.billmind._shared.infrastructure.health;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class StartupReadinessChecker {
@@ -35,6 +39,8 @@ public class StartupReadinessChecker {
     private final String anthropicApiKey;
     private final String geminiApiKey;
     private final String groqApiKey;
+    private final boolean kafkaEnabled;
+    private final String kafkaBootstrapServers;
 
     public StartupReadinessChecker(
             DataSource dataSource,
@@ -44,7 +50,9 @@ public class StartupReadinessChecker {
             @Value("${llm.openai.api-key:}") String openAiApiKey,
             @Value("${llm.anthropic.api-key:}") String anthropicApiKey,
             @Value("${llm.gemini.api-key:}") String geminiApiKey,
-            @Value("${llm.groq.api-key:}") String groqApiKey) {
+            @Value("${llm.groq.api-key:}") String groqApiKey,
+            @Value("${kafka.enabled:false}") boolean kafkaEnabled,
+            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String kafkaBootstrapServers) {
         this.dataSource = dataSource;
         this.llmProvider = llmProvider;
         this.ollamaBaseUrl = ollamaBaseUrl;
@@ -53,6 +61,8 @@ public class StartupReadinessChecker {
         this.anthropicApiKey = anthropicApiKey;
         this.geminiApiKey = geminiApiKey;
         this.groqApiKey = groqApiKey;
+        this.kafkaEnabled = kafkaEnabled;
+        this.kafkaBootstrapServers = kafkaBootstrapServers;
     }
 
     @PostConstruct
@@ -60,6 +70,9 @@ public class StartupReadinessChecker {
         log.info("┌─ BillMind startup checks ───────────────────────");
         checkPgVector();
         checkLlmProvider();
+        if (kafkaEnabled) {
+            checkKafka();
+        }
         log.info("└─ All checks passed — ready to accept requests ──");
     }
 
@@ -138,6 +151,22 @@ public class StartupReadinessChecker {
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Could not retrieve Ollama model list (" + e.getClass().getSimpleName() + ")", e);
+        }
+    }
+
+    private void checkKafka() {
+        try (AdminClient admin = AdminClient.create(
+                Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrapServers,
+                       AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, (int) TIMEOUT.toMillis(),
+                       AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, (int) TIMEOUT.toMillis()))) {
+
+            admin.describeCluster().clusterId().get((int) TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            log.info("│  [OK] Kafka reachable at {}", kafkaBootstrapServers);
+
+        } catch (Exception ex) {
+            throw new IllegalStateException(
+                    "Kafka is not reachable at " + kafkaBootstrapServers + ". " +
+                    "Start Kafka or set KAFKA_ENABLED=false to disable it.", ex);
         }
     }
 

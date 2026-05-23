@@ -13,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - billmind_pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U billmind -d billmind"]
       interval: 10s
@@ -51,10 +52,10 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -70,9 +71,9 @@ services:
     profiles:
       - kafka
 
-  # Pulls the minimum required models on first start.
-  # all-minilm  — embeddings (always required when using Ollama for vectors)
-  # llama3.2    — chat/classification (required when LLM_PROVIDER=ollama)
+  # Pulls the chat model on first start.
+  # llama3.2  — chat/classification (required when LLM_PROVIDER=ollama)
+  # Embeddings (AllMiniLM-L6-v2) run via ONNX inside the app container — Ollama is not needed for vector search.
   ollama-setup:
     image: ollama/ollama:latest
     container_name: billmind-ollama-setup
@@ -83,8 +84,6 @@ services:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: >
       /bin/sh -c "
-        echo 'Pulling all-minilm (embeddings)...' &&
-        ollama pull all-minilm &&
         echo 'Pulling llama3.2 (chat)...' &&
         ollama pull llama3.2 &&
         echo 'Models ready.'
@@ -92,6 +91,45 @@ services:
     restart: "no"
     profiles:
       - local-ai
+
+  # ── Application ──────────────────────────────────────────────────────────────
+  # Default profile: postgres only. Add --profile local-ai to also start Ollama.
+  # Override LLM_PROVIDER and the corresponding API key env var for cloud providers.
+
+  app:
+    build: .
+    container_name: billmind-app
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: jdbc:postgresql://postgres:5432/billmind
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: billmind
+      DB_USERNAME: billmind
+      DB_PASSWORD: billmind
+      CORS_ALLOWED_ORIGIN: "http://localhost:8082"
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: llama3.2
+      OLLAMA_TIMEOUT_SECONDS: 240
+      PGVECTOR_TABLE_NAME: vector_store
+      PGVECTOR_DIMENSIONS: 384
+      PGVECTOR_USE_INDEX: "true"
+      PGVECTOR_INDEX_LIST_SIZE: 100
+      KAFKA_ENABLED: "${KAFKA_ENABLED:-false}"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_PARTITIONS: 3
+      KAFKA_TOPIC_REPLICAS: 1
+      JWT_SECRET: dev-only-secret-change-in-production
+      JWT_EXPIRATION: 86400000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+        required: false
 
 volumes:
   billmind_pgdata:

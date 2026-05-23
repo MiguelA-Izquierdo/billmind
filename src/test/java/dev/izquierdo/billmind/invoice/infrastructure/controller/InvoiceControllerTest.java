@@ -7,6 +7,7 @@ import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionService;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
+import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
 import org.junit.jupiter.api.BeforeEach;
@@ -114,6 +115,19 @@ class InvoiceControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value(
                         "El archivo no parece ser una factura de suministro del hogar (electricidad, gas, agua o telecomunicaciones)"
+                ));
+    }
+
+    @Test
+    void uploadInvoice_withUnsupportedSupplyType_returns422() throws Exception {
+        doThrow(new UnsupportedSupplyTypeException(InvoiceType.GAS)).when(commandBus).dispatch(any());
+
+        mockMvc.perform(multipart("/api/v1/invoices/upload")
+                        .file(validPdf("factura-gas.pdf"))
+                        .header("X-Session-Id", SESSION_ID.toString()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "El tipo de suministro 'GAS' no está soportado todavía. Por el momento solo se aceptan facturas de electricidad."
                 ));
     }
 

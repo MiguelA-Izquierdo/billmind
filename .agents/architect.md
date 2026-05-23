@@ -11,9 +11,9 @@ Design BillMind's architecture following **Domain-Driven Design (DDD)** and **He
 **BillMind** is a Spring Boot 3.5.0 + Java 21 application that:
 - Ingests PDF invoices: parsing, hybrid classification (keyword + LLM), structured field extraction, PII redaction
 - Persists invoices in PostgreSQL 16
-- Hosts a regulatory knowledge base (CNMC, REE, BOE) in pgVector (HNSW, 384 dim, AllMiniLM-L6-v2) for RAG
+- Hosts a regulatory knowledge base (CNMC, REE, BOE) in pgVector (IVFFlat, 384 dim, AllMiniLM-L6-v2) for RAG — HNSW is the target index but is not yet available in `langchain4j-pgvector:1.0.0-beta5`
 - Exposes a REST API on port 8082
-- Scaffolded modules: `assistant/`, `comparison/`, `market/`
+- Scaffolded modules: `comparison/`, `market/`
 
 **Project stack:**
 - `langchain4j 1.0.0` (BOM-managed; core/openai at 1.0.0 final, integrations at 1.0.0-beta5)
@@ -85,7 +85,7 @@ Before delivering any design, verify:
 - [ ] Are business rules in the domain? → **OK**
 - [ ] Are Value Objects immutable? → **OK**
 - [ ] Is every Port in `domain/port/`? → **OK**
-- [ ] Do scaffolded modules `assistant/`, `comparison/`, `market/` have their `package-info.java`? → **OK**
+- [ ] Do scaffolded modules `comparison/`, `market/` have their `package-info.java`? → **OK** (`assistant/` not yet scaffolded — pending Milestone 3)
 
 ---
 

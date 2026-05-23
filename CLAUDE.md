@@ -10,7 +10,7 @@
 
 The product lets an anonymous visitor upload an invoice and (a) compare it against current market data and (b) chat about it. The chat uses dual context: the user's full invoice text passed directly to the LLM + semantic retrieval from the regulatory knowledge base. User accounts are out of scope for Phase 1 — the frontend generates a UUID per session and sends it as `X-Session-Id`. Auth lands in Milestone 7 (Phase 2).
 
-**Current state:** Milestones 0 and 1 are complete. The `invoice/` module handles the full pipeline: PDF ingestion, hybrid classification, LLM-powered structured field extraction (electricity, gas, water, telecom), PII redaction, and persistence. Session infrastructure (`sessions` table, `X-Session-Id` filter) and `GET /invoices` endpoints are in place. The `comparison/`, `market/` and `assistant/` modules are scaffolding. Next: Milestone 2 (regulatory knowledge base + hybrid retrieval). See `docs/PLAN.md` for the full roadmap.
+**Current state:** Milestones 0, 1, and the Market Price Consumer part of Milestone 2 are complete. The `invoice/` module handles the full pipeline: PDF ingestion, hybrid classification, LLM-powered structured field extraction (electricity, gas, water, telecom), PII redaction, and persistence. Session infrastructure (`sessions` table, `X-Session-Id` filter) and `GET /invoices` endpoints are in place. The `market/` module is fully implemented: Kafka consumer (`ElectricityPriceConsumer`), `electricity_rates` persistence, `GET /api/v1/market-rates` endpoint, and a static HTML viewer. The `comparison/` module is scaffolding (package skeleton only). The `assistant/` module does not exist yet. Next: regulatory knowledge base + hybrid retrieval (remaining deliverables of Milestone 2). See `docs/PLAN.md` for the full roadmap.
 
 ---
 
@@ -31,9 +31,11 @@ src/main/java/dev/izquierdo/billmind/
 │   └── infrastructure/
 │       ├── GlobalExceptionHandler    # Centralized @ControllerAdvice
 │       ├── command/                  # SimpleCommandBus
+│       ├── config/                   # LangChain4jConfig (EmbeddingModel, PgVectorEmbeddingStore)
 │       ├── dto/                      # ErrorResponseDTO, SuccessResponseDTO
 │       ├── event/                    # SpringDomainEventPublisher
-│       ├── health/                   # StartupReadinessChecker, OllamaHealthIndicator
+│       ├── health/                   # StartupReadinessChecker, OllamaHealthIndicator, KafkaHealthIndicator
+│       ├── kafka/                    # KafkaEvent, KafkaConsumerFactoryConfig
 │       ├── llm/                      # TimedChatLanguageModel (implements ChatModel), ModelPricingRegistry, LlmResponseJsonSanitizer
 │       ├── persistence/              # SessionEntity, SessionJpaRepository
 │       ├── query/                    # SimpleQueryBus
@@ -51,18 +53,20 @@ src/main/java/dev/izquierdo/billmind/
 │   │   └── usecase/                  # UploadInvoiceUseCase, GetInvoiceUseCase, GetSessionInvoicesUseCase
 │   └── infrastructure/
 │       ├── adapter/
-│       │   ├── classifier/           # HybridInvoiceClassifier, KeywordClassifier, LlmInvoiceClassifier
-│       │   ├── fieldextractor/       # LlmInvoiceFieldExtractor, ExtractionPromptBuilder
+│       │   ├── classifier/           # KeywordInvoiceClassifier, LlmInvoiceClassifier
+│       │   ├── fieldextractor/       # ExtractionPromptBuilder, InvoiceFieldsValidator
 │       │   ├── pii/                  # HybridPiiRedactor, PiiPatterns
-│       │   └── PdfInvoiceParser      # PDF bytes → plain text (implements InvoiceParser port)
+│       │   ├── HybridInvoiceClassifier    # implements InvoiceClassifier port
+│       │   ├── LlmInvoiceFieldExtractor   # implements InvoiceFieldExtractor port
+│       │   └── PdfInvoiceParser           # PDF bytes → plain text (implements InvoiceParser port)
 │       ├── config/                   # chat/ (ChatModelRolesConfig, per-provider beans)
 │       ├── controller/               # InvoiceController
 │       │   └── dto/                  # InvoiceResponse, InvoiceUploadResponse
 │       └── persistence/              # InvoiceEntity, JpaInvoiceRepository
 │
-├── assistant/                        # Bounded Context: conversational RAG (Milestone 3)
+├── assistant/                        # Bounded Context: conversational RAG (Milestone 3 — not yet scaffolded)
 ├── comparison/                       # Bounded Context: comparison agent (Milestone 5)
-└── market/                           # Bounded Context: market rate ingestion (Milestone 4)
+└── market/                           # Bounded Context: market rate ingestion (Milestone 2 — Market Consumer)
 ```
 
 ### Rules (NEVER violate)
@@ -144,8 +148,9 @@ Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api
 |---|---|---|
 | `domain/` | Pure unit test | `@Test` only |
 | `application/usecase/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` |
-| `infrastructure/adapter/` | Integration test | `@SpringBootTest` + TestContainers |
-| `infrastructure/controller/` | Integration test | `@SpringBootTest` + `@AutoConfigureMockMvc` |
+| `infrastructure/adapter/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` |
+| `infrastructure/adapter/` (`*IT.java`) | Integration test | `@SpringBootTest` + TestContainers |
+| `infrastructure/controller/` | MVC slice test | `@WebMvcTest` + `@MockBean` |
 
 - Naming: `should[State]When[Condition]()` or `given[Ctx]_when[Action]_then[Result]()`
 - Integration tests suffixed `*IT.java`

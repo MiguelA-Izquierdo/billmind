@@ -8,7 +8,7 @@ Ensure BillMind is secure by design across all layers: REST API, file handling, 
 
 ## Project Context
 
-**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 0.36.2
+**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 1.0.0
 
 **Attack surface:**
 - **REST API** (port 8082): PDF upload endpoint, future search endpoints
@@ -120,7 +120,7 @@ Dependencies to monitor regularly:
 | Dependency | Current Version | Potential Risk |
 |---|---|---|
 | `spring-boot` | 3.5.0 | Keep on latest patch releases |
-| `langchain4j` | 0.36.2 | Check CVEs in transitive libraries |
+| `langchain4j` | 1.0.0 | Check CVEs in transitive libraries |
 | `pdfbox` (via langchain4j-document-parser-apache-pdfbox) | transitive | History of PDF parsing CVEs |
 | `postgresql` driver | transitive | Verify version |
 | `testcontainers` | 1.21.0 | Test scope only, low risk |

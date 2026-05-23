@@ -2,9 +2,9 @@
 
 > **Are you overpaying on your utility bills?** BillMind ingests your invoices, understands them semantically, and will soon tell you exactly how much you're being overcharged — and who offers a better deal.
 
-An AI-powered REST API for utility invoice intelligence: PDF ingestion, hybrid AI classification, LLM-powered structured extraction, and (coming soon) price comparison against real market data.
+An AI-powered REST API for utility invoice intelligence: PDF ingestion, hybrid AI classification, LLM-powered structured extraction, and price comparison against real market data (Milestone 2).
 
-Built with **Spring Boot 3.5.0**, **Java 21**, and **LangChain4j 0.36.2**. Supports both **fully local AI** (Ollama, zero cloud dependencies) and **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env variable — your choice.
+Built with **Spring Boot 3.5.0**, **Java 21**, and **LangChain4j 1.0.0**. Supports both **fully local AI** (Ollama, zero cloud dependencies) and **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env variable — your choice.
 
 ---
 
@@ -21,8 +21,8 @@ PDF invoice
                   and provider company; rejects non-supply documents
     │
     ▼
-3. EXTRACT      — LangChain4j AiServices extracts structured fields (price/kWh, contracted power,
-                  billing period, totals); PII redacted before persisting
+3. EXTRACT      — LangChain4j ChatModel extracts structured fields (price/kWh, contracted power,
+                  billing period, totals) via typed prompt + JSON parsing; PII redacted before persisting
     │
     ▼
 4. COMPARE  *   — cross-references your rates against current market data; LLM evaluates overpayment
@@ -45,11 +45,11 @@ PDF text
   ├─ blank? ──────────────────► rejected (OTRO / DESCONOCIDA)
   │
   ▼
-KeywordClassifier ──── match? ──► LlmClassifier.extractCompany()
-  │                                       │
-  │ no match                              ▼
-  ▼                              InvoiceClassification(type, company)
-LlmClassifier.classify()
+KeywordInvoiceClassifier ──── match? ──► LlmInvoiceClassifier.extractCompany()
+  │                                              │
+  │ no match                                     ▼
+  ▼                                     InvoiceClassification(type, company)
+LlmInvoiceClassifier.classify()
   │
   ▼
 InvoiceClassification(type, company)
@@ -63,7 +63,7 @@ Keywords handle the obvious cases ("kWh", "REE" → electricity). The LLM is onl
 LLM_PROVIDER=ollama      # 100% local, no API keys needed
 LLM_PROVIDER=anthropic   # Claude Sonnet 4.6
 LLM_PROVIDER=openai      # GPT-4o
-LLM_PROVIDER=gemini      # Gemini 1.5 Pro
+LLM_PROVIDER=gemini      # Gemini 2.5 Flash
 LLM_PROVIDER=groq        # Llama 3.3 70B (fast inference)
 ```
 
@@ -121,16 +121,18 @@ src/main/java/dev/izquierdo/billmind/
 │   │   └── query/              # GetInvoiceQuery, GetSessionInvoicesQuery, handlers
 │   └── infrastructure/
 │       ├── adapter/
-│       │   ├── classifier/     # HybridInvoiceClassifier, KeywordClassifier, LlmInvoiceClassifier
-│       │   ├── fieldextractor/ # LlmInvoiceFieldExtractor, ExtractionPromptBuilder
-│       │   └── pii/            # HybridPiiRedactor, PiiPatterns
-│       ├── config/             # LangChain4jConfig, ChatModelRolesConfig, per-provider beans
+│       │   ├── classifier/     # KeywordInvoiceClassifier, LlmInvoiceClassifier
+│       │   ├── fieldextractor/ # ExtractionPromptBuilder, InvoiceFieldsValidator
+│       │   ├── pii/            # HybridPiiRedactor, PiiPatterns
+│       │   ├── HybridInvoiceClassifier
+│       │   └── LlmInvoiceFieldExtractor
+│       ├── config/             # ChatModelRolesConfig, per-provider beans
 │       ├── controller/         # InvoiceController
 │       └── persistence/        # InvoiceEntity, JpaInvoiceRepository
 │
 ├── assistant/                  # Bounded Context: conversational RAG        [Roadmap M3]
 ├── comparison/                 # Bounded Context: price comparison agent     [Roadmap M5]
-└── market/                     # Bounded Context: market rate ingestion      [Roadmap M4]
+└── market/                     # Bounded Context: market rate ingestion      [Active — M2]
 ```
 
 ---
@@ -149,24 +151,23 @@ Full reference (log levels, key log lines, validation thresholds, Micrometer roa
 ## Quick Start
 
 ```bash
-# 1. Start infrastructure
-#    Default (cloud provider or Ollama already running locally):
-docker-compose up -d
+# Local AI (Ollama) + Kafka
+docker compose --profile local-ai --profile kafka up -d
 
-#    Local AI mode — also starts Ollama and pulls all-minilm automatically:
-docker-compose --profile local-ai up -d
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env — set LLM_PROVIDER and the matching credentials
-
-# 3. Run
-./mvnw spring-boot:run
-# → http://localhost:8082
+# Cloud LLM provider + Kafka (edit LLM_PROVIDER and add the API key in docker-compose.yml)
+docker compose --profile kafka up -d
 ```
 
-- Full configuration reference → [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
+See [`docs/DOCKER.md`](docs/DOCKER.md) for the full setup guide, profile reference, and provider switching instructions.
+
+---
+
+## Docs
+
+- Docker setup → [`docs/DOCKER.md`](docs/DOCKER.md)
+- Configuration reference → [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - API reference → [`docs/API.md`](docs/API.md)
+- Market module → [`docs/MARKET.md`](docs/MARKET.md)
 - Test guide → [`docs/TESTING.md`](docs/TESTING.md)
 - Observability → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)
 - Roadmap → [`docs/PLAN.md`](docs/PLAN.md)

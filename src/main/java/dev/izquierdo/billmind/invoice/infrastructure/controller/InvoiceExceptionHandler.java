@@ -4,7 +4,6 @@ import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
-import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -35,13 +34,6 @@ class InvoiceExceptionHandler {
     @ExceptionHandler(InvoiceFieldExtractionException.class)
     ResponseEntity<ErrorResponseDTO> handleInvoiceFieldExtraction(InvoiceFieldExtractionException ex) {
         logException(ex);
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
-                ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
-        );
-    }
-
-    @ExceptionHandler(NotASupplyInvoiceException.class)
-    ResponseEntity<ErrorResponseDTO> handleNotASupplyInvoice(NotASupplyInvoiceException ex) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
                 ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
         );

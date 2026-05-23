@@ -1,0 +1,60 @@
+# Eventos de prueba — ElectricityPriceEvent
+# Topic: market.electricity-price-updated
+#
+# Publicar con kcat (todos a la vez):
+#   kcat -b localhost:9092 -t market.electricity-price-updated -P -l electricity-price-events.txt
+#
+# Publicar con kafka-console-producer (uno a uno, pegar cada JSON):
+#   kafka-console-producer.sh --bootstrap-server localhost:9092 --topic market.electricity-price-updated
+#
+# ══════════════════════════════════════════════════════════════════════════════
+# EVENTOS VÁLIDOS — deben persistirse en market_rates
+# ══════════════════════════════════════════════════════════════════════════════
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000001","company":"IBERDROLA","tariffName":"2.0TD","pricePerKwh":0.148500,"contractedPowerPrice":0.103000,"validFrom":"2025-01-01","validTo":"2025-12-31","region":"PENINSULA","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000002","company":"ENDESA","tariffName":"2.0TD","pricePerKwh":0.152300,"contractedPowerPrice":0.107500,"validFrom":"2025-01-01","validTo":"2025-12-31","region":"PENINSULA","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000003","company":"NATURGY","tariffName":"2.0TD","pricePerKwh":0.145800,"contractedPowerPrice":0.101200,"validFrom":"2025-01-01","validTo":"2025-12-31","region":"PENINSULA","source":"CNMC","publishedAt":"2025-01-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000004","company":"REPSOL","tariffName":"2.0TD","pricePerKwh":0.139900,"contractedPowerPrice":0.098400,"validFrom":"2025-02-01","validTo":"2025-12-31","region":"PENINSULA","source":"CNMC","publishedAt":"2025-02-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000005","company":"HOLALUZ","tariffName":"2.0TD","pricePerKwh":0.134200,"contractedPowerPrice":0.096700,"validFrom":"2025-03-01","validTo":null,"region":"PENINSULA","source":"CNMC","publishedAt":"2025-03-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000006","company":"IBERDROLA","tariffName":"3.0TD","pricePerKwh":0.121000,"contractedPowerPrice":0.089300,"validFrom":"2025-01-01","validTo":"2025-12-31","region":"PENINSULA","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000007","company":"ENDESA","tariffName":"PVPC","pricePerKwh":0.098700,"contractedPowerPrice":0.078600,"validFrom":"2025-01-01","validTo":null,"region":"PENINSULA","source":"OMIE","publishedAt":"2025-01-01T00:00:00Z"}
+
+{"type":"ElectricityPriceUpdated","eventId":"11111111-0000-0000-0000-000000000008","company":"IBERDROLA","tariffName":"2.0TD","pricePerKwh":0.201400,"contractedPowerPrice":0.118900,"validFrom":"2025-01-01","validTo":"2025-12-31","region":"BALEARES","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ERRORES DE DOMINIO — ACK inmediato, van a market.electricity-price-updated.domain-errors
+# ══════════════════════════════════════════════════════════════════════════════
+
+# [DOMAIN ERROR] pricePerKwh negativo
+{"type":"ElectricityPriceUpdated","eventId":"22222222-0000-0000-0000-000000000001","company":"IBERDROLA","tariffName":"2.0TD","pricePerKwh":-0.050000,"contractedPowerPrice":0.103000,"validFrom":"2025-01-01","validTo":null,"region":"PENINSULA","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+# [DOMAIN ERROR] company en blanco
+{"type":"ElectricityPriceUpdated","eventId":"22222222-0000-0000-0000-000000000002","company":"   ","tariffName":"2.0TD","pricePerKwh":0.148500,"contractedPowerPrice":0.103000,"validFrom":"2025-01-01","validTo":null,"region":"PENINSULA","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+# [DOMAIN ERROR] validFrom null
+{"type":"ElectricityPriceUpdated","eventId":"22222222-0000-0000-0000-000000000003","company":"ENDESA","tariffName":"2.0TD","pricePerKwh":0.148500,"contractedPowerPrice":null,"validFrom":null,"validTo":null,"region":"PENINSULA","source":"REE","publishedAt":null}
+
+# [DOMAIN ERROR] validTo anterior a validFrom
+{"type":"ElectricityPriceUpdated","eventId":"22222222-0000-0000-0000-000000000004","company":"NATURGY","tariffName":"2.0TD","pricePerKwh":0.148500,"contractedPowerPrice":null,"validFrom":"2025-06-01","validTo":"2025-01-01","region":"PENINSULA","source":"CNMC","publishedAt":null}
+
+# [DOMAIN ERROR] source vacío
+{"type":"ElectricityPriceUpdated","eventId":"22222222-0000-0000-0000-000000000005","company":"REPSOL","tariffName":"2.0TD","pricePerKwh":0.148500,"contractedPowerPrice":null,"validFrom":"2025-01-01","validTo":null,"region":"PENINSULA","source":"","publishedAt":null}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ERRORES DE INFRAESTRUCTURA — 3 reintentos y van al DLT
+# ══════════════════════════════════════════════════════════════════════════════
+
+# [DLT] eventId no es un UUID válido → IllegalArgumentException en UUID.fromString
+{"type":"ElectricityPriceUpdated","eventId":"esto-no-es-un-uuid","company":"IBERDROLA","tariffName":"2.0TD","pricePerKwh":0.148500,"contractedPowerPrice":0.103000,"validFrom":"2025-01-01","validTo":null,"region":"PENINSULA","source":"REE","publishedAt":"2025-01-01T00:00:00Z"}
+
+# [DLT] type desconocido → el consumer lanza IllegalStateException ("Unexpected event type")
+{"type":"GasPriceUpdated","eventId":"33333333-0000-0000-0000-000000000002","company":"NATURGY","tariffName":"T2","pricePerKwh":0.082000,"contractedPowerPrice":null,"validFrom":"2025-01-01","validTo":null,"region":"PENINSULA","source":"CNMC","publishedAt":"2025-01-01T00:00:00Z"}
+
+# [DLT] JSON malformado → falla la deserialización antes de llegar al consumer
+{esto no es json valido

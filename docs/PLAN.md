@@ -38,8 +38,8 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | Hybrid retrieval over knowledge base (pgVector + `tsvector` BM25 + RRF) | 2 | Pure vector search misses keyword-heavy regulatory queries |
 | Cross-encoder re-ranker | 2 | Retrieval quality |
 | Apache Kafka (KRaft) + `spring-kafka` | 2 | Event-driven market price ingestion — no polling |
-| `market/` bounded context — `MarketRate` aggregate + `market_rates` table | 2 | Persist incoming price events for the comparison agent |
-| `MarketPriceConsumer` — Kafka listener on `market.price-updated` | 2 | Prices arrive in real-time; the external producer is a separate service |
+| `market/` bounded context — `ElectricityRate` aggregate + `electricity_rates` table | 2 | Persist incoming price events for the comparison agent |
+| `ElectricityPriceConsumer` — Kafka listener on `market.electricity-price-updated`; future `GasPriceConsumer`, etc. follow the same per-supply-type pattern | 2 | Prices arrive in real-time; the external producer is a separate service |
 | `assistant/` bounded context | 3 | Conversational RAG — the demo "wow" |
 | SSE streaming | 3 | Real LLM UX |
 | Persistent conversational memory | 3 | Stateless design — no volatile in-process storage |
@@ -66,8 +66,11 @@ sessions (id UUID PK, first_seen_at, last_seen_at)
           └── messages (id, conversation_id FK, role, content,
                        citations[], created_at, tokens_in, tokens_out)
 
-market_rates (id, supply_type, provider, tariff_name,
-              price_per_kwh, valid_from, valid_to, region, source)
+electricity_rates (id, supply_type, company, tariff_name,
+              price_per_kwh,
+              price_per_kwh_valle, price_per_kwh_llano, price_per_kwh_punta,
+              contracted_power_price, contracted_power_price_p2,
+              valid_from, valid_to, region, source, received_at)
 
 comparisons (id, invoice_id FK, session_id FK, result_json,
              tools_called[], created_at, model_used)
@@ -143,14 +146,29 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Architectural decision — multi-model role routing (resolved):** two named beans `fastChatModel` and `smartChatModel` are defined in `ChatModelRolesConfig`. In dev both alias the single configured provider. In production they can be independently routed to different providers by replacing the aliases with provider-specific beans (`llm.role.fast.*` / `llm.role.smart.*` properties). Role assignment: `fastChatModel` → classification, PII redaction; `smartChatModel` → structured extraction, RAG, agent reasoning.
 
-### Milestone 2 — Knowledge Base Ingestion + Hybrid Search + Market Price Consumer ← NEXT
+### Milestone 2 — Knowledge Base Ingestion + Hybrid Search + Market Price Consumer ← IN PROGRESS
+
+> **Electricity-first:** all milestones through Phase 1 target electricity invoices only (`InvoiceType.LUZ`). Uploading a gas, water, or telecom invoice returns HTTP 422 (`UnsupportedSupplyTypeException`). Support for other supply types is deferred to a later milestone.
 
 **Objective:** populate the regulatory knowledge base, build the retrieval layer the assistant will use, and introduce event-driven market price ingestion via Kafka.
 
-**Deliverables — Knowledge Base:**
+**Deliverables — Market Price Consumer (Kafka): ✓ COMPLETE**
 
-- Migrate existing Milestone 1 string-literal prompts to versioned `.txt` files under `src/main/resources/prompts/` (one file per role: `classify.txt`, `extract-electricity.txt`, `extract-gas.txt`, `extract-water.txt`, `extract-telecom.txt`, `redact-pii.txt`). Loaded at startup via `ClassPathResource`; adapters inject the text, not the path. New prompts for Milestone 2 follow the same convention.
-  - Initial golden set (5–10 anonymized invoices) with field-extraction tests as the baseline for the M6 eval harness.
+- Apache Kafka (KRaft, no ZooKeeper) in `docker-compose.yml` under the `kafka` profile.
+  - `spring-kafka` dependency in `pom.xml`.
+  - Bounded context `market/` with:
+    - `ElectricityRate` aggregate: `id`, `supplyType` (`InvoiceType` enum), `company`, `tariffName`, `pricePerKwh` (nullable for TOU tariffs), `pricePerKwhValle`, `pricePerKwhLlano`, `pricePerKwhPunta` (nullable for flat-rate tariffs), `contractedPowerPrice`, `contractedPowerPriceP2` (both nullable), `validFrom`, `validTo`, `region`, `source`, `receivedAt`.
+    - Port `ElectricityRateRepository`.
+    - `electricity_rates` table (JPA entity).
+  - `ElectricityPriceEvent` record (Kafka message schema for electricity, deserialized from JSON): `eventId`, `company`, `tariffName`, `pricePerKwh` (nullable for TOU), `pricePerKwhValle`, `pricePerKwhLlano`, `pricePerKwhPunta` (nullable for flat-rate), `contractedPowerPrice`, `contractedPowerPriceP2` (both nullable), `validFrom`, `validTo`, `region`, `source`, `publishedAt`. A `type` discriminator field is required; unknown types are sent directly to DLT. Future supply types add their own event records (`GasPriceEvent`, etc.).
+  - `ElectricityPriceConsumer`: `@KafkaListener` on topic `market.electricity-price-updated`, consumer group `billmind-market`. Deserializes JSON → `ElectricityPriceEvent` → delegates to `SaveElectricityRateUseCase`. Idempotent upsert on `(company, supplyType, tariffName, validFrom)`. Future supply types introduce their own consumer class (`GasPriceConsumer` on `market.gas-price-updated`, etc.).
+  - `SaveElectricityRateUseCase` — application layer between consumer and repository (keeps hexagonal rules intact; the consumer lives in infrastructure and never touches the domain directly).
+  - Dead-letter topic `market.electricity-price-updated.DLT` for deserialization or validation failures; domain validation errors go to `market.electricity-price-updated.domain-errors`.
+  - Integration test with TestContainers Kafka (`spring-kafka-test`).
+
+**Deliverables — Knowledge Base: PENDING**
+
+- Initial golden set (5–10 anonymized invoices) with field-extraction tests as the baseline for the M6 eval harness.
   - Bounded context `knowledge/` with `KnowledgeDocument` aggregate and `KnowledgeChunk`.
   - Ingestion pipeline: fetch regulatory documents (CNMC methodology, REE/ESIOS tariff guides, BOE sector regulations) → chunk → embed → store in pgVector with metadata (`doc_type`, `source`, `title`, `section`).
   - Port `KnowledgeSearchRepository`.
@@ -160,23 +178,9 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - Admin endpoint `POST /api/v1/admin/knowledge/ingest` to trigger ingestion manually.
   - Retrieval tests with recall@k / MRR against a small curated query set.
 
-**Deliverables — Market Price Consumer (Kafka):**
-
-- Apache Kafka (KRaft, no ZooKeeper) added to `docker-compose.yml` under the `kafka` profile. Start with: `docker-compose --profile kafka up -d`.
-  - `spring-kafka` dependency in `pom.xml`.
-  - Bounded context `market/` with:
-    - `MarketRate` aggregate: `id`, `supplyType` (`InvoiceType` enum), `company`, `tariffName`, `pricePerKwh`, `contractedPowerPrice` (nullable, electricity only), `validFrom`, `validTo`, `region`, `source`, `receivedAt`.
-    - Port `MarketRateRepository`.
-    - `market_rates` table (JPA entity).
-  - `MarketPriceEvent` record (Kafka message schema, deserialized from JSON): `eventId`, `supplyType`, `company`, `tariffName`, `pricePerKwh`, `contractedPowerPrice` (nullable), `validFrom`, `validTo`, `region`, `source`, `publishedAt`.
-  - `MarketPriceConsumer`: `@KafkaListener` on topic `market.price-updated`, consumer group `billmind-market`. Deserializes JSON → `MarketPriceEvent` → delegates to `SaveMarketRateUseCase`. Idempotent upsert on `(company, supplyType, tariffName, validFrom)`.
-  - `SaveMarketRateUseCase` — application layer between consumer and repository (keeps hexagonal rules intact; the consumer lives in infrastructure and never touches the domain directly).
-  - Dead-letter topic `market.price-updated.DLT` for deserialization or validation failures.
-  - Integration test with TestContainers Kafka (`spring-kafka-test`).
-
 **Dependencies:** Milestone 0 (database infrastructure).
 
-**Note on the price producer:** BillMind only consumes. The service that fetches prices from external sources (e.g. REE ESIOS API) and publishes `MarketPriceEvent` is a separate system, developed independently. BillMind trusts its events without question.
+**Note on the price producer:** BillMind only consumes. The service that fetches prices from external sources (e.g. REE ESIOS API) and publishes `ElectricityPriceEvent` (and future per-supply-type events) is a separate system, developed independently. BillMind trusts its events without question.
 
 **Candidate documents (knowledge base):**
 - CNMC: tariff methodology circulars
@@ -184,7 +188,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - BOE: Real Decreto 1164/2001, RD 216/2014, and related sector regulations
   - Glossary of billing terms (CUPS, término de potencia, peaje de acceso, etc.)
 
-**Engineering highlights:** versioned prompt files loaded via `ClassPathResource`, initial extraction golden set as regression baseline, hybrid pgVector + BM25 retrieval with RRF, recall@k / MRR evaluation, metadata-filtered knowledge search; event-driven market price ingestion via Kafka (KRaft) with idempotent upsert, DLT for failures, and TestContainers integration tests.
+**Engineering highlights:** event-driven market price ingestion via Kafka (KRaft) with flat-rate and TOU pricing support, idempotent upsert, DLT + domain-error topics, TestContainers integration tests; initial extraction golden set as regression baseline, hybrid pgVector + BM25 retrieval with RRF, recall@k / MRR evaluation, metadata-filtered knowledge search.
 
 ### Milestone 3 — `assistant/` module — Conversational RAG
 
@@ -207,14 +211,14 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 ### Milestone 4 — Market Price Producer *(separate service, developed independently)*
 
-**Objective:** build the external service that fetches prices from real sources and publishes `MarketPriceEvent` to Kafka, making BillMind's consumer fully operational end-to-end.
+**Objective:** build the external service that fetches prices from real sources and publishes per-supply-type price events to Kafka, making BillMind's consumer fully operational end-to-end.
 
-**Scope:** this is a standalone Spring Boot service, not part of the `billmind` repo. It shares the `market.price-updated` Kafka topic and the `MarketPriceEvent` JSON schema defined in Milestone 2.
+**Scope:** this is a standalone Spring Boot service, not part of the `billmind` repo. It publishes to per-supply-type topics (`market.electricity-price-updated`, `market.gas-price-updated`, etc.) using the event schemas defined in Milestone 2 (`ElectricityPriceEvent`, and future `GasPriceEvent`, etc.).
 
 **Deliverables:**
 
 - Daily `@Scheduled` job pulling from REE ESIOS API for electricity; mocks for gas, water, telecom initially.
-  - Maps API response → `MarketPriceEvent` and publishes to `market.price-updated`.
+  - Maps API response → `ElectricityPriceEvent` (or the corresponding per-supply-type event) and publishes to the matching topic.
   - Idempotent: does not re-publish if price has not changed since last run.
   - Admin endpoint for manual trigger and last-run inspection.
 
@@ -228,14 +232,14 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Deliverables:**
 
-- LangChain4j `AiServices` with `@Tool` methods: `getInvoiceFields`, `getCurrentMarketRates`, `getDatasetBenchmark`, `calculateAnnualSavings`.
+- LangChain4j `AiServices` with `@Tool` methods: `getInvoiceFields`, `getCurrentElectricityRates`, `getDatasetBenchmark`, `calculateAnnualSavings`.
   - `CompareInvoiceUseCase`.
   - `ComparisonResult` record.
   - `POST /api/v1/invoices/{id}/comparison`.
   - `comparisons` table.
   - Traces of which tools the agent invoked.
 
-**Dependencies:** Milestones 1, 2 (`market_rates` table populated via Kafka consumer).
+**Dependencies:** Milestones 1, 2 (`electricity_rates` table populated via Kafka consumer).
 
 **Engineering highlights:** LangChain4j `@Tool` agent with deterministic Java tools for numerical math, tool invocation tracing, structured comparison output.
 

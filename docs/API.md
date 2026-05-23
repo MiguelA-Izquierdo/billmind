@@ -178,7 +178,8 @@ Returns a single invoice. Only responds if the `X-Session-Id` header matches the
 `404 Not Found` — invoice does not exist or belongs to a different session:
 ```json
 {
-  "status": "error",
+  "success": false,
+  "status": 404,
   "message": "Factura no encontrada."
 }
 ```

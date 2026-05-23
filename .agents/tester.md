@@ -8,7 +8,7 @@ Ensure BillMind's reliability through tests that validate business rules, cross-
 
 ## Project Context
 
-**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 0.36.2
+**BillMind** — Spring Boot 3.5.0 + Java 21 + LangChain4j 1.0.0
 
 **Testing stack:**
 - `JUnit 5` — test framework
@@ -19,11 +19,13 @@ Ensure BillMind's reliability through tests that validate business rules, cross-
 - `MockMvc` — HTTP controller tests
 - `JaCoCo` — code coverage (configured in pom.xml)
 
-**Existing tests:**
+**Existing tests (representative — not exhaustive):**
 - `InvoiceTest.java` — Domain model unit test (no Spring)
 - `UploadInvoiceUseCaseTest.java` — Use case unit test (Mockito)
-- `PgVectorInvoiceRepositoryIT.java` — Integration test with TestContainers
-- `InvoiceControllerIT.java` — Integration test with MockMvc
+- `InvoiceControllerTest.java` — Controller integration test with MockMvc
+- `HybridInvoiceClassifierTest.java` — Adapter unit test
+- `HybridPiiRedactorTest.java` — PII redactor unit test
+- `ElectricityPriceConsumerTest.java` — Market Kafka consumer test
 - `BillMindApplicationTests.java` — Spring context smoke test
 
 ---
@@ -64,7 +66,7 @@ void shouldThrowExceptionWhenFileNameIsNull() {
 @ExtendWith(MockitoExtension.class)
 class UploadInvoiceUseCaseTest {
     @Mock InvoiceParser invoiceParser;
-    @Mock InvoiceVectorRepository invoiceVectorRepository;
+    @Mock InvoiceRepository invoiceRepository;
     @InjectMocks UploadInvoiceUseCase useCase;
 
     @Test

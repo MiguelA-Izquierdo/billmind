@@ -1,8 +1,10 @@
 package dev.izquierdo.billmind.invoice.application.usecase;
 
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
+import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
+import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
 import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceClassifier;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
@@ -45,6 +47,9 @@ public class UploadInvoiceUseCase {
         InvoiceClassification classification = invoiceClassifier.classify(rawText);
         if (!classification.isSupplyInvoice()) {
             throw new NotASupplyInvoiceException();
+        }
+        if (classification.getType() != InvoiceType.LUZ) {
+            throw new UnsupportedSupplyTypeException(classification.getType());
         }
         Invoice classified = invoice.withClassification(classification);
 
