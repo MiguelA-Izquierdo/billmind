@@ -1,64 +1,42 @@
 pipeline {
     agent { label 'docker-enabled' }
 
-    parameters {
-        string(name: 'BRANCH_TO_BUILD', defaultValue: 'main', description: 'Branch to build')
-    }
-
     environment {
         APP_NAME = 'billmind'
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Prepare') {
             steps {
                 script {
-                    def raw   = params.BRANCH_TO_BUILD ?: 'main'
-                    def clean = raw
-                        .replaceAll('origin/', '')
-                        .replaceAll('refs/heads/', '')
-                        .replaceAll('refs/tags/', '')
-
-                    echo "Building branch: ${clean}"
-
-                    checkout([$class: 'GitSCM',
-                        branches: [[name: "*/${clean}"]],
-                        userRemoteConfigs: scm.userRemoteConfigs,
-                        extensions: scm.extensions
-                    ])
-
                     def tag
                     if (env.TAG_NAME) {
                         tag = env.TAG_NAME
-                    } else if (clean == 'main') {
+                    } else if (env.BRANCH_NAME == 'main') {
                         tag = 'latest'
-                    } else if (clean == 'develop') {
+                    } else if (env.BRANCH_NAME == 'develop') {
                         tag = 'beta'
-                    } else if (clean.startsWith('feature/')) {
+                    } else if (env.BRANCH_NAME.startsWith('feature/')) {
                         tag = 'alpha'
                     } else {
-                        tag = clean.replaceAll('/', '-')
+                        tag = env.BRANCH_NAME.replaceAll('/', '-')
                     }
 
                     env.DOCKER_TAG = tag
-                    env.IS_MAIN    = (clean == 'main').toString()
+                    env.IS_MAIN    = (env.BRANCH_NAME == 'main').toString()
 
-                    echo "Docker tag: ${env.DOCKER_TAG} | is main: ${env.IS_MAIN}"
+                    echo "Branch: ${env.BRANCH_NAME} | Docker tag: ${env.DOCKER_TAG}"
                 }
             }
         }
 
         stage('Tests') {
             steps {
-                script {
-                    def tag = env.DOCKER_TAG
-                    echo "Running tests for tag: ${tag}"
-                    sh """
-                        chmod +x mvnw
-                        ./mvnw test
-                    """
-                }
+                sh """
+                    chmod +x mvnw
+                    ./mvnw test
+                """
             }
             post {
                 always {
@@ -79,6 +57,13 @@ pipeline {
         }
 
         stage('Build & Dockerize') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    buildingTag()
+                }
+            }
             steps {
                 script {
                     def tag = env.DOCKER_TAG
@@ -92,6 +77,12 @@ pipeline {
         }
 
         stage('Backup') {
+            when {
+                anyOf {
+                    branch 'main'
+                    buildingTag()
+                }
+            }
             steps {
                 script {
                     def tag  = env.DOCKER_TAG
