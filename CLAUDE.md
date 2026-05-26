@@ -150,8 +150,7 @@ Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api
 | `application/usecase/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` |
 | `infrastructure/adapter/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` |
 | `infrastructure/adapter/` (`*IT.java`) | Integration test | `@SpringBootTest` + TestContainers |
-| `infrastructure/controller/` | MVC slice test | `@WebMvcTest` + `@MockBean` |
-
+| `infrastructure/controller/` | MVC slice test | `@WebMvcTest` + `@MockitoBean` |
 - Naming: `should[State]When[Condition]()` or `given[Ctx]_when[Action]_then[Result]()`
 - Integration tests suffixed `*IT.java`
 - Never mock the class under test
@@ -174,7 +173,7 @@ Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api
 ## API Response Format
 
 ```json
-{ "success": true,  "status": 200, "message": "...", "data": { ... } }
+{ "success": true,  "status": 200, "message": "...", "data": { "..." } }
 { "success": false, "status": 400, "message": "...", "errors": { "field": { "code": "message" } } }
 ```
 

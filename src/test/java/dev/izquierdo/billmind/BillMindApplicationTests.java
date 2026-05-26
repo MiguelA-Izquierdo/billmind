@@ -13,7 +13,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @EnableAutoConfiguration(exclude = {
@@ -23,22 +23,22 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 })
 class BillMindApplicationTests {
 
-    @MockBean
+    @MockitoBean
     EmbeddingStore<TextSegment> embeddingStore;
 
-    @MockBean
+    @MockitoBean
     StartupReadinessChecker startupReadinessChecker;
 
-    @MockBean
+    @MockitoBean
     InvoiceJpaRepository invoiceJpaRepository;
 
-    @MockBean
+    @MockitoBean
     SessionJpaRepository sessionJpaRepository;
 
-    @MockBean
+    @MockitoBean
     InvoiceFieldExtractor invoiceFieldExtractor;
 
-    @MockBean
+    @MockitoBean
     ElectricityRateJpaRepository marketRateJpaRepository;
 
     @Test

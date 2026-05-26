@@ -26,8 +26,7 @@
 | `application/usecase/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` | No |
 | `infrastructure/adapter/` | Unit test with Mockito | `@ExtendWith(MockitoExtension.class)` | No |
 | `infrastructure/adapter/` (`*IT.java`) | Integration test | `@SpringBootTest` + TestContainers | Yes |
-| `infrastructure/controller/` | MVC slice test | `@WebMvcTest` + `@MockBean` | No |
-
+| `infrastructure/controller/` | MVC slice test | `@WebMvcTest` + `@MockitoBean` | No |
 Integration tests are suffixed `*IT.java` and excluded from `mvn test` by default (bound to the `verify` phase).
 
 ---

@@ -1,6 +1,10 @@
 pipeline {
     agent { label 'docker-enabled' }
 
+    tools {
+            jdk 'java-21'
+        }
+
     environment {
         APP_NAME = 'billmind'
     }

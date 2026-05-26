@@ -2,8 +2,12 @@ package dev.izquierdo.billmind._shared.infrastructure;
 
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
+import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
+import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException;
+import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
+import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.slf4j.Logger;
@@ -24,29 +28,20 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    public GlobalExceptionHandler() {
-    }
-
-    @ExceptionHandler(NullPointerException.class)
-    public ResponseEntity<ErrorResponseDTO> handleNullPointerException(NullPointerException ex) {
-        logException(ex);
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Se ha producido un error interno en el servidor"
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-    }
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleAllExceptions(Exception ex) {
         logException(ex);
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Se ha producido un error interno en el servidor"
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ErrorResponseDTO.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Se ha producido un error interno en el servidor")
         );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
+    @ExceptionHandler(InvoiceNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvoiceNotFoundException(InvoiceNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ErrorResponseDTO.of(HttpStatus.NOT_FOUND.value(), ex.getMessage())
+        );
+    }
 
     @ExceptionHandler(NotASupplyInvoiceException.class)
     public ResponseEntity<ErrorResponseDTO> handleNotASupplyInvoiceException(NotASupplyInvoiceException ex) {
@@ -62,86 +57,86 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InvoiceFieldExtractionException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvoiceFieldExtractionException(InvoiceFieldExtractionException ex) {
+        logException(ex);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
+        );
+    }
+
+    @ExceptionHandler(LlmServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleLlmServiceUnavailableException(LlmServiceUnavailableException ex) {
+        logException(ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                ErrorResponseDTO.of(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage())
+        );
+    }
+
+    @ExceptionHandler(InvalidElectricityRateException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidElectricityRateException(InvalidElectricityRateException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
+        );
+    }
+
     @ExceptionHandler(ValidationErrorsException.class)
     public ResponseEntity<ErrorResponseDTO> handleValidationErrorsException(ValidationErrorsException ex) {
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.BAD_REQUEST.value(),
-                ex.getMessage(),
-                ex.getErrors()
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), ex.getErrors())
         );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ErrorResponseDTO> handleMissingPart(MissingServletRequestPartException ex) {
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "El campo '" + ex.getRequestPartName() + "' es obligatorio"
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), "El campo '" + ex.getRequestPartName() + "' es obligatorio")
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponseDTO> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(),
-                        "El archivo supera el tamaño máximo permitido (5 MB)")
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), "El archivo supera el tamaño máximo permitido (5 MB)")
         );
     }
 
     @ExceptionHandler(MultipartException.class)
     public ResponseEntity<ErrorResponseDTO> handleMultipartException(MultipartException ex) {
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "La petición debe ser multipart/form-data e incluir el campo 'file'"
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), "La petición debe ser multipart/form-data e incluir el campo 'file'")
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Object> handleInvalidFormatException(HttpMessageNotReadableException ex) {
+    public ResponseEntity<ErrorResponseDTO> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
         Map<String, Map<String, String>> errors = new HashMap<>();
 
         Throwable cause = ex.getCause();
         if (cause instanceof InvalidFormatException invalidFormatEx && !invalidFormatEx.getPath().isEmpty()) {
             String fieldName = invalidFormatEx.getPath().get(0).getFieldName();
-            Map<String, String> fieldErrors = new HashMap<>();
-            fieldErrors.put("invalid", "Se esperaba un número, pero se recibió: " + invalidFormatEx.getValue());
-            errors.put(fieldName, fieldErrors);
+            errors.put(fieldName, Map.of("invalid", "Se esperaba un número, pero se recibió: " + invalidFormatEx.getValue()));
         } else {
-            Map<String, String> generalErrors = new HashMap<>();
-            generalErrors.put("invalid", "El formato de la petición no es válido.");
-            errors.put("body", generalErrors);
+            errors.put("body", Map.of("invalid", "El formato de la petición no es válido."));
         }
 
-        ErrorResponseDTO errorResponse = ErrorResponseDTO.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Error de validación en la petición",
-                errors
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), "Error de validación en la petición", errors)
         );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     private void logException(Exception ex) {
-        StackTraceElement origin = ex.getStackTrace().length > 0
-                ? ex.getStackTrace()[0]
-                : null;
-
+        StackTraceElement origin = ex.getStackTrace().length > 0 ? ex.getStackTrace()[0] : null;
         if (origin != null) {
-            log.error(
-                    "Exception: {} | Cause: {} | File: {} | Line: {}",
+            log.error("Exception: {} | Cause: {} | File: {} | Line: {}",
                     ex.getMessage(),
                     ex.getCause() != null ? ex.getCause().toString() : "N/A",
                     origin.getFileName(),
                     origin.getLineNumber(),
-                    ex
-            );
+                    ex);
         } else {
             log.error("Exception: {}", ex.getMessage(), ex);
         }
     }
-
 }
 
