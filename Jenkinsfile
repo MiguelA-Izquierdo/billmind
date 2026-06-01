@@ -9,6 +9,10 @@ pipeline {
         APP_NAME = 'billmind'
     }
 
+    parameters {
+        string(name: 'REGISTRY', defaultValue: '192.168.1.100:5000', description: 'Registry de imágenes')
+    }
+
     stages {
 
         stage('Prepare') {
@@ -60,7 +64,7 @@ pipeline {
             }
         }
 
-        stage('Build & Dockerize') {
+        stage('Build & Push') {
             when {
                 anyOf {
                     branch 'main'
@@ -70,11 +74,12 @@ pipeline {
             }
             steps {
                 script {
-                    def tag = env.DOCKER_TAG
+                    def image = "${params.REGISTRY}/${APP_NAME}:${env.DOCKER_TAG}"
                     sh """
                         chmod +x mvnw
                         ./mvnw package -DskipTests -Dmaven.test.skip=true
-                        docker build -t ${APP_NAME}:${tag} .
+                        docker build -t ${image} .
+                        docker push ${image}
                     """
                 }
             }
@@ -89,13 +94,13 @@ pipeline {
             }
             steps {
                 script {
-                    def tag  = env.DOCKER_TAG
-                    def path = env.BACKUP_PATH ?: "/opt/docker-backups/${APP_NAME}"
-                    def ts   = new Date().format('yyyyMMdd-HHmm')
+                    def image = "${params.REGISTRY}/${APP_NAME}:${env.DOCKER_TAG}"
+                    def path  = env.BACKUP_PATH ?: "/opt/docker-backups/${APP_NAME}"
+                    def ts    = new Date().format('yyyyMMdd-HHmm')
                     sh """
                         mkdir -p ${path}
-                        docker save ${APP_NAME}:${tag} \
-                            | gzip > ${path}/backup-${tag}-${ts}.tar.gz
+                        docker save ${image} \
+                            | gzip > ${path}/backup-${env.DOCKER_TAG}-${ts}.tar.gz
                         docker image prune -f
                     """
                 }
@@ -106,9 +111,9 @@ pipeline {
     post {
         failure {
             script {
-                def tag = env.DOCKER_TAG ?: 'unknown'
-                sh "docker rmi ${APP_NAME}:${tag} || true"
-                echo "Pipeline failed — image ${APP_NAME}:${tag} removed"
+                def image = "${params.REGISTRY}/${APP_NAME}:${env.DOCKER_TAG ?: 'unknown'}"
+                sh "docker rmi ${image} || true"
+                echo "Pipeline failed — image ${image} removed"
             }
         }
         always {
