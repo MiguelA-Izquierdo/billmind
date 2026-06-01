@@ -75,12 +75,14 @@ pipeline {
             steps {
                 script {
                     def image = "${params.REGISTRY}/${APP_NAME}:${env.DOCKER_TAG}"
-                    sh """
-                        chmod +x mvnw
-                        ./mvnw package -DskipTests -Dmaven.test.skip=true
-                        docker build -t ${image} .
-                        docker push ${image}
-                    """
+                    docker.withRegistry("http://${params.REGISTRY}", 'local-registry-creds-DOCKER') {
+                        sh """
+                            chmod +x mvnw
+                            ./mvnw package -DskipTests -Dmaven.test.skip=true
+                            docker build -t ${image} .
+                            docker push ${image}
+                        """
+                    }
                 }
             }
         }
