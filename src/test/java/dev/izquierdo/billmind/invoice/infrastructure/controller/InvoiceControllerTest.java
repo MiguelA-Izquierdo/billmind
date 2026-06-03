@@ -3,6 +3,7 @@ package dev.izquierdo.billmind.invoice.infrastructure.controller;
 import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.application.query.QueryBus;
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
+import dev.izquierdo.billmind._shared.infrastructure.session.PublicRoutesService;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionService;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException;
@@ -12,8 +13,10 @@ import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import dev.izquierdo.billmind._shared.infrastructure.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InvoiceController.class)
+@Import(SecurityConfig.class)
 class InvoiceControllerTest {
 
     @Autowired
@@ -50,6 +54,9 @@ class InvoiceControllerTest {
 
     @MockitoBean
     private SessionContext sessionContext;
+
+    @MockitoBean
+    private PublicRoutesService publicRoutesService;
 
     private static final UUID SESSION_ID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 

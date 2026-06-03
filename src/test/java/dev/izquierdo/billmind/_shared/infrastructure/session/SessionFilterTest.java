@@ -17,13 +17,15 @@ class SessionFilterTest {
 
     private SessionService sessionService;
     private SessionContext sessionContext;
+    private PublicRoutesService publicRoutesService;
     private SessionFilter filter;
 
     @BeforeEach
     void setUp() {
         sessionService = mock(SessionService.class);
         sessionContext = mock(SessionContext.class);
-        filter = new SessionFilter(sessionService, sessionContext, new ObjectMapper());
+        publicRoutesService = mock(PublicRoutesService.class);
+        filter = new SessionFilter(sessionService, sessionContext, new ObjectMapper(), publicRoutesService);
     }
 
     @Test
@@ -76,6 +78,19 @@ class SessionFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(any(), any());
+        verifyNoInteractions(sessionService, sessionContext);
+    }
+
+    @Test
+    void shouldSkipFilterForPublicApiRoute() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/market-rates");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+        when(publicRoutesService.isPublicRoute(request)).thenReturn(true);
 
         filter.doFilter(request, response, chain);
 

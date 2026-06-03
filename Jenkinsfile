@@ -69,12 +69,30 @@ pipeline {
                 anyOf {
                     branch 'main'
                     branch 'develop'
+                    branch pattern: 'feature/*', comparator: 'GLOB'
                     buildingTag()
                 }
             }
             steps {
                 script {
                     def image = "${params.REGISTRY}/${APP_NAME}:${env.DOCKER_TAG}"
+
+                    if (env.TAG_NAME) {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'local-registry-creds-DOCKER',
+                            usernameVariable: 'REG_USER',
+                            passwordVariable: 'REG_PASS'
+                        )]) {
+                            def status = sh(
+                                script: "curl -s -o /dev/null -w '%{http_code}' -u \${REG_USER}:\${REG_PASS} http://${params.REGISTRY}/v2/${APP_NAME}/manifests/${env.DOCKER_TAG}",
+                                returnStdout: true
+                            ).trim()
+                            if (status == '200') {
+                                error "La imagen ${image} ya existe en el registry — los tags git son inmutables."
+                            }
+                        }
+                    }
+
                     docker.withRegistry("http://${params.REGISTRY}", 'local-registry-creds-DOCKER') {
                         sh """
                             chmod +x mvnw
