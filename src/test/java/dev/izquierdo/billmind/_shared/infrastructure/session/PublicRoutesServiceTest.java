@@ -41,8 +41,8 @@ class PublicRoutesServiceTest {
     }
 
     @Test
-    void shouldDenyPostInvoiceUpload() {
-        assertThat(publicRoutesService.isPublicRoute(request("POST", "/api/v1/invoices/upload"))).isFalse();
+    void shouldDenyPostInvoices() {
+        assertThat(publicRoutesService.isPublicRoute(request("POST", "/api/v1/invoices"))).isFalse();
     }
 
     @Test

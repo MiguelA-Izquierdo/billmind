@@ -1,0 +1,230 @@
+{
+  "info": {
+    "name": "BillMind API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "type": "string"
+    },
+    {
+      "key": "invoiceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "Upload invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-Id", "value": "{{sessionId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "PDF invoice (max 5 MB)"
+                }
+              ]
+            },
+            "description": "Sube un PDF. El pipeline ejecuta clasificación (keyword + LLM), extracción de campos estructurados y redacción de PII. Devuelve invoiceId y fileName."
+          }
+        },
+        {
+          "name": "Get session invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Session-Id", "value": "{{sessionId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices"]
+            },
+            "description": "Devuelve todas las facturas subidas en la sesión actual."
+          }
+        },
+        {
+          "name": "Get invoice by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Session-Id", "value": "{{sessionId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/{{invoiceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "invoices", "{{invoiceId}}"]
+            },
+            "description": "Devuelve una factura con todos sus campos extraídos: supplyType, provider, billingPeriodStart, billingPeriodEnd, totalAmount."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assistant",
+      "item": [
+        {
+          "name": "Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-Id", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "text/event-stream" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/assistant/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "assistant", "chat"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceId\": \"{{invoiceId}}\",\n  \"message\": \"¿Estoy pagando más de lo que debería por kWh?\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Pregunta al asistente sobre una factura. La respuesta llega como SSE. Eventos: {type:'token', content:'...'} con la respuesta completa, {type:'citations', items:[...]} con las fuentes regulatorias usadas, y finalmente data:[DONE]."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market Rates",
+      "item": [
+        {
+          "name": "Get electricity rates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-rates",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-rates"]
+            },
+            "description": "Devuelve todas las tarifas de electricidad ingestadas desde Kafka."
+          }
+        },
+        {
+          "name": "Delete all electricity rates",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/market-rates",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "market-rates"]
+            },
+            "description": "Elimina todos los registros de tarifas de la base de datos."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Knowledge Admin",
+      "item": [
+        {
+          "name": "Ingest document",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/knowledge/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "knowledge", "ingest"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docType\": \"CNMC\",\n  \"title\": \"Guía tarifas eléctricas 2.0TD\",\n  \"source\": \"https://www.cnmc.es/\",\n  \"content\": \"Contenido del documento regulatorio…\",\n  \"validFrom\": \"2024-01-01\",\n  \"validTo\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Ingesta un documento regulatorio. El contenido se trocea (500 chars, 100 de solape), se embede con AllMiniLM-L6-v2 y se almacena en pgVector. Valores de docType: CNMC, REE, BOE."
+          }
+        },
+        {
+          "name": "Seed example documents",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/knowledge/ingest/seed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "knowledge", "ingest", "seed"]
+            },
+            "description": "Re-ingesta los documentos de ejemplo CNMC/REE/BOE definidos en KnowledgeSeedData."
+          }
+        },
+        {
+          "name": "Search knowledge base",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/knowledge/search?q=tarifa 2.0TD discriminación horaria&maxResults=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "knowledge", "search"],
+              "query": [
+                { "key": "q", "value": "tarifa 2.0TD discriminación horaria" },
+                { "key": "maxResults", "value": "5" }
+              ]
+            },
+            "description": "Búsqueda semántica sobre la base de conocimiento. Devuelve los N chunks más relevantes con título, fuente y puntuación de similitud."
+          }
+        },
+        {
+          "name": "Delete all knowledge",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/knowledge",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "knowledge"]
+            },
+            "description": "Elimina todos los documentos y chunks de la base de conocimiento (PostgreSQL y pgVector)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Spring Actuator health. Incluye estado de DB, Kafka, disco y probes de liveness/readiness."
+          }
+        }
+      ]
+    }
+  ]
+}

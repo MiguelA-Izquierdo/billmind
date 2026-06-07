@@ -7,6 +7,7 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException
 import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
+import dev.izquierdo.billmind.assistant.domain.exceptions.ConversationNotFoundException;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
@@ -15,11 +16,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,6 +36,27 @@ public class GlobalExceptionHandler {
         logException(ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 ErrorResponseDTO.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Se ha producido un error interno en el servidor")
+        );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ErrorResponseDTO.of(HttpStatus.NOT_FOUND.value(), "Recurso no encontrado")
+        );
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(
+                ErrorResponseDTO.of(HttpStatus.METHOD_NOT_ALLOWED.value(), "Método HTTP no permitido")
+        );
+    }
+
+    @ExceptionHandler(ConversationNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleConversationNotFoundException(ConversationNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ErrorResponseDTO.of(HttpStatus.NOT_FOUND.value(), ex.getMessage())
         );
     }
 

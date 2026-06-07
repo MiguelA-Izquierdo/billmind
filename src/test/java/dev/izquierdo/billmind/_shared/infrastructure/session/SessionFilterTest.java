@@ -46,7 +46,7 @@ class SessionFilterTest {
 
     @Test
     void shouldRejectWithMissingHeader() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/invoices/upload");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/invoices");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 

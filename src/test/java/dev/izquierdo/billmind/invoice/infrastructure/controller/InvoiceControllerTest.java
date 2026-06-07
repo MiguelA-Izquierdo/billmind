@@ -72,7 +72,7 @@ class InvoiceControllerTest {
         byte[] pdfContent = "%PDF-1.4 fake invoice content".getBytes();
         MockMultipartFile file = new MockMultipartFile("file", "factura.pdf", "application/pdf", pdfContent);
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(file)
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isCreated())
@@ -85,7 +85,7 @@ class InvoiceControllerTest {
 
     @Test
     void uploadInvoice_withoutFile_returns400() throws Exception {
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("El campo 'file' es obligatorio"));
@@ -95,7 +95,7 @@ class InvoiceControllerTest {
     void uploadInvoice_withEmptyFile_returns400() throws Exception {
         MockMultipartFile emptyFile = new MockMultipartFile("file", "vacio.pdf", "application/pdf", new byte[0]);
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(emptyFile)
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isBadRequest());
@@ -106,7 +106,7 @@ class InvoiceControllerTest {
         MockMultipartFile invalidFile = new MockMultipartFile(
                 "file", "malicious.pdf", "application/pdf", "not a pdf content".getBytes());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(invalidFile)
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isBadRequest());
@@ -116,7 +116,7 @@ class InvoiceControllerTest {
     void uploadInvoice_withNonSupplyInvoice_returns422() throws Exception {
         doThrow(new NotASupplyInvoiceException()).when(commandBus).dispatch(any());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("contrato.pdf"))
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isUnprocessableEntity())
@@ -129,7 +129,7 @@ class InvoiceControllerTest {
     void uploadInvoice_withUnsupportedSupplyType_returns422() throws Exception {
         doThrow(new UnsupportedSupplyTypeException(InvoiceType.GAS)).when(commandBus).dispatch(any());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura-gas.pdf"))
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isUnprocessableEntity())
@@ -142,7 +142,7 @@ class InvoiceControllerTest {
     void uploadInvoice_whenFileTooLarge_returns400WithClearMessage() throws Exception {
         doThrow(new MaxUploadSizeExceededException(5L * 1024 * 1024)).when(commandBus).dispatch(any());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura.pdf"))
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isBadRequest())
@@ -153,7 +153,7 @@ class InvoiceControllerTest {
     void uploadInvoice_whenNullPointerException_returns500() throws Exception {
         doThrow(new NullPointerException("unexpected null")).when(commandBus).dispatch(any());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura.pdf"))
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isInternalServerError())
@@ -164,7 +164,7 @@ class InvoiceControllerTest {
     void uploadInvoice_whenUnexpectedException_returns500() throws Exception {
         doThrow(new RuntimeException("db connection lost")).when(commandBus).dispatch(any());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura.pdf"))
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isInternalServerError())
@@ -178,7 +178,7 @@ class InvoiceControllerTest {
         );
         doThrow(new ValidationErrorsException(errors)).when(commandBus).dispatch(any());
 
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura.pdf"))
                         .header("X-Session-Id", SESSION_ID.toString()))
                 .andExpect(status().isBadRequest())
@@ -189,7 +189,7 @@ class InvoiceControllerTest {
 
     @Test
     void uploadInvoice_withMissingSessionHeader_returns400() throws Exception {
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura.pdf")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("La cabecera X-Session-Id es obligatoria"));
@@ -197,7 +197,7 @@ class InvoiceControllerTest {
 
     @Test
     void uploadInvoice_withInvalidSessionHeader_returns400() throws Exception {
-        mockMvc.perform(multipart("/api/v1/invoices/upload")
+        mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura.pdf"))
                         .header("X-Session-Id", "not-a-uuid"))
                 .andExpect(status().isBadRequest())

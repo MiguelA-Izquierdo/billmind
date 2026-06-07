@@ -32,7 +32,7 @@ public class InvoiceController {
         this.sessionContext = sessionContext;
     }
 
-    @PostMapping("/upload")
+    @PostMapping
     public ResponseEntity<SuccessResponseDTO> uploadInvoice(
             @RequestParam("file") MultipartFile file) throws IOException {
 

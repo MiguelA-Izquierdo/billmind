@@ -4,6 +4,8 @@ import dev.izquierdo.billmind._shared.infrastructure.health.StartupReadinessChec
 import dev.izquierdo.billmind._shared.infrastructure.persistence.SessionJpaRepository;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
 import dev.izquierdo.billmind.invoice.infrastructure.persistence.InvoiceJpaRepository;
+import dev.izquierdo.billmind.knowledge.infrastructure.persistence.KnowledgeChunkJpaRepository;
+import dev.izquierdo.billmind.knowledge.infrastructure.persistence.KnowledgeDocumentJpaRepository;
 import dev.izquierdo.billmind.market.infrastructure.persistence.ElectricityRateJpaRepository;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingStore;
@@ -40,6 +42,12 @@ class BillMindApplicationTests {
 
     @MockitoBean
     ElectricityRateJpaRepository marketRateJpaRepository;
+
+    @MockitoBean
+    KnowledgeChunkJpaRepository knowledgeChunkJpaRepository;
+
+    @MockitoBean
+    KnowledgeDocumentJpaRepository knowledgeDocumentJpaRepository;
 
     @Test
     void contextLoads() {
