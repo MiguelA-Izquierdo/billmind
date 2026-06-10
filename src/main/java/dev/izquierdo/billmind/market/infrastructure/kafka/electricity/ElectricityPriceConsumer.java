@@ -2,7 +2,7 @@ package dev.izquierdo.billmind.market.infrastructure.kafka.electricity;
 
 import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.infrastructure.kafka.KafkaEvent;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import dev.izquierdo.billmind.market.application.command.SaveElectricityRateCommand;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

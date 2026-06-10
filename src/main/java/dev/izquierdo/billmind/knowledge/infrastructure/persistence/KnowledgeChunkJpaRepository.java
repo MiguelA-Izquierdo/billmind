@@ -12,8 +12,8 @@ public interface KnowledgeChunkJpaRepository extends JpaRepository<KnowledgeChun
 
     @Query(value = """
             SELECT * FROM knowledge_chunks
-            WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', :query)
-            ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', :query)) DESC
+            WHERE to_tsvector('spanish', unaccent(content)) @@ plainto_tsquery('spanish', unaccent(:query))
+            ORDER BY ts_rank(to_tsvector('spanish', unaccent(content)), plainto_tsquery('spanish', unaccent(:query))) DESC
             LIMIT :limit
             """, nativeQuery = true)
     List<KnowledgeChunkEntity> searchByContent(@Param("query") String query, @Param("limit") int limit);

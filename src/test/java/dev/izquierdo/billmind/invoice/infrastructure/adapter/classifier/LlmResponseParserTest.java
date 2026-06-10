@@ -3,7 +3,7 @@ package dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitizer;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

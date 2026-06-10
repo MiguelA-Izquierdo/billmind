@@ -1,14 +1,13 @@
 package dev.izquierdo.billmind.invoice.infrastructure.persistence;
 
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
-import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.GasFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.MobileLine;
-import dev.izquierdo.billmind.invoice.domain.model.fields.StreamingService;
-import dev.izquierdo.billmind.invoice.domain.model.fields.TelecomFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.MobileLine;
+import dev.izquierdo.billmind._shared.domain.model.fields.StreamingService;
+import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -86,7 +85,7 @@ class InvoiceEntityTest {
         ElectricityFields fields = new ElectricityFields(
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31),
                 new BigDecimal("45.50"), new BigDecimal("405.000"),
-                new BigDecimal("0.140000"), new BigDecimal("3.300"));
+                new BigDecimal("0.140000"), null, null, null, new BigDecimal("3.300"));
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura_luz.pdf")
                 .supplyType(InvoiceType.LUZ)
                 .fields(fields)
@@ -164,8 +163,8 @@ class InvoiceEntityTest {
         assertThat(result.includedMobileLines()).isEqualTo(1);
         assertThat(result.mobileLineCount()).isEqualTo(3);
         assertThat(result.lines()).hasSize(3);
-        assertThat(result.lines().get(0).lineType()).isEqualTo("FIBRA");
+        assertThat(result.lines().getFirst().lineType()).isEqualTo("FIBRA");
         assertThat(result.streamingServices()).hasSize(1);
-        assertThat(result.streamingServices().get(0).platform()).isEqualTo("NETFLIX");
+        assertThat(result.streamingServices().getFirst().platform()).isEqualTo("NETFLIX");
     }
 }

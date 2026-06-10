@@ -40,6 +40,9 @@ public class KnowledgeAdminController {
 
     @PostMapping("/ingest/seed")
     public ResponseEntity<SuccessResponseDTO> seed() {
+        if (!knowledgeRepository.isEmpty()) {
+            return ResponseEntity.ok(SuccessResponseDTO.of(200, "La base de conocimiento ya contiene documentos"));
+        }
         KnowledgeSeedData.exampleDocuments()
                 .forEach(commandBus::dispatch);
         return ResponseEntity.ok(SuccessResponseDTO.of(200, "Documentos de ejemplo ingestados correctamente"));
@@ -52,6 +55,15 @@ public class KnowledgeAdminController {
         List<KnowledgeSearchResult> results = queryBus.dispatch(new SearchKnowledgeQuery(q, maxResults));
         List<KnowledgeSearchResponse> data = results.stream().map(KnowledgeSearchResponse::from).toList();
         return ResponseEntity.ok(SuccessResponseDTO.of(200, "Búsqueda completada", data));
+    }
+
+    @PostMapping("/reindex")
+    public ResponseEntity<SuccessResponseDTO> reindex() {
+        long indexed = knowledgeRepository.rebuildIndex();
+        String message = indexed == 0
+                ? "Índice no creado: se necesitan al menos 100 vectores"
+                : "Índice IVFFlat reconstruido con " + indexed + " vectores";
+        return ResponseEntity.ok(SuccessResponseDTO.of(200, message));
     }
 
     @DeleteMapping

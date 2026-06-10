@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier;
 
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package dev.izquierdo.billmind.invoice.domain.model;
+package dev.izquierdo.billmind._shared.domain.model;
 
 public enum InvoiceType {
     LUZ, AGUA, GAS, TELCO, OTRO;

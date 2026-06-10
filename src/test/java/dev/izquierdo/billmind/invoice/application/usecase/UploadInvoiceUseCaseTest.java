@@ -4,8 +4,8 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceExcepti
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
-import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceClassifier;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceParser;
@@ -60,7 +60,7 @@ class UploadInvoiceUseCaseTest {
                 .thenReturn(new InvoiceClassification(InvoiceType.LUZ, "IBERDROLA"));
         when(piiRedactor.redact(anyString())).thenReturn("texto redactado");
         when(fieldExtractor.extract(anyString(), any()))
-                .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null));
+                .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null, null, null, null));
 
         uploadInvoiceUseCase.upload(invoice, pdfContent);
 

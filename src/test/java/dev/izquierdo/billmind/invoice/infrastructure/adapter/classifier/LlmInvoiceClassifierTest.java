@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier;
 
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

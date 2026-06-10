@@ -157,6 +157,30 @@
   .banner { padding: 10px 16px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; }
   .banner.warn { background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.3); color: var(--elec); }
   .banner.error { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.3); color: var(--red); }
+
+  /* ── Comparison card (injected after upload) ── */
+  .cmp-bubble { padding: 18px 20px !important; }
+  .cmp-intro { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .cmp-savings { text-align: center; padding: 20px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .cmp-savings-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+  .cmp-amount { font-size: 52px; font-weight: 800; letter-spacing: -2px; line-height: 1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+  .cmp-amount.positive { color: var(--green); }
+  .cmp-amount.negative { color: var(--red); }
+  .cmp-with { font-size: 13px; }
+  .cmp-with strong { color: var(--accent); }
+  .tou-badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; background: rgba(108,111,245,.15); color: var(--accent); border: 1px solid rgba(108,111,245,.3); border-radius: 5px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  .cmp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .cmp-item { display: flex; flex-direction: column; align-items: center; background: var(--surf2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 6px; text-align: center; }
+  .cmp-val { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .cmp-val.yours { color: var(--elec); }
+  .cmp-val.best  { color: var(--green); }
+  .cmp-key { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .cmp-alts-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; font-weight: 600; }
+  .cmp-alt-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(46,50,72,.4); font-size: 12px; }
+  .cmp-alt-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .cmp-alt-company { color: var(--muted); font-size: 11px; }
+  .cmp-alt-price { color: var(--green); font-weight: 600; font-size: 13px; }
+  .cmp-footer { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
 </style>
 </head>
 <body>
@@ -330,19 +354,120 @@ async function uploadFile(file) {
     progress.textContent = '¡Factura procesada!';
     document.getElementById('file-input').value = '';
     await loadInvoices();
-    // Auto-select the new invoice
-    const newId = body.data?.id;
+    const newId = body.data?.invoiceId;
     if (newId) {
       const sel = document.getElementById('invoice-select');
       sel.value = newId;
       sel.dispatchEvent(new Event('change'));
     }
+    showComparisonResult(body.data);
   } catch (err) {
     showBanner('Error de red al subir la factura: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
     progress.classList.remove('visible');
   }
+}
+
+// ── Comparison result card ───────────────────────────────
+function showComparisonResult(data) {
+  if (!data) return;
+  const c = data.comparison;
+  document.getElementById('welcome').style.display = 'none';
+
+  const id     = 'msg-' + (++msgCounter);
+  const el     = document.createElement('div');
+  el.className = 'msg assistant';
+  el.id        = id;
+
+  let inner = `<div class="cmp-intro">He analizado <strong>${escHtml(data.fileName ?? 'tu factura')}</strong>. Esto es lo que encontré:</div>`;
+
+  if (c) {
+    const savings  = Number(c.annualSavingsEuros);
+    const positive = savings >= 0;
+    const d        = c.details ?? {};
+    const isTou    = d.touRate;
+
+    inner += `
+      <div class="cmp-savings">
+        <div class="cmp-savings-label">${positive ? 'Ahorro potencial' : 'Coste adicional'}</div>
+        <div class="cmp-amount ${positive ? 'positive' : 'negative'}" id="${id}-counter">0,00 €</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">al año</div>
+        <div class="cmp-with">
+          con <strong>${escHtml(c.bestTariffName)}</strong> de ${escHtml(c.bestCompany)}
+          ${isTou ? '<span class="tou-badge">Discriminada</span>' : ''}
+        </div>
+      </div>
+      <div class="cmp-grid">
+        <div class="cmp-item">
+          <span class="cmp-val yours">${fmtPrice(d.userPricePerKwh)}</span>
+          <span class="cmp-key">Tu precio${isTou ? ' medio' : ''}</span>
+        </div>
+        <div class="cmp-item">
+          <span class="cmp-val best">${fmtPrice(d.bestPricePerKwh)}</span>
+          <span class="cmp-key">Mejor precio</span>
+        </div>
+        <div class="cmp-item">
+          <span class="cmp-val">${fmtKwh(d.annualKwhEstimate)}</span>
+          <span class="cmp-key">kWh / año</span>
+        </div>
+      </div>`;
+
+    const alts = d.alternatives ?? [];
+    if (alts.length) {
+      inner += `<div class="cmp-alts-title">Otras opciones</div>`;
+      inner += alts.map(a => `
+        <div class="cmp-alt-row">
+          <div>
+            <div>${escHtml(a.tariffName)}</div>
+            <div class="cmp-alt-company">${escHtml(a.company)}</div>
+          </div>
+          <span class="cmp-alt-price">${fmtPrice(a.effectivePricePerKwh)} €/kWh${a.touRate ? ' · disc.' : ''}</span>
+        </div>`).join('');
+    }
+  } else {
+    inner += `<div style="color:var(--muted);font-size:13px">Factura procesada, pero no hay datos de mercado suficientes para calcular el ahorro.</div>`;
+  }
+
+  inner += `<div class="cmp-footer">Puedes preguntarme cualquier cosa sobre esta factura.</div>`;
+
+  el.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg-content">
+      <div class="msg-bubble cmp-bubble">${inner}</div>
+      <span class="msg-meta">${fmtTime(new Date())}</span>
+    </div>`;
+
+  messagesEl().appendChild(el);
+  scrollBottom();
+
+  if (c) animateCounter(c.annualSavingsEuros, id + '-counter');
+}
+
+function animateCounter(target, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const end      = Math.abs(Number(target));
+  const prefix   = Number(target) >= 0 ? '' : '-';
+  const duration = 1400;
+  const startTs  = performance.now();
+  function step(now) {
+    const t    = Math.min((now - startTs) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.textContent = prefix + (end * ease).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function fmtPrice(val) {
+  if (val == null) return '—';
+  return Number(val).toFixed(6).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
+}
+
+function fmtKwh(val) {
+  if (val == null) return '—';
+  return Number(val).toLocaleString('es-ES', { maximumFractionDigits: 0 });
 }
 
 // ── Load invoices ────────────────────────────────────────

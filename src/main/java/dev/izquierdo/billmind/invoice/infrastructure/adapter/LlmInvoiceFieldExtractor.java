@@ -5,12 +5,12 @@ import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitize
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
-import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.GasFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.TelecomFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.fieldextractor.ExtractionPromptBuilder;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.fieldextractor.InvoiceFieldsValidator;
@@ -31,14 +31,32 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
     // Instruction blocks only — invoice text is injected separately by ExtractionPromptBuilder.
 
     private static final String ELECTRICITY_INSTRUCTIONS =
-            "Extract fields from the electricity invoice delimited below.\n" +
+            "Extract fields from the Spanish electricity invoice delimited below.\n" +
             "Output ONLY valid JSON matching this schema (no prose, no markdown fences):\n" +
             "{\"billingPeriodStart\":\"YYYY-MM-DD\",\"billingPeriodEnd\":\"YYYY-MM-DD\"," +
-            "\"totalAmount\":0.00,\"consumptionKwh\":0.0,\"pricePerKwh\":0.000,\"contractedPowerKw\":0.0}\n" +
+            "\"totalAmount\":0.00,\"consumptionKwh\":0.0," +
+            "\"pricePerKwh\":0.000,\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null," +
+            "\"contractedPowerKw\":0.0}\n" +
             "ISO-8601 dates. Dot decimal separator. Null for any missing field.\n\n" +
+            "=== pricePerKwh / TOU RULES ===\n" +
+            "FLAT RATE: set pricePerKwh, leave P1/P2/P3 null.\n" +
+            "  Labels: '€/kWh', 'precio energía', 'término de energía activa', 'coste de la energía'.\n" +
+            "TOU (discriminación horaria 2.0TD or similar): set P1/P2/P3, leave pricePerKwh null.\n" +
+            "  P1 = punta  (labels: P1, PUNTA, PEAK)\n" +
+            "  P2 = llano  (labels: P2, LLANO, FLAT)\n" +
+            "  P3 = valle  (labels: P3, VALLE, OFF-PEAK, NOCHE)\n" +
+            "  Two-period (día/noche): use P1=día, P3=noche, P2=null.\n" +
+            "Never set both pricePerKwh and any P1/P2/P3.\n\n" +
+            "=== consumptionKwh ===\n" +
+            "Labels: 'kWh', 'Energía consumida'. For TOU: sum all periods.\n\n" +
             "Input: IBERDROLA Periodo 01/01/2024 al 31/01/2024 320 kWh 0,1823 €/kWh 3,3 kW Total 67,20 €\n" +
             "Output: {\"billingPeriodStart\":\"2024-01-01\",\"billingPeriodEnd\":\"2024-01-31\"," +
-            "\"totalAmount\":67.20,\"consumptionKwh\":320.0,\"pricePerKwh\":0.1823,\"contractedPowerKw\":3.3}";
+            "\"totalAmount\":67.20,\"consumptionKwh\":320.0,\"pricePerKwh\":0.1823," +
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.3}\n\n" +
+            "Input: ENDESA 08/05/2018 10/06/2018 | P1 (punta) 120 kWh 0,15234 €/kWh | P2 (llano) 130 kWh 0,10123 €/kWh | P3 (valle) 100 kWh 0,06891 €/kWh | Potencia 3,45 kW | Total 80,95 €\n" +
+            "Output: {\"billingPeriodStart\":\"2018-05-08\",\"billingPeriodEnd\":\"2018-06-10\"," +
+            "\"totalAmount\":80.95,\"consumptionKwh\":350.0,\"pricePerKwh\":null," +
+            "\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45}";
 
     private static final String GAS_INSTRUCTIONS =
             "Extract fields from the gas invoice delimited below.\n" +

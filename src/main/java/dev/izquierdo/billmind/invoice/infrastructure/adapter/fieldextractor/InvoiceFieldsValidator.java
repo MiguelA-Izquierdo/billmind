@@ -1,11 +1,11 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.fieldextractor;
 
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
-import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.GasFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.TelecomFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -30,6 +30,12 @@ public class InvoiceFieldsValidator {
             case ElectricityFields e -> {
                 requireNonNegative(e.consumptionKwh(),    "consumptionKwh");
                 requireNonNegative(e.contractedPowerKw(), "contractedPowerKw");
+                boolean hasFlat = e.pricePerKwh() != null;
+                boolean hasTou  = e.pricePerKwhP1() != null
+                               || e.pricePerKwhP2() != null
+                               || e.pricePerKwhP3() != null;
+                require(!hasFlat || !hasTou,
+                        "pricePerKwh cannot coexist with TOU prices (P1/P2/P3)");
             }
             case GasFields g -> {
                 requireNonNegative(g.consumptionM3(),  "consumptionM3");

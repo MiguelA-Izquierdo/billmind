@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.invoice.domain.exceptions;
 
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 
 public class UnsupportedSupplyTypeException extends RuntimeException {
 

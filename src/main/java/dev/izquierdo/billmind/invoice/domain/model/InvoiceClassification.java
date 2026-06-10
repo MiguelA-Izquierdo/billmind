@@ -1,5 +1,7 @@
 package dev.izquierdo.billmind.invoice.domain.model;
 
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+
 import java.util.Objects;
 
 public class InvoiceClassification {

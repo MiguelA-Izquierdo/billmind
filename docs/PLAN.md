@@ -36,14 +36,15 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | `PiiRedactor` applied to full invoice text | 1 | GDPR + dataset safety |
 | Regulatory knowledge base ingestion pipeline | 2 | Populate the RAG corpus before the assistant can use it |
 | Hybrid retrieval over knowledge base (pgVector + `tsvector` BM25 + RRF) | 2 | Pure vector search misses keyword-heavy regulatory queries |
-| Cross-encoder re-ranker | 2 | Retrieval quality |
 | Apache Kafka (KRaft) + `spring-kafka` | 2 | Event-driven market price ingestion — no polling |
-| `market/` bounded context — `ElectricityRate` aggregate + `electricity_rates` table | 2 | Persist incoming price events for the comparison agent |
+| `market/` bounded context — `ElectricityRate` aggregate + `electricity_rates` table | 2 | Persist incoming price events for the comparison engine |
 | `ElectricityPriceConsumer` — Kafka listener on `market.electricity-price-updated`; future `GasPriceConsumer`, etc. follow the same per-supply-type pattern | 2 | Prices arrive in real-time; the external producer is a separate service |
-| `assistant/` bounded context | 3 | Conversational RAG — the demo "wow" |
-| SSE streaming | 3 | Real LLM UX |
-| Persistent conversational memory | 3 | Stateless design — no volatile in-process storage |
-| LangChain4j `AiServices` with `@Tool` (agent) | 5 | Agents over monolithic prompts |
+| `comparison/` bounded context — deterministic savings engine | 3 | Core product value: quantify overpayment immediately on upload |
+| Comparison result embedded in `POST /api/v1/invoices` response | 3 | No extra step — savings visible the moment the invoice is processed |
+| `comparisons` table | 3 | Persist results for history and future re-evaluation |
+| `assistant/` bounded context | 5 | Explains the savings, answers follow-up questions |
+| SSE streaming | 5 | Real LLM UX |
+| Persistent conversational memory | 5 | Multi-turn history; conversation tied to session |
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | Langfuse self-hosted | 6 | LLM observability |
 | Spring Security + JWT + rate limiting | 7 | Phase 2 |
@@ -146,7 +147,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Architectural decision — multi-model role routing (resolved):** two named beans `fastChatModel` and `smartChatModel` are defined in `ChatModelRolesConfig`. In dev both alias the single configured provider. In production they can be independently routed to different providers by replacing the aliases with provider-specific beans (`llm.role.fast.*` / `llm.role.smart.*` properties). Role assignment: `fastChatModel` → classification, PII redaction; `smartChatModel` → structured extraction, RAG, agent reasoning.
 
-### Milestone 2 — Knowledge Base Ingestion + Hybrid Search + Market Price Consumer ← IN PROGRESS
+### Milestone 2 — Knowledge Base Ingestion + Hybrid Search + Market Price Consumer ✓ COMPLETE
 
 > **Electricity-first:** all milestones through Phase 1 target electricity invoices only (`InvoiceType.LUZ`). Uploading a gas, water, or telecom invoice returns HTTP 422 (`UnsupportedSupplyTypeException`). Support for other supply types is deferred to a later milestone.
 
@@ -166,48 +167,47 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - Dead-letter topic `market.electricity-price-updated.DLT` for deserialization or validation failures; domain validation errors go to `market.electricity-price-updated.domain-errors`.
   - Integration test with TestContainers Kafka (`spring-kafka-test`).
 
-**Deliverables — Knowledge Base: PENDING**
+**Deliverables — Knowledge Base: ✓ COMPLETE**
 
-- Initial golden set (5–10 anonymized invoices) with field-extraction tests as the baseline for the M6 eval harness.
-  - Bounded context `knowledge/` with `KnowledgeDocument` aggregate and `KnowledgeChunk`.
-  - Ingestion pipeline: fetch regulatory documents (CNMC methodology, REE/ESIOS tariff guides, BOE sector regulations) → chunk → embed → store in pgVector with metadata (`doc_type`, `source`, `title`, `section`).
+- Bounded context `knowledge/` with `KnowledgeDocument` aggregate and `KnowledgeChunk`.
+  - Ingestion pipeline: text → chunk (overlap sliding window, 150 words / 30 overlap) → embed (AllMiniLM-L6-v2, local ONNX, 384d) → store in pgVector with metadata (`doc_type`, `source`, `title`, `section`).
   - Port `KnowledgeSearchRepository`.
-  - Adapter combining pgVector + Postgres `tsvector` BM25 with Reciprocal Rank Fusion (RRF).
-  - Metadata filters (`doc_type`, `supply_type`).
-  - Optional cross-encoder re-ranker.
-  - Admin endpoint `POST /api/v1/admin/knowledge/ingest` to trigger ingestion manually.
-  - Retrieval tests with recall@k / MRR against a small curated query set.
+  - Adapter combining pgVector cosine similarity + Postgres `tsvector` BM25 (`unaccent` + `to_tsvector('spanish', ...)`) with Reciprocal Rank Fusion (RRF).
+  - Admin endpoint `POST /api/v1/admin/knowledge/ingest` to trigger ingestion; `DELETE` to clear; `POST /reindex` to rebuild IVFFlat index.
+  - Seed data: 6 regulatory documents (CNMC, REE/2.0TD, PVPC, glossary, invoice reading guide, FAQ) auto-loaded at startup when `knowledge.seed.enabled=true`.
+  - Pluggable embedding provider via `EMBEDDING_PROVIDER` env var (`allminilm` default, `openai`, `ollama`).
+  - IVFFlat index managed automatically by `JpaKnowledgeRepository.rebuildIndex()` (`lists = sqrt(rows)`; skipped below 100 vectors).
+  - Retrieval quality IT: `HybridKnowledgeSearchRepositoryRetrievalIT` with 8-query golden set asserting recall@3 ≥ 0.625, recall@5 ≥ 0.750, MRR@5 ≥ 0.500.
 
 **Dependencies:** Milestone 0 (database infrastructure).
 
-**Note on the price producer:** BillMind only consumes. The service that fetches prices from external sources (e.g. REE ESIOS API) and publishes `ElectricityPriceEvent` (and future per-supply-type events) is a separate system, developed independently. BillMind trusts its events without question.
+**Note on the price producer:** BillMind only consumes. The service that fetches prices from external sources (e.g. REE ESIOS API) and publishes `ElectricityPriceEvent` is a separate system, developed independently. BillMind trusts its events without question.
 
-**Candidate documents (knowledge base):**
-- CNMC: tariff methodology circulars
-  - REE: PVPC price guides, access toll documentation
-  - BOE: Real Decreto 1164/2001, RD 216/2014, and related sector regulations
-  - Glossary of billing terms (CUPS, término de potencia, peaje de acceso, etc.)
+**Engineering highlights:** event-driven market price ingestion via Kafka (KRaft) with flat-rate and TOU pricing support, idempotent upsert, DLT + domain-error topics, TestContainers integration tests; hybrid pgVector + BM25 retrieval with RRF, automated IVFFlat index lifecycle, recall@k / MRR quality gate in CI.
 
-**Engineering highlights:** event-driven market price ingestion via Kafka (KRaft) with flat-rate and TOU pricing support, idempotent upsert, DLT + domain-error topics, TestContainers integration tests; initial extraction golden set as regression baseline, hybrid pgVector + BM25 retrieval with RRF, recall@k / MRR evaluation, metadata-filtered knowledge search.
+### Milestone 3 — `comparison/` module — Savings Engine ← NEXT
 
-### Milestone 3 — `assistant/` module — Conversational RAG
+**Objective:** deliver the core product value: quantify exactly how much the user is overpaying and what they should switch to. The comparison result is returned synchronously with the invoice upload — no extra step required from the user.
 
-**Objective:** deliver conversational invoice analysis with SSE streaming responses and mandatory cited sources.
+**Product rationale:** the savings figure is the "wow" moment. Everything else (chat, regulatory context) exists to explain and deepen that finding. Showing it immediately on upload, before the user asks anything, is the right narrative order.
 
 **Deliverables:**
 
-- Bounded context `assistant/` with `Conversation`, `Message`, `Citation`.
-  - `AskAssistantUseCase` with dual context strategy:
-    - User's invoice full text → passed directly in the prompt (no retrieval needed, fits in context window).
-    - Regulatory knowledge base → semantic RAG retrieval (CNMC, REE, BOE documents).
-  - `POST /api/v1/assistant/chat` with SSE streaming.
-  - Persistent conversational memory.
-  - Mandatory citations (regulatory source + invoice line when applicable).
-  - Prompt-injection guardrails on input.
+- Bounded context `comparison/` fully implemented (currently skeleton only).
+  - Domain: `ComparisonResult` value object — `userPricePerKwh`, `bestRate` (company, tariffName, pricePerKwh), `alternativeRates` (up to 3 ranked alternatives), `annualKwhEstimate`, `annualSavingsEuros`, `comparedAt`.
+  - Port `ElectricityRateQueryPort` — queries `electricity_rates` for the best available rates for a given supply type.
+  - `CompareInvoiceUseCase` — deterministic arithmetic, no LLM: finds cheapest flat-rate and TOU options in `electricity_rates`, estimates annual kWh from the billing period, computes savings vs user's extracted `pricePerKwh`. The LLM never does numerical math.
+  - Graceful degradation: if `electricity_rates` is empty (producer not yet running), `ComparisonResult` is `null` — no error, no blocking.
+  - `comparisons` table — stores each result with `invoiceId`, `sessionId`, result JSON, and `comparedAt`.
+  - `POST /api/v1/invoices/{id}/comparison` — explicit re-run endpoint.
+  - **Synchronous integration with upload:** `UploadInvoiceUseCase` calls `CompareInvoiceUseCase` after extraction; the `POST /api/v1/invoices` response includes a `comparison` field (nullable).
+  - Static HTML updated: savings card displayed immediately after successful upload showing `userPricePerKwh`, `bestRate`, `annualSavingsEuros`. Hidden when `comparison` is null.
 
-**Dependencies:** Milestone 1 (structured invoice fields), Milestone 2 (knowledge base populated and searchable).
+**Dependencies:** Milestone 1 (extracted invoice fields including `pricePerKwh` and `consumptionKwh`), Milestone 2 (`electricity_rates` table — data populated by Kafka producer when running).
 
-**Engineering highlights:** SSE streaming in Spring, dual-context (direct invoice text + regulatory RAG), mandatory citation enforcement at the API boundary, prompt-injection guardrails.
+**Note on the LangChain4j tool-calling agent:** the original design used `AiServices` with `@Tool` methods for the comparison. That approach is deferred — deterministic arithmetic is faster, cheaper, testable, and delivers the same value. The agent layer can be added later if reasoning over multiple tariff dimensions becomes complex.
+
+**Engineering highlights:** deterministic savings calculation (arithmetic, not LLM), graceful null when market data is absent, synchronous result embedded in upload response, savings card in static HTML.
 
 ### Milestone 4 — Market Price Producer *(separate service, developed independently)*
 
@@ -226,22 +226,26 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Engineering highlights:** event publishing decouples data sourcing from BillMind's ingestion; any future price source (scraper, third-party API, manual upload) can replace or extend this producer without touching BillMind.
 
-### Milestone 5 — `comparison/` module — Tool-calling Agent
+### Milestone 5 — `assistant/` module — Conversational RAG
 
-**Objective:** deliver the comparison engine: a tool-calling agent that evaluates user rates against current market benchmarks and computes concrete savings estimates.
+**Objective:** deliver conversational invoice analysis — the layer that explains the comparison result and answers follow-up questions. By this point the user already knows their savings figure; the chat exists to help them understand why and how to act.
 
 **Deliverables:**
 
-- LangChain4j `AiServices` with `@Tool` methods: `getInvoiceFields`, `getCurrentElectricityRates`, `getDatasetBenchmark`, `calculateAnnualSavings`.
-  - `CompareInvoiceUseCase`.
-  - `ComparisonResult` record.
-  - `POST /api/v1/invoices/{id}/comparison`.
-  - `comparisons` table.
-  - Traces of which tools the agent invoked.
+- Bounded context `assistant/` fully implemented (currently: domain model + SSE streaming wired, `InMemoryAssistantRepository` — persistence missing).
+  - `conversations` and `messages` tables; `JpaAssistantRepository` replacing `InMemoryAssistantRepository`.
+  - `AskAssistantUseCase` with dual context strategy:
+    - User's invoice full text → passed directly in the prompt (no retrieval needed, fits in context window).
+    - Regulatory knowledge base → semantic RAG retrieval (CNMC, REE, BOE documents from Milestone 2).
+  - `POST /api/v1/assistant/chat` with SSE streaming (already wired; needs persistent memory).
+  - `GET /conversations/{id}` — returns conversation history; responds only if `X-Session-Id` matches.
+  - Mandatory citations (regulatory source cited in every answer that references regulation).
+  - Prompt-injection guardrails on input.
+  - Static HTML chat page connected to the comparison result: pre-populated suggestion "¿Cómo cambio a [bestRate.tariffName] de [bestRate.company]?" using the comparison data from Milestone 3.
 
-**Dependencies:** Milestones 1, 2 (`electricity_rates` table populated via Kafka consumer).
+**Dependencies:** Milestone 1 (invoice fields), Milestone 2 (knowledge base), Milestone 3 (comparison result available as context seed for the first message).
 
-**Engineering highlights:** LangChain4j `@Tool` agent with deterministic Java tools for numerical math, tool invocation tracing, structured comparison output.
+**Engineering highlights:** persistent multi-turn conversation history, dual-context RAG (direct invoice text + regulatory retrieval), SSE streaming, citation enforcement, prompt-injection guardrails.
 
 ### Milestone 6 — Evaluation Harness + Observability
 
@@ -255,7 +259,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - Self-hosted Langfuse with traces, tokens, latencies, estimated cost.
   - Basic dashboard.
 
-**Dependencies:** Milestones 3, 5.
+**Dependencies:** Milestones 3, 5 (new numbering: comparison + chat).
 
 **Engineering highlights:** RAGAS-style metrics (faithfulness, context precision, answer relevancy), quality regression gate in CI, structured LLM observability with token and latency tracking.
 
@@ -289,6 +293,6 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - Session UUID generated client-side and persisted in `localStorage`.
   - Public deploy (Docker compose, or Vercel + Fly.io with Ollama).
 
-**Dependencies:** Milestone 3 minimum, ideally with 5.
+**Dependencies:** Milestone 3 (comparison) minimum, ideally with Milestone 5 (chat).
 
 **Engineering highlights:** Next.js + Tailwind with SSE streaming and citation-linked PDF viewer; session UUID persisted client-side; full-stack Docker Compose deployment with Ollama, PostgreSQL + pgVector, and the Spring Boot API behind a single command.

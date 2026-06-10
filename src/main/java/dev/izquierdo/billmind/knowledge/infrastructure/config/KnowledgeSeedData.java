@@ -238,6 +238,44 @@ public class KnowledgeSeedData {
                         """,
                         null, null
                 )
+                ,
+                new IngestDocumentCommand(
+                        DocType.GENERAL,
+                        "Preguntas Frecuentes sobre Facturas de Luz",
+                        "BillMind / FAQ consumidor",
+                        """
+                        ¿Por qué me ha subido tanto la factura este mes?
+                        Las facturas pueden dispararse por varias razones: un aumento del precio de la energía en el mercado mayorista (especialmente en PVPC), un periodo de facturación más largo de lo habitual, un consumo mayor por frío o calor extremo, o un error en la lectura del contador. Revisa el número de días facturados y si las lecturas son reales o estimadas.
+
+                        ¿Me están cobrando de más? ¿Cómo lo sé?
+                        Compara el precio por kWh efectivo dividiendo el total de la factura entre los kWh consumidos. Si ese precio es muy superior al mercado actual, es posible que tengas una tarifa cara o que haya un error. Puedes reclamar a tu comercializadora o a la CNMC si sospechas un cobro incorrecto.
+
+                        ¿Qué hago si la factura me parece rara o incorrecta?
+                        Primero contacta con tu comercializadora y pide explicación del desglose. Si no te convencen, puedes presentar una reclamación formal ante la CNMC de forma gratuita a través de su portal web. Guarda siempre una copia de tus facturas.
+
+                        ¿Por qué pago aunque no consuma nada de luz?
+                        La factura tiene una parte fija (término de potencia) que pagas por tener el suministro disponible, independientemente de si enciendes algo o no. Es como el abono de una autopista: pagas por poder usarla. Si llevas mucho tiempo sin usar el suministro, considera reducir la potencia contratada.
+
+                        ¿Merece la pena poner la lavadora de noche?
+                        Sí, si tienes discriminación horaria (tarifa 2.0TD). Por la noche, en periodo valle, el precio de la energía es significativamente más barato. Lo mismo aplica los fines de semana y festivos nacionales. El lavavajillas, la secadora y la carga del coche eléctrico son los electrodomésticos donde más se nota el ahorro.
+
+                        ¿Qué es eso del CUPS que pone en la factura?
+                        Es el código que identifica tu punto de suministro, como el DNI de tu conexión a la red. Siempre empieza por ES y tiene 20 o 22 caracteres. Lo necesitarás si quieres cambiar de comercializadora.
+
+                        ¿Puedo cambiarme de compañía de luz fácilmente?
+                        Sí, el cambio es gratuito y el suministro no se interrumpe en ningún momento. Tardas entre 7 y 21 días hábiles. Solo necesitas tu CUPS y aceptar el nuevo contrato.
+
+                        ¿Qué diferencia hay entre la luz de mercado libre y el PVPC?
+                        El PVPC es una tarifa regulada por el Gobierno con precio variable hora a hora según el mercado. El mercado libre ofrece precios fijos o indexados acordados con la comercializadora. El PVPC puede ser más barato si consumes en horas baratas; el mercado libre da más estabilidad en la factura.
+
+                        Mi factura tiene lecturas estimadas, ¿es normal?
+                        No debería ocurrir con frecuencia si tienes contador inteligente (telemedida), ya que envía lecturas reales automáticamente. Si ves estimaciones repetidas, pide a tu distribuidora que revise el contador o que verifique si hay problemas de comunicación con el telemedidor.
+
+                        ¿Por qué hay tantos impuestos en la factura?
+                        Además del coste de la energía, pagas peajes de red (transporte y distribución), cargos del sistema (financian renovables y costes insulares), el Impuesto Especial sobre la Electricidad (5,11%) y el IVA (21%, aunque puede estar reducido temporalmente). Entre peajes, cargos e impuestos pueden suponer más del 50% de tu factura.
+                        """,
+                        null, null
+                )
         );
     }
 }

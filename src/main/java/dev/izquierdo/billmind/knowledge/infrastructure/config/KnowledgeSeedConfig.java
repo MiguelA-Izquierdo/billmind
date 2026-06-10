@@ -26,25 +26,19 @@ public class KnowledgeSeedConfig {
     }
 
     @PostConstruct
-    public void seedIfEmpty() {
-        if (!seedEnabled) {
-            log.debug("Knowledge base seeding disabled");
-            return;
+    public void initialize() {
+        if (seedEnabled && knowledgeRepository.isEmpty()) {
+            log.info("Seeding knowledge base with example documents…");
+            KnowledgeSeedData.exampleDocuments().forEach(cmd -> {
+                try {
+                    ingestUseCase.execute(cmd);
+                    log.info("Seeded: [{}] {}", cmd.docType(), cmd.title());
+                } catch (Exception ex) {
+                    log.error("Failed to seed document '{}': {}", cmd.title(), ex.getMessage(), ex);
+                }
+            });
+            log.info("Knowledge base seeding complete");
         }
-        if (!knowledgeRepository.isEmpty()) {
-            log.debug("Knowledge base already populated, skipping seed");
-            return;
-        }
-
-        log.info("Seeding knowledge base with example documents…");
-        KnowledgeSeedData.exampleDocuments().forEach(cmd -> {
-            try {
-                ingestUseCase.execute(cmd);
-                log.info("Seeded: [{}] {}", cmd.docType(), cmd.title());
-            } catch (Exception ex) {
-                log.error("Failed to seed document '{}': {}", cmd.title(), ex.getMessage(), ex);
-            }
-        });
-        log.info("Knowledge base seeding complete");
+        knowledgeRepository.rebuildIndex();
     }
 }

@@ -53,8 +53,6 @@ Pull the chat model before starting (if running Ollama outside Docker):
 ollama pull llama3.2     # chat — required when LLM_PROVIDER=ollama
 ```
 
-> Embeddings (AllMiniLM-L6-v2) run via ONNX inside the JVM — no Ollama model is needed for vector search.
-
 ### OpenAI
 
 | Variable | Example | Description |
@@ -86,14 +84,72 @@ ollama pull llama3.2     # chat — required when LLM_PROVIDER=ollama
 
 ---
 
+## Embedding Model
+
+Set `EMBEDDING_PROVIDER` to choose the vector embedding backend. The selected model determines the vector dimensions stored in pgVector — **changing the model requires clearing `vector_store` and re-ingesting all documents**.
+
+| Variable | Options | Default | Description |
+|---|---|---|---|
+| `EMBEDDING_PROVIDER` | `allminilm` \| `openai` \| `ollama` | `allminilm` | Active embedding backend |
+
+### allminilm (local — default)
+
+Runs entirely inside the JVM via ONNX. No API key, no network call, no Ollama instance needed. Fixed 384-dimensional output.
+
+| Variable | Default | Description |
+|---|---|---|
+| — | — | No configuration required |
+
+### openai
+
+Uses the OpenAI Embeddings API. Requires `OPENAI_API_KEY` (shared with `LLM_PROVIDER=openai`).
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model name |
+
+Known dimensions:
+
+| Model | Dimensions |
+|---|---|
+| `text-embedding-3-small` | 1536 |
+| `text-embedding-3-large` | 3072 |
+| `text-embedding-ada-002` | 1536 |
+
+### ollama
+
+Uses a locally running Ollama server to generate embeddings. The model must be pulled before starting.
+
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model name |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Shared with `LLM_PROVIDER=ollama` |
+
+Pull the embedding model before starting:
+
+```bash
+ollama pull nomic-embed-text   # 768d
+ollama pull mxbai-embed-large  # 1024d
+```
+
+> **Startup validation:** BillMind always embeds a test string at startup and compares the vector length against `PGVECTOR_DIMENSIONS`. A mismatch causes an immediate startup failure with a clear error message.
+
+---
+
 ## Vector Store (pgVector)
 
 | Variable | Default | Description |
 |---|---|---|
 | `PGVECTOR_TABLE_NAME` | `vector_store` | Table name for vector storage |
-| `PGVECTOR_DIMENSIONS` | `384` | Embedding dimensions — must match the model (`all-minilm` → 384) |
-| `PGVECTOR_USE_INDEX` | `true` | Create an IVFFlat index on startup (`false` skips index creation). HNSW is not yet supported by `langchain4j-pgvector:1.0.0-beta5`. |
-| `PGVECTOR_INDEX_LIST_SIZE` | `100` | IVFFlat `lists` parameter. **Required even when `PGVECTOR_USE_INDEX=false`** — omitting it causes a startup failure. Tune to `sqrt(row_count)` in production. |
+| `PGVECTOR_DIMENSIONS` | `384` | Embedding dimensions — must match the model (`allminilm` → 384, `bge-m3` → 1024) |
+
+**Index management** is automatic — no manual configuration required:
+
+- On every startup and after every `POST /api/v1/admin/knowledge/reindex`, the app counts the vectors in `vector_store` and decides:
+  - **< 100 vectors** → no index, sequential scan (fast enough at this scale)
+  - **≥ 100 vectors** → IVFFlat index with `lists = sqrt(rows)`, recalculated each time
+
+This means the index always has the right number of lists for the current dataset size. HNSW is the target for a future upgrade when supported by `langchain4j-pgvector`.
 
 ---
 

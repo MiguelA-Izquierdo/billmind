@@ -1,6 +1,7 @@
 package dev.izquierdo.billmind.invoice.domain.model;
 
-import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 
 import java.time.Instant;
 import java.util.Objects;

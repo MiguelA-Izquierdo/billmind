@@ -1,14 +1,14 @@
 package dev.izquierdo.billmind.invoice.infrastructure.persistence;
 
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
-import dev.izquierdo.billmind.invoice.domain.model.fields.ElectricityFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.GasFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.MobileLine;
-import dev.izquierdo.billmind.invoice.domain.model.fields.StreamingService;
-import dev.izquierdo.billmind.invoice.domain.model.fields.TelecomFields;
-import dev.izquierdo.billmind.invoice.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.MobileLine;
+import dev.izquierdo.billmind._shared.domain.model.fields.StreamingService;
+import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -60,6 +60,15 @@ public class InvoiceEntity {
 
     @Column(name = "price_per_kwh", precision = 10, scale = 6)
     private BigDecimal pricePerKwh;
+
+    @Column(name = "price_per_kwh_p1", precision = 10, scale = 6)
+    private BigDecimal pricePerKwhP1;
+
+    @Column(name = "price_per_kwh_p2", precision = 10, scale = 6)
+    private BigDecimal pricePerKwhP2;
+
+    @Column(name = "price_per_kwh_p3", precision = 10, scale = 6)
+    private BigDecimal pricePerKwhP3;
 
     @Column(name = "contracted_power_kw", precision = 6, scale = 3)
     private BigDecimal contractedPowerKw;
@@ -124,8 +133,11 @@ public class InvoiceEntity {
             entity.totalAmount        = fields.totalAmount();
             switch (fields) {
                 case ElectricityFields f -> {
-                    entity.consumptionKwh  = f.consumptionKwh();
-                    entity.pricePerKwh     = f.pricePerKwh();
+                    entity.consumptionKwh    = f.consumptionKwh();
+                    entity.pricePerKwh       = f.pricePerKwh();
+                    entity.pricePerKwhP1     = f.pricePerKwhP1();
+                    entity.pricePerKwhP2     = f.pricePerKwhP2();
+                    entity.pricePerKwhP3     = f.pricePerKwhP3();
                     entity.contractedPowerKw = f.contractedPowerKw();
                 }
                 case GasFields f -> {
@@ -168,7 +180,9 @@ public class InvoiceEntity {
         if (billingPeriodStart == null) return null;
         return switch (supplyType) {
             case LUZ   -> new ElectricityFields(billingPeriodStart, billingPeriodEnd, totalAmount,
-                                                consumptionKwh, pricePerKwh, contractedPowerKw);
+                                                consumptionKwh, pricePerKwh,
+                                                pricePerKwhP1, pricePerKwhP2, pricePerKwhP3,
+                                                contractedPowerKw);
             case GAS   -> new GasFields(billingPeriodStart, billingPeriodEnd, totalAmount,
                                         consumptionM3, consumptionKwh, pricePerKwh);
             case AGUA  -> new WaterFields(billingPeriodStart, billingPeriodEnd, totalAmount,

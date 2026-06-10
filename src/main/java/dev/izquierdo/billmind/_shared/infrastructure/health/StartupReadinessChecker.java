@@ -2,6 +2,7 @@ package dev.izquierdo.billmind._shared.infrastructure.health;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import jakarta.annotation.PostConstruct;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -32,6 +33,7 @@ public class StartupReadinessChecker {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final DataSource dataSource;
+    private final EmbeddingModel embeddingModel;
     private final String llmProvider;
     private final String ollamaBaseUrl;
     private final String ollamaChatModel;
@@ -41,9 +43,14 @@ public class StartupReadinessChecker {
     private final String groqApiKey;
     private final boolean kafkaEnabled;
     private final String kafkaBootstrapServers;
+    private final String embeddingProvider;
+    private final String ollamaEmbeddingModel;
+    private final int vectorDimensions;
+    private final String vectorTable;
 
     public StartupReadinessChecker(
             DataSource dataSource,
+            EmbeddingModel embeddingModel,
             @Value("${llm.provider}") String llmProvider,
             @Value("${llm.ollama.base-url:http://localhost:11434}") String ollamaBaseUrl,
             @Value("${llm.ollama.model:llama3.2}") String ollamaChatModel,
@@ -52,17 +59,26 @@ public class StartupReadinessChecker {
             @Value("${llm.gemini.api-key:}") String geminiApiKey,
             @Value("${llm.groq.api-key:}") String groqApiKey,
             @Value("${kafka.enabled:false}") boolean kafkaEnabled,
-            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String kafkaBootstrapServers) {
-        this.dataSource = dataSource;
-        this.llmProvider = llmProvider;
-        this.ollamaBaseUrl = ollamaBaseUrl;
-        this.ollamaChatModel = ollamaChatModel;
-        this.openAiApiKey = openAiApiKey;
-        this.anthropicApiKey = anthropicApiKey;
-        this.geminiApiKey = geminiApiKey;
-        this.groqApiKey = groqApiKey;
-        this.kafkaEnabled = kafkaEnabled;
+            @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String kafkaBootstrapServers,
+            @Value("${embedding.provider:allminilm}") String embeddingProvider,
+            @Value("${embedding.ollama.model:nomic-embed-text}") String ollamaEmbeddingModel,
+            @Value("${pgvector.dimensions:384}") int vectorDimensions,
+            @Value("${pgvector.table-name:vector_store}") String vectorTable) {
+        this.dataSource            = dataSource;
+        this.embeddingModel        = embeddingModel;
+        this.llmProvider           = llmProvider;
+        this.ollamaBaseUrl         = ollamaBaseUrl;
+        this.ollamaChatModel       = ollamaChatModel;
+        this.openAiApiKey          = openAiApiKey;
+        this.anthropicApiKey       = anthropicApiKey;
+        this.geminiApiKey          = geminiApiKey;
+        this.groqApiKey            = groqApiKey;
+        this.kafkaEnabled          = kafkaEnabled;
         this.kafkaBootstrapServers = kafkaBootstrapServers;
+        this.embeddingProvider     = embeddingProvider;
+        this.ollamaEmbeddingModel  = ollamaEmbeddingModel;
+        this.vectorDimensions      = vectorDimensions;
+        this.vectorTable           = vectorTable;
     }
 
     @PostConstruct
@@ -70,6 +86,7 @@ public class StartupReadinessChecker {
         log.info("┌─ BillMind startup checks ───────────────────────");
         checkPgVector();
         checkLlmProvider();
+        checkEmbeddingProvider();
         if (kafkaEnabled) {
             checkKafka();
         }
@@ -78,16 +95,18 @@ public class StartupReadinessChecker {
 
     private void checkPgVector() {
         try (Connection conn = dataSource.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                     "SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'")) {
+             Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery(
+                    "SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'");
             rs.next();
             if (rs.getInt(1) == 0) {
                 throw new IllegalStateException(
                         "pgVector extension is not installed. " +
                         "Connect to PostgreSQL and run: CREATE EXTENSION vector;");
             }
-            log.info("│  [OK] PostgreSQL + pgVector");
+            rs.close();
+            stmt.execute("CREATE EXTENSION IF NOT EXISTS unaccent");
+            log.info("│  [OK] PostgreSQL + pgVector + unaccent");
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException("Cannot verify pgVector extension: " + e.getMessage(), e);
         }
@@ -106,10 +125,67 @@ public class StartupReadinessChecker {
         }
     }
 
+    private void checkEmbeddingProvider() {
+        switch (embeddingProvider) {
+            case "allminilm" -> {} // local ONNX — available if the dep is on the classpath
+            case "openai"    -> requireApiKey("OpenAI (embeddings)", openAiApiKey, "OPENAI_API_KEY");
+            case "ollama"    -> checkOllamaEmbedding();
+            default -> throw new IllegalStateException(
+                    "Unknown EMBEDDING_PROVIDER='" + embeddingProvider + "'. " +
+                    "Valid values: allminilm, openai, ollama");
+        }
+        checkEmbeddingDimensions();
+    }
+
+    private void checkEmbeddingDimensions() {
+        int modelDim = embeddingModel.embed("test").content().vector().length;
+        if (modelDim != vectorDimensions) {
+            throw new IllegalStateException(String.format(
+                    "Embedding model produces %d-d vectors but PGVECTOR_DIMENSIONS=%d. " +
+                    "Set PGVECTOR_DIMENSIONS=%d in your .env file.",
+                    modelDim, vectorDimensions, modelDim));
+        }
+        checkVectorStoreColumnDimension(modelDim);
+        log.info("│  [OK] Embedding — provider={}, dimensions={}", embeddingProvider, modelDim);
+    }
+
+    private void checkVectorStoreColumnDimension(int expected) {
+        String sql = "SELECT atttypmod FROM pg_attribute " +
+                     "WHERE attrelid = ?::regclass AND attname = 'embedding'";
+        try (Connection conn = dataSource.getConnection();
+             var stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, vectorTable);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (!rs.next()) {
+                    return; // table does not exist yet — PgVectorEmbeddingStore will create it
+                }
+                int actual = rs.getInt(1);
+                if (actual != expected) {
+                    throw new IllegalStateException(String.format(
+                            "Table '%s' has embedding column of %d dimensions but model produces %d. " +
+                            "Run: DROP TABLE %s; and restart to let it be recreated with the correct schema.",
+                            vectorTable, actual, expected, vectorTable));
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            // regclass cast throws if the table doesn't exist — treat as not yet created
+            if (e.getMessage() != null && e.getMessage().contains("does not exist")) {
+                return;
+            }
+            throw new IllegalStateException("Could not verify vector store column dimensions: " + e.getMessage(), e);
+        }
+    }
+
     private void checkOllama() {
         HttpClient client = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
         checkOllamaReachable(client);
-        checkOllamaModelAvailable(client);
+        checkOllamaModelAvailable(client, ollamaChatModel);
+    }
+
+    private void checkOllamaEmbedding() {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+        checkOllamaReachable(client);
+        checkOllamaModelAvailable(client, ollamaEmbeddingModel);
     }
 
     private void checkOllamaReachable(HttpClient client) {
@@ -130,27 +206,28 @@ public class StartupReadinessChecker {
         }
     }
 
-    private void checkOllamaModelAvailable(HttpClient client) {
+    private void checkOllamaModelAvailable(HttpClient client, String modelName) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(ollamaBaseUrl + "/api/tags"))
                     .GET().timeout(TIMEOUT).build();
             String body = client.send(request, HttpResponse.BodyHandlers.ofString()).body();
 
-            String baseModelName = ollamaChatModel.split(":")[0];
+            String baseModelName = modelName.split(":")[0];
             JsonNode models = MAPPER.readTree(body).path("models");
             for (JsonNode model : models) {
                 if (model.path("name").asText().split(":")[0].equals(baseModelName)) {
-                    log.info("│  [OK] Ollama model '{}' available", ollamaChatModel);
+                    log.info("│  [OK] Ollama model '{}' available", modelName);
                     return;
                 }
             }
             throw new IllegalStateException(
-                    "Chat model '" + ollamaChatModel + "' is not pulled in Ollama. " +
-                    "Run: ollama pull " + ollamaChatModel);
+                    "Model '" + modelName + "' is not pulled in Ollama. " +
+                    "Run: ollama pull " + modelName);
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Could not retrieve Ollama model list (" + e.getClass().getSimpleName() + ")", e);
+            throw new IllegalStateException(
+                    "Could not retrieve Ollama model list (" + e.getClass().getSimpleName() + ")", e);
         }
     }
 

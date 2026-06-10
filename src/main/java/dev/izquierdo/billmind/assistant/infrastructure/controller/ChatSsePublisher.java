@@ -1,6 +1,5 @@
 package dev.izquierdo.billmind.assistant.infrastructure.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
 import org.slf4j.Logger;

@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.application.command;
 
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import dev.izquierdo.billmind.market.application.usecase.SaveElectricityRateUseCase;
 import dev.izquierdo.billmind.market.domain.model.ElectricityRate;
 import org.junit.jupiter.api.Test;

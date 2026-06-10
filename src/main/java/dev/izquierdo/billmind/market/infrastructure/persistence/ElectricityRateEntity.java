@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.infrastructure.persistence;
 
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;

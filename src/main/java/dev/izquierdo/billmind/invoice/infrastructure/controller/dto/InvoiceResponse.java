@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.controller.dto;
 
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind.invoice.domain.model.fields.InvoiceFields;
+import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 
 import java.math.BigDecimal;
 import java.time.Instant;

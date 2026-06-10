@@ -1,13 +1,13 @@
-package dev.izquierdo.billmind.invoice.domain.model.fields;
+package dev.izquierdo.billmind._shared.domain.model.fields;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record GasFields(
+public record WaterFields(
         LocalDate billingPeriodStart,
         LocalDate billingPeriodEnd,
         BigDecimal totalAmount,
         BigDecimal consumptionM3,
-        BigDecimal consumptionKwh,
-        BigDecimal pricePerKwh
+        BigDecimal pricePerM3,
+        BigDecimal sewageCharge
 ) implements InvoiceFields {}

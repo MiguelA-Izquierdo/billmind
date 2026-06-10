@@ -12,4 +12,6 @@ public interface KnowledgeRepository {
     boolean isEmpty();
 
     void deleteAll();
+
+    long rebuildIndex();
 }

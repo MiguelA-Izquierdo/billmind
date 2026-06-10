@@ -7,10 +7,10 @@ Reference for sessions where modules are designed or extended. Use with `@CLAUDE
 ## Design Decisions
 
 1. **UUID generated in the controller** — strict CQRS: commands return no value (`CommandBus.dispatch()` returns `void`).
-2. **AllMiniLM-L6-v2** via local ONNX runtime (bundled in the jar) — no external API, 384 dimensions, fast. Ollama is not involved in embeddings.
-3. **IVFFlat** as the pgVector index — only index type supported by `langchain4j-pgvector:1.0.0-beta5`. HNSW is the target for a future upgrade when available in the LangChain4j release.
-4. **Chunk size 500, overlap 100** — configurable if better parameters emerge.
-5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. The embedding model (AllMiniLM-L6-v2) is always local ONNX regardless of provider. See *LLM Provider Strategy* section below.
+2. **Pluggable embedding model** — selected at runtime via `EMBEDDING_PROVIDER` (`allminilm` default). `allminilm` runs as local ONNX inside the JVM (384d, no network call). `ollama` delegates to a local Ollama server (e.g. `bge-m3` at 1024d for better Spanish). `openai` uses the Embeddings API. Changing the model requires dropping `vector_store` and re-ingesting — the pgVector column dimension is a schema constraint.
+3. **Automatic IVFFlat index management** — `PgVectorEmbeddingStore` is always configured with `useIndex=false`; the app manages the index lifecycle itself via `JpaKnowledgeRepository.rebuildIndex()`. At startup (after seed) and on `POST /admin/knowledge/reindex`: if vectors < 100 → no index (sequential scan); if vectors ≥ 100 → `DROP + CREATE INDEX` with `lists = sqrt(rows)`. This keeps `lists` correct as the dataset grows without any manual env var tuning. HNSW is the target for a future upgrade when available in `langchain4j-pgvector`.
+4. **Chunk size 150, overlap 30** — tuned to AllMiniLM-L6-v2's 256-token limit. Configurable via `KNOWLEDGE_CHUNK_SIZE` and `KNOWLEDGE_CHUNK_OVERLAP`.
+5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. See *LLM Provider Strategy* section below.
 6. **Domain Events** wired to Spring's `ApplicationEventPublisher`. The first active listener is introduced in Milestone 5, where `InvoiceProcessed` triggers the comparison pipeline.
 7. **Frontend-generated session UUID** — sent as `X-Session-Id` header. The backend correlates resources to it but does not authenticate (Phase 1 is anonymous). Auth lands in Milestone 7.
 8. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
@@ -48,7 +48,7 @@ The `ChatModel` bean is selected at startup via `LLM_PROVIDER`. All providers im
 
 Gemini and Groq use Google's / Groq's OpenAI-compatible REST endpoints via `OpenAiChatModel` — no extra LangChain4j SDK dependency is required for either.
 
-**The embedding model is always `AllMiniLmL6V2EmbeddingModel` (local ONNX, 384 dim) and is never switchable.** Changing it would require dropping and recreating the `vector_store` table and re-ingesting all documents — the pgVector dimension is a schema constraint, not a runtime setting.
+**The embedding model is selected via `EMBEDDING_PROVIDER`.** Changing it requires dropping `vector_store` and re-ingesting all documents — the pgVector column dimension is a schema constraint validated at startup.
 
 **Security note:** when using a cloud provider, invoice text is sent to a third-party API. PII redaction (rule #7 in CLAUDE.md) must have run before any LLM call.
 

@@ -4,12 +4,16 @@ import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.application.query.QueryBus;
 import dev.izquierdo.billmind._shared.infrastructure.dto.SuccessResponseDTO;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
+import dev.izquierdo.billmind.comparison.application.usecase.CompareInvoiceUseCase;
+import dev.izquierdo.billmind.comparison.infrastructure.controller.dto.ComparisonResponseDTO;
 import dev.izquierdo.billmind.invoice.application.command.UploadInvoiceCommand;
 import dev.izquierdo.billmind.invoice.application.query.GetInvoiceQuery;
 import dev.izquierdo.billmind.invoice.application.query.GetSessionInvoicesQuery;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.infrastructure.controller.dto.InvoiceResponse;
 import dev.izquierdo.billmind.invoice.infrastructure.controller.dto.InvoiceUploadResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,14 +26,20 @@ import java.util.UUID;
 @RequestMapping("/api/v1/invoices")
 public class InvoiceController {
 
+    private static final Logger log = LoggerFactory.getLogger(InvoiceController.class);
+
     private final CommandBus commandBus;
     private final QueryBus queryBus;
     private final SessionContext sessionContext;
+    private final CompareInvoiceUseCase compareInvoiceUseCase;
 
-    public InvoiceController(CommandBus commandBus, QueryBus queryBus, SessionContext sessionContext) {
-        this.commandBus = commandBus;
-        this.queryBus = queryBus;
-        this.sessionContext = sessionContext;
+    public InvoiceController(CommandBus commandBus, QueryBus queryBus,
+                              SessionContext sessionContext,
+                              CompareInvoiceUseCase compareInvoiceUseCase) {
+        this.commandBus           = commandBus;
+        this.queryBus             = queryBus;
+        this.sessionContext       = sessionContext;
+        this.compareInvoiceUseCase = compareInvoiceUseCase;
     }
 
     @PostMapping
@@ -41,10 +51,29 @@ public class InvoiceController {
         UploadInvoiceCommand command = new UploadInvoiceCommand(invoiceId, sessionId, file.getOriginalFilename(), file.getBytes());
         commandBus.dispatch(command);
 
+        Invoice invoice = queryBus.dispatch(new GetInvoiceQuery(invoiceId, sessionId));
+        ComparisonResponseDTO comparison = null;
+        if (invoice.getFields() == null) {
+            log.info("Comparison skipped for invoice={} — field extraction produced no data", invoiceId);
+        } else {
+            comparison = compareInvoiceUseCase.compare(invoice.getFields())
+                    .map(result -> {
+                        log.debug("Comparison completed for invoice={} savings={}€ bestRate={}/{}",
+                                invoiceId, result.annualSavingsEuros(),
+                                result.bestCompany(), result.bestTariffName());
+                        return ComparisonResponseDTO.from(result);
+                    })
+                    .orElseGet(() -> {
+                        log.debug("Comparison skipped for invoice={} supplyType={} — insufficient data for comparison (pricePerKwh or consumptionKwh missing, or no market rates)",
+                                invoiceId, invoice.getSupplyType());
+                        return null;
+                    });
+        }
+
         return ResponseEntity.status(201).body(SuccessResponseDTO.of(
                 201,
                 "Factura subida y procesada correctamente.",
-                new InvoiceUploadResponse(invoiceId, command.fileName())
+                new InvoiceUploadResponse(invoiceId, command.fileName(), comparison)
         ));
     }
 

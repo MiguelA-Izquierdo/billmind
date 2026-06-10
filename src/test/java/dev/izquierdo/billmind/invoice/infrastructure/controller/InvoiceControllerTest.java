@@ -2,6 +2,7 @@ package dev.izquierdo.billmind.invoice.infrastructure.controller;
 
 import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.application.query.QueryBus;
+import dev.izquierdo.billmind.comparison.application.usecase.CompareInvoiceUseCase;
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
 import dev.izquierdo.billmind._shared.infrastructure.session.PublicRoutesService;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
@@ -10,7 +11,7 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind.invoice.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import dev.izquierdo.billmind._shared.infrastructure.config.SecurityConfig;
@@ -58,6 +59,9 @@ class InvoiceControllerTest {
     @MockitoBean
     private PublicRoutesService publicRoutesService;
 
+    @MockitoBean
+    private CompareInvoiceUseCase compareInvoiceUseCase;
+
     private static final UUID SESSION_ID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
     @BeforeEach
@@ -71,6 +75,12 @@ class InvoiceControllerTest {
     void uploadInvoice_withValidFile_returns201AndInvoiceId() throws Exception {
         byte[] pdfContent = "%PDF-1.4 fake invoice content".getBytes();
         MockMultipartFile file = new MockMultipartFile("file", "factura.pdf", "application/pdf", pdfContent);
+
+        Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf")
+                .sessionId(SESSION_ID)
+                .supplyType(InvoiceType.LUZ)
+                .build();
+        when(queryBus.dispatch(any())).thenReturn(invoice);
 
         mockMvc.perform(multipart("/api/v1/invoices")
                         .file(file)

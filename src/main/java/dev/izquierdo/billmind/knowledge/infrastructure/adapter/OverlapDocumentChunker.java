@@ -14,8 +14,8 @@ public class OverlapDocumentChunker implements DocumentChunker {
     private final int overlap;
 
     public OverlapDocumentChunker(
-            @Value("${knowledge.chunk.size:500}") int chunkSize,
-            @Value("${knowledge.chunk.overlap:100}") int overlap) {
+            @Value("${knowledge.chunk.size:150}") int chunkSize,
+            @Value("${knowledge.chunk.overlap:30}") int overlap) {
         this.chunkSize = chunkSize;
         this.overlap   = overlap;
     }
