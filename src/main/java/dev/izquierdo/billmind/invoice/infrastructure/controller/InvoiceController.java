@@ -89,4 +89,19 @@ public class InvoiceController {
         Invoice invoice = queryBus.dispatch(new GetInvoiceQuery(id, sessionContext.getSessionId()));
         return ResponseEntity.ok(SuccessResponseDTO.of(200, "Factura obtenida correctamente", InvoiceResponse.from(invoice)));
     }
+
+    @GetMapping("/{id}/comparison")
+    public ResponseEntity<SuccessResponseDTO> getComparison(@PathVariable UUID id) {
+        Invoice invoice = queryBus.dispatch(new GetInvoiceQuery(id, sessionContext.getSessionId()));
+        if (invoice.getFields() == null) {
+            return ResponseEntity.ok(SuccessResponseDTO.of(200, "Sin datos de extracción para comparar.", null));
+        }
+        ComparisonResponseDTO comparison = compareInvoiceUseCase.compare(invoice.getFields())
+                .map(r -> {
+                    log.debug("Comparison on select invoice={} savings={}€", id, r.annualSavingsEuros());
+                    return ComparisonResponseDTO.from(r);
+                })
+                .orElse(null);
+        return ResponseEntity.ok(SuccessResponseDTO.of(200, "Comparación calculada.", comparison));
+    }
 }

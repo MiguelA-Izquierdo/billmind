@@ -58,6 +58,15 @@ public class InvoiceEntity {
     @Column(name = "consumption_kwh", precision = 10, scale = 3)
     private BigDecimal consumptionKwh;
 
+    @Column(name = "consumption_kwh_p1", precision = 10, scale = 3)
+    private BigDecimal consumptionKwhP1;
+
+    @Column(name = "consumption_kwh_p2", precision = 10, scale = 3)
+    private BigDecimal consumptionKwhP2;
+
+    @Column(name = "consumption_kwh_p3", precision = 10, scale = 3)
+    private BigDecimal consumptionKwhP3;
+
     @Column(name = "price_per_kwh", precision = 10, scale = 6)
     private BigDecimal pricePerKwh;
 
@@ -134,6 +143,9 @@ public class InvoiceEntity {
             switch (fields) {
                 case ElectricityFields f -> {
                     entity.consumptionKwh    = f.consumptionKwh();
+                    entity.consumptionKwhP1  = f.consumptionKwhP1();
+                    entity.consumptionKwhP2  = f.consumptionKwhP2();
+                    entity.consumptionKwhP3  = f.consumptionKwhP3();
                     entity.pricePerKwh       = f.pricePerKwh();
                     entity.pricePerKwhP1     = f.pricePerKwhP1();
                     entity.pricePerKwhP2     = f.pricePerKwhP2();
@@ -180,7 +192,9 @@ public class InvoiceEntity {
         if (billingPeriodStart == null) return null;
         return switch (supplyType) {
             case LUZ   -> new ElectricityFields(billingPeriodStart, billingPeriodEnd, totalAmount,
-                                                consumptionKwh, pricePerKwh,
+                                                consumptionKwh,
+                                                consumptionKwhP1, consumptionKwhP2, consumptionKwhP3,
+                                                pricePerKwh,
                                                 pricePerKwhP1, pricePerKwhP2, pricePerKwhP3,
                                                 contractedPowerKw);
             case GAS   -> new GasFields(billingPeriodStart, billingPeriodEnd, totalAmount,

@@ -40,6 +40,12 @@ public class JpaElectricityRateRepository implements ElectricityRateRepository {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ElectricityRate> findLatestPerTariff() {
+        return jpa.findLatestPerTariff().stream().map(ElectricityRateMapper::toDomain).toList();
+    }
+
+    @Override
     @Transactional
     public void deleteAll() {
         long count = jpa.count();

@@ -35,27 +35,37 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "Output ONLY valid JSON matching this schema (no prose, no markdown fences):\n" +
             "{\"billingPeriodStart\":\"YYYY-MM-DD\",\"billingPeriodEnd\":\"YYYY-MM-DD\"," +
             "\"totalAmount\":0.00,\"consumptionKwh\":0.0," +
+            "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
             "\"pricePerKwh\":0.000,\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null," +
             "\"contractedPowerKw\":0.0}\n" +
             "ISO-8601 dates. Dot decimal separator. Null for any missing field.\n\n" +
             "=== pricePerKwh / TOU RULES ===\n" +
-            "FLAT RATE: set pricePerKwh, leave P1/P2/P3 null.\n" +
-            "  Labels: '€/kWh', 'precio energía', 'término de energía activa', 'coste de la energía'.\n" +
-            "TOU (discriminación horaria 2.0TD or similar): set P1/P2/P3, leave pricePerKwh null.\n" +
+            "TOU (discriminación horaria) means the PRICE PER kWh DIFFERS by period. If prices vary: set pricePerKwhP1/P2/P3, leave pricePerKwh null.\n" +
             "  P1 = punta  (labels: P1, PUNTA, PEAK)\n" +
             "  P2 = llano  (labels: P2, LLANO, FLAT)\n" +
             "  P3 = valle  (labels: P3, VALLE, OFF-PEAK, NOCHE)\n" +
             "  Two-period (día/noche): use P1=día, P3=noche, P2=null.\n" +
-            "Never set both pricePerKwh and any P1/P2/P3.\n\n" +
+            "FLAT RATE: the same price applies to ALL periods (or only one price appears). Set pricePerKwh, leave pricePerKwhP1/P2/P3 null.\n" +
+            "  Labels: '€/kWh', 'precio energía', 'término de energía activa', 'coste de la energía'.\n" +
+            "CRITICAL: if P1/P2/P3 prices are all equal (or one single price is multiplied across periods), treat as FLAT RATE — set pricePerKwh, leave P1/P2/P3 null.\n" +
+            "Never set both pricePerKwh and any pricePerKwhP1/P2/P3.\n\n" +
             "=== consumptionKwh ===\n" +
-            "Labels: 'kWh', 'Energía consumida'. For TOU: sum all periods.\n\n" +
+            "Total consumption. Labels: 'kWh', 'Energía consumida'. For TOU: sum all periods.\n\n" +
+            "=== consumptionKwhP1/P2/P3 ===\n" +
+            "Set to the kWh consumed in each period when shown, for both flat-rate and TOU invoices.\n" +
+            "  P1=punta, P2=llano, P3=valle. Two-period: P1=día, P3=noche, P2=null.\n" +
+            "  Leave null when the invoice does not break down consumption by period.\n\n" +
             "Input: IBERDROLA Periodo 01/01/2024 al 31/01/2024 320 kWh 0,1823 €/kWh 3,3 kW Total 67,20 €\n" +
             "Output: {\"billingPeriodStart\":\"2024-01-01\",\"billingPeriodEnd\":\"2024-01-31\"," +
-            "\"totalAmount\":67.20,\"consumptionKwh\":320.0,\"pricePerKwh\":0.1823," +
+            "\"totalAmount\":67.20,\"consumptionKwh\":320.0," +
+            "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
+            "\"pricePerKwh\":0.1823," +
             "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.3}\n\n" +
             "Input: ENDESA 08/05/2018 10/06/2018 | P1 (punta) 120 kWh 0,15234 €/kWh | P2 (llano) 130 kWh 0,10123 €/kWh | P3 (valle) 100 kWh 0,06891 €/kWh | Potencia 3,45 kW | Total 80,95 €\n" +
             "Output: {\"billingPeriodStart\":\"2018-05-08\",\"billingPeriodEnd\":\"2018-06-10\"," +
-            "\"totalAmount\":80.95,\"consumptionKwh\":350.0,\"pricePerKwh\":null," +
+            "\"totalAmount\":80.95,\"consumptionKwh\":350.0," +
+            "\"consumptionKwhP1\":120.0,\"consumptionKwhP2\":130.0,\"consumptionKwhP3\":100.0," +
+            "\"pricePerKwh\":null," +
             "\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45}";
 
     private static final String GAS_INSTRUCTIONS =

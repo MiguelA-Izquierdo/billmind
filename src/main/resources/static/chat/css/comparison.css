@@ -1,0 +1,180 @@
+/* ── Card positioning ──────────────────────────────────────────── */
+.msg.cmp-msg {
+  margin: 0 auto;
+  max-width: 480px;
+  width: 100%;
+}
+
+.cmp-msg .msg-content {
+  max-width: calc(100% - 42px);
+  flex: 1;
+}
+
+/* ── Base component styles ─────────────────────────────────────── */
+.cmp-bubble { padding: 14px 16px !important; }
+.cmp-intro  { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+
+/* Main row: savings summary (left) + metric grid (right) */
+.cmp-main {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.cmp-summary {
+  flex: 0 0 auto;
+  text-align: center;
+  min-width: 120px;
+  max-width: 150px;
+  border-right: 1px solid var(--border);
+  padding-right: 12px;
+}
+
+.cmp-savings-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  margin-bottom: 5px;
+}
+
+.cmp-amount {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.cmp-amount.positive { color: var(--green); }
+.cmp-amount.negative { color: var(--red); }
+
+.cmp-year {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.cmp-with       { font-size: 11px; line-height: 1.4; }
+.cmp-with strong { color: var(--accent); }
+
+.tou-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  background: rgba(108,111,245,.15);
+  color: var(--accent);
+  border: 1px solid rgba(108,111,245,.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Grid occupies the right side of cmp-main */
+.cmp-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+
+.cmp-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px;
+}
+
+.cmp-val { font-size: 13px; font-weight: 700; }
+.cmp-val.yours { color: var(--elec); }
+.cmp-val.best  { color: var(--green); }
+.cmp-key { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+
+.cmp-alts-title {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.cmp-alt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(46,50,72,.4);
+  font-size: 12px;
+}
+.cmp-alt-row:last-child { border-bottom: none; padding-bottom: 0; }
+.cmp-alt-company { color: var(--muted); font-size: 11px; }
+.cmp-alt-price   { color: var(--green); font-weight: 600; font-size: 12px; }
+
+.cmp-footer {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+/* ── TOU secondary block ───────────────────────────────────────── */
+.cmp-tou-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.cmp-tou-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--accent);
+  margin-bottom: 8px;
+  opacity: .75;
+}
+
+.cmp-tou-disclaimer {
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ── Media queries — always AFTER base styles ──────────────────── */
+
+/* ≤1100px: slight card shrink */
+@media (max-width: 1100px) {
+  .msg.cmp-msg { max-width: 440px; }
+}
+
+/* ≤860px: fill chat area, drop avatar */
+@media (max-width: 860px) {
+  .msg.cmp-msg            { max-width: 100%; }
+  .cmp-msg .msg-avatar    { display: none; }
+  .cmp-msg .msg-content   { max-width: 100%; }
+}
+
+/* ≤600px: mobile — collapse grid to 2 rows */
+@media (max-width: 600px) {
+  .cmp-main       { flex-direction: column; }
+  .cmp-summary    { max-width: 100%; border-right: none; padding-right: 0;
+                    border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .cmp-grid       { grid-template-columns: 1fr 1fr 1fr; }
+  .cmp-item       { flex-direction: column; align-items: center; justify-content: center; padding: 6px 4px; }
+  .cmp-amount     { font-size: 26px; }
+}

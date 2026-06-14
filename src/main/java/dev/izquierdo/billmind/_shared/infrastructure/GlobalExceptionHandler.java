@@ -8,6 +8,7 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableExc
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.assistant.domain.exceptions.ConversationNotFoundException;
+import dev.izquierdo.billmind.knowledge.domain.exceptions.EmptyDocumentException;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
@@ -97,6 +98,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(EmptyDocumentException.class)
+    public ResponseEntity<ErrorResponseDTO> handleEmptyDocumentException(EmptyDocumentException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
+        );
+    }
+
     @ExceptionHandler(InvalidElectricityRateException.class)
     public ResponseEntity<ErrorResponseDTO> handleInvalidElectricityRateException(InvalidElectricityRateException ex) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
@@ -108,6 +116,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleValidationErrorsException(ValidationErrorsException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), ex.getMessage(), ex.getErrors())
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponseDTO> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                ErrorResponseDTO.of(HttpStatus.BAD_REQUEST.value(), ex.getMessage())
         );
     }
 
@@ -138,7 +153,7 @@ public class GlobalExceptionHandler {
 
         Throwable cause = ex.getCause();
         if (cause instanceof InvalidFormatException invalidFormatEx && !invalidFormatEx.getPath().isEmpty()) {
-            String fieldName = invalidFormatEx.getPath().get(0).getFieldName();
+            String fieldName = invalidFormatEx.getPath().getFirst().getFieldName();
             errors.put(fieldName, Map.of("invalid", "Se esperaba un número, pero se recibió: " + invalidFormatEx.getValue()));
         } else {
             errors.put("body", Map.of("invalid", "El formato de la petición no es válido."));

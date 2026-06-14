@@ -45,7 +45,7 @@ class InvoiceFieldsValidatorTest {
 
     @Test
     void shouldAllowNullOptionalTypeSpecificFields() {
-        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("45.00"), null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("45.00"), null, null, null, null, null, null, null, null, null);
         assertThatCode(() -> validator.validate(fields)).doesNotThrowAnyException();
     }
 
@@ -53,14 +53,14 @@ class InvoiceFieldsValidatorTest {
 
     @Test
     void shouldRejectNullBillingPeriodStart() {
-        ElectricityFields fields = new ElectricityFields(null, END, new BigDecimal("45.00"), null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(null, END, new BigDecimal("45.00"), null, null, null, null, null, null, null, null, null);
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
 
     @Test
     void shouldRejectNullBillingPeriodEnd() {
-        ElectricityFields fields = new ElectricityFields(START, null, new BigDecimal("45.00"), null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(START, null, new BigDecimal("45.00"), null, null, null, null, null, null, null, null, null);
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
@@ -68,14 +68,14 @@ class InvoiceFieldsValidatorTest {
     @Test
     void shouldRejectStartAfterEnd() {
         ElectricityFields fields = new ElectricityFields(
-                END, START, new BigDecimal("45.00"), null, null, null, null, null, null);
+                END, START, new BigDecimal("45.00"), null, null, null, null, null, null, null, null, null);
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
 
     @Test
     void shouldAcceptSameDayPeriod() {
-        ElectricityFields fields = new ElectricityFields(START, START, new BigDecimal("5.00"), null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(START, START, new BigDecimal("5.00"), null, null, null, null, null, null, null, null, null);
         assertThatCode(() -> validator.validate(fields)).doesNotThrowAnyException();
     }
 
@@ -83,21 +83,21 @@ class InvoiceFieldsValidatorTest {
 
     @Test
     void shouldRejectNullTotalAmount() {
-        ElectricityFields fields = new ElectricityFields(START, END, null, null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(START, END, null, null, null, null, null, null, null, null, null, null);
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
 
     @Test
     void shouldRejectNegativeTotalAmount() {
-        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("-1.00"), null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("-1.00"), null, null, null, null, null, null, null, null, null);
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
 
     @Test
     void shouldAcceptZeroTotalAmount() {
-        ElectricityFields fields = new ElectricityFields(START, END, BigDecimal.ZERO, null, null, null, null, null, null);
+        ElectricityFields fields = new ElectricityFields(START, END, BigDecimal.ZERO, null, null, null, null, null, null, null, null, null);
         assertThatCode(() -> validator.validate(fields)).doesNotThrowAnyException();
     }
 
@@ -106,7 +106,7 @@ class InvoiceFieldsValidatorTest {
     @Test
     void shouldRejectNegativeConsumptionKwh() {
         ElectricityFields fields = new ElectricityFields(
-                START, END, new BigDecimal("45.00"), new BigDecimal("-1"), null, null, null, null, null);
+                START, END, new BigDecimal("45.00"), new BigDecimal("-1"), null, null, null, null, null, null, null, null);
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
@@ -114,7 +114,7 @@ class InvoiceFieldsValidatorTest {
     @Test
     void shouldRejectNegativeContractedPowerKw() {
         ElectricityFields fields = new ElectricityFields(
-                START, END, new BigDecimal("45.00"), null, null, null, null, null, new BigDecimal("-3.3"));
+                START, END, new BigDecimal("45.00"), null, null, null, null, null, null, null, null, new BigDecimal("-3.3"));
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
@@ -123,7 +123,7 @@ class InvoiceFieldsValidatorTest {
     void shouldRejectFlatAndTouPricesCoexisting() {
         ElectricityFields fields = new ElectricityFields(
                 START, END, new BigDecimal("45.00"), new BigDecimal("300"),
-                new BigDecimal("0.15"), new BigDecimal("0.22"), null, null, new BigDecimal("3.3"));
+                null, null, null, new BigDecimal("0.15"), new BigDecimal("0.22"), null, null, new BigDecimal("3.3"));
         assertThatThrownBy(() -> validator.validate(fields))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
     }
@@ -132,7 +132,7 @@ class InvoiceFieldsValidatorTest {
     void shouldPassValidTouElectricityFields() {
         ElectricityFields fields = new ElectricityFields(
                 START, END, new BigDecimal("67.20"), new BigDecimal("320"),
-                null, new BigDecimal("0.22"), new BigDecimal("0.18"), new BigDecimal("0.14"), new BigDecimal("3.3"));
+                null, null, null, null, new BigDecimal("0.22"), new BigDecimal("0.18"), new BigDecimal("0.14"), new BigDecimal("3.3"));
         assertThatCode(() -> validator.validate(fields)).doesNotThrowAnyException();
     }
 
@@ -174,8 +174,8 @@ class InvoiceFieldsValidatorTest {
 
     private static ElectricityFields validElectricity() {
         return new ElectricityFields(START, END,
-                new BigDecimal("67.20"), new BigDecimal("320"), new BigDecimal("0.1823"),
-                null, null, null, new BigDecimal("3.3"));
+                new BigDecimal("67.20"), new BigDecimal("320"), null, null, null,
+                new BigDecimal("0.1823"), null, null, null, new BigDecimal("3.3"));
     }
 
     private static GasFields validGas() {

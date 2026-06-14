@@ -29,6 +29,9 @@ public class InvoiceFieldsValidator {
         switch (fields) {
             case ElectricityFields e -> {
                 requireNonNegative(e.consumptionKwh(),    "consumptionKwh");
+                requireNonNegative(e.consumptionKwhP1(),  "consumptionKwhP1");
+                requireNonNegative(e.consumptionKwhP2(),  "consumptionKwhP2");
+                requireNonNegative(e.consumptionKwhP3(),  "consumptionKwhP3");
                 requireNonNegative(e.contractedPowerKw(), "contractedPowerKw");
                 boolean hasFlat = e.pricePerKwh() != null;
                 boolean hasTou  = e.pricePerKwhP1() != null

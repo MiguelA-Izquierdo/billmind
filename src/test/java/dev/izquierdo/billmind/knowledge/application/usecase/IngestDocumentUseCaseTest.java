@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -29,33 +30,36 @@ class IngestDocumentUseCaseTest {
 
     @Test
     void shouldChunkAndSaveDocument() {
+        UUID docId = UUID.randomUUID();
         IngestDocumentCommand cmd = new IngestDocumentCommand(
-                DocType.GLOSSARY, "Glosario", "REE", "word1 word2 word3", null, null);
+                docId, DocType.GLOSSARY, "Glosario", "REE", "word1 word2 word3", null, null);
         when(chunker.chunk(anyString())).thenReturn(List.of("word1 word2", "word2 word3"));
 
         useCase.execute(cmd);
 
-        ArgumentCaptor<KnowledgeDocument> docCaptor   = ArgumentCaptor.forClass(KnowledgeDocument.class);
+        ArgumentCaptor<KnowledgeDocument> docCaptor      = ArgumentCaptor.forClass(KnowledgeDocument.class);
         ArgumentCaptor<List<KnowledgeChunk>> chunkCaptor = ArgumentCaptor.forClass(List.class);
-        verify(repository).save(docCaptor.capture(), chunkCaptor.capture());
+        verify(repository).upsert(docCaptor.capture(), chunkCaptor.capture());
 
-        assertEquals("Glosario",     docCaptor.getValue().getTitle());
+        assertEquals("Glosario",       docCaptor.getValue().getTitle());
         assertEquals(DocType.GLOSSARY, docCaptor.getValue().getDocType());
-        assertEquals(2, chunkCaptor.getValue().size());
-        assertEquals(0, chunkCaptor.getValue().get(0).getChunkIndex());
-        assertEquals(1, chunkCaptor.getValue().get(1).getChunkIndex());
+        assertEquals(docId,            docCaptor.getValue().getId());
+        assertEquals(2,                chunkCaptor.getValue().size());
+        assertEquals(0,                chunkCaptor.getValue().get(0).getChunkIndex());
+        assertEquals(1,                chunkCaptor.getValue().get(1).getChunkIndex());
     }
+
 
     @Test
     void shouldAssignUniqueIdsToChunks() {
         IngestDocumentCommand cmd = new IngestDocumentCommand(
-                DocType.GENERAL, "T", "S", "content", null, null);
+                UUID.randomUUID(), DocType.GENERAL, "T", "S", "content", null, null);
         when(chunker.chunk(anyString())).thenReturn(List.of("chunk A", "chunk B"));
 
         useCase.execute(cmd);
 
         ArgumentCaptor<List<KnowledgeChunk>> captor = ArgumentCaptor.forClass(List.class);
-        verify(repository).save(any(), captor.capture());
+        verify(repository).upsert(any(), captor.capture());
 
         List<KnowledgeChunk> chunks = captor.getValue();
         assertNotEquals(chunks.get(0).getId(), chunks.get(1).getId());
@@ -64,5 +68,11 @@ class IngestDocumentUseCaseTest {
     @Test
     void shouldRejectNullRepository() {
         assertThrows(NullPointerException.class, () -> new IngestDocumentUseCase(null, chunker));
+    }
+
+    @Test
+    void shouldRejectNullDocId() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new IngestDocumentCommand(null, DocType.GENERAL, "T", "S", "content", null, null));
     }
 }

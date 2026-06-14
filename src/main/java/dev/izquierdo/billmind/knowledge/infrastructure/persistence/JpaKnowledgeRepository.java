@@ -1,5 +1,6 @@
 package dev.izquierdo.billmind.knowledge.infrastructure.persistence;
 
+import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -14,13 +15,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.jdbc.datasource.DataSourceUtils;
+
 import javax.sql.DataSource;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 public class JpaKnowledgeRepository implements KnowledgeRepository {
@@ -41,6 +47,10 @@ public class JpaKnowledgeRepository implements KnowledgeRepository {
                                    EmbeddingModel embeddingModel,
                                    DataSource dataSource,
                                    @Value("${pgvector.table-name:vector_store}") String vectorTable) {
+        if (!vectorTable.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            throw new IllegalArgumentException(
+                    "Invalid vector table name (alphanumeric + underscore only): " + vectorTable);
+        }
         this.docJpa         = docJpa;
         this.chunkJpa       = chunkJpa;
         this.embeddingStore = embeddingStore;
@@ -62,46 +72,119 @@ public class JpaKnowledgeRepository implements KnowledgeRepository {
 
     @Override
     @Transactional
-    public void save(KnowledgeDocument document, List<KnowledgeChunk> chunks) {
+    public void upsert(KnowledgeDocument document, List<KnowledgeChunk> chunks) {
+        deleteByDocumentId(document.getId());
+
         docJpa.save(KnowledgeMapper.toDocEntity(document));
         log.debug("Knowledge document saved: id={} title={} chunks={}", document.getId(), document.getTitle(), chunks.size());
 
+        List<TextSegment> segments = new ArrayList<>(chunks.size());
         for (KnowledgeChunk chunk : chunks) {
-            dev.langchain4j.data.document.Metadata metadata = new dev.langchain4j.data.document.Metadata()
-                    .put("doc_id",   document.getId().toString())
-                    .put("doc_type", document.getDocType().name())
-                    .put("title",    document.getTitle())
-                    .put("source",   document.getSource())
-                    .put("section",  chunk.getSection() != null ? chunk.getSection() : "");
+            segments.add(TextSegment.from(chunk.getContent(), buildMetadata(document, chunk)));
+        }
 
-            TextSegment segment    = TextSegment.from(chunk.getContent(), metadata);
-            Embedding embedding    = embeddingModel.embed(segment.text()).content();
-            String embeddingId     = embeddingStore.add(embedding, segment);
+        List<Embedding> embeddings = embeddingModel.embedAll(segments).content();
+        List<String> embeddingIds  = embeddingStore.addAll(embeddings, segments);
 
-            verifyEmbeddingStored(embeddingId, document.getTitle());
-            chunkJpa.save(KnowledgeMapper.toChunkEntity(chunk, embeddingId));
+        // embeddingStore operates outside the Spring transaction (auto-commit).
+        // If anything below fails, compensate by deleting the embeddings we just wrote.
+        try {
+            verifyAllEmbeddingsStored(embeddingIds, document.getTitle());
+
+            List<KnowledgeChunkEntity> entities = new ArrayList<>(chunks.size());
+            for (int i = 0; i < chunks.size(); i++) {
+                entities.add(KnowledgeMapper.toChunkEntity(chunks.get(i), embeddingIds.get(i)));
+            }
+            chunkJpa.saveAll(entities);
+        } catch (Exception e) {
+            log.error("Upsert failed after embedding write — compensating deletion of {} embeddings for docId={}",
+                    embeddingIds.size(), document.getId());
+            deleteEmbeddingsByIds(embeddingIds);
+            throw e;
         }
     }
 
+    private Metadata buildMetadata(KnowledgeDocument document, KnowledgeChunk chunk) {
+        return new Metadata()
+                .put("doc_id",   document.getId().toString())
+                .put("doc_type", document.getDocType().name())
+                .put("title",    document.getTitle())
+                .put("source",   document.getSource())
+                .put("section",  chunk.getSection() != null ? chunk.getSection() : "");
+    }
+
     // PgVectorEmbeddingStore uses its own JDBC connection outside the Spring transaction,
-    // so failures are not propagated as exceptions — verify the row was actually committed.
-    private void verifyEmbeddingStored(String embeddingId, String docTitle) {
-        String sql = "SELECT COUNT(*) FROM " + vectorTable + " WHERE embedding_id = ?";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setObject(1, java.util.UUID.fromString(embeddingId));
-            try (ResultSet rs = stmt.executeQuery()) {
-                rs.next();
-                if (rs.getInt(1) == 0) {
-                    throw new IllegalStateException(String.format(
-                            "Embedding was not persisted to '%s' for document '%s' (id=%s). " +
-                            "Check embedding model connectivity and vector store configuration.",
-                            vectorTable, docTitle, embeddingId));
+    // so failures are not propagated as exceptions — verify the rows were actually committed.
+    // DataSourceUtils.getConnection() reuses the transaction-bound connection; READ COMMITTED
+    // (PostgreSQL default) guarantees visibility of the embedding store's auto-committed inserts.
+    private void verifyAllEmbeddingsStored(List<String> ids, String docTitle) {
+        String sql = "SELECT COUNT(*) FROM " + vectorTable + " WHERE embedding_id = ANY(?)";
+        UUID[] uuids = ids.stream().map(UUID::fromString).toArray(UUID[]::new);
+        Connection conn = DataSourceUtils.getConnection(dataSource);
+        try {
+            Array pgArray = conn.createArrayOf("uuid", uuids);
+            try {
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                try {
+                    stmt.setArray(1, pgArray);
+                    ResultSet rs = stmt.executeQuery();
+                    try {
+                        rs.next();
+                        int count = rs.getInt(1);
+                        if (count != ids.size()) {
+                            throw new IllegalStateException(String.format(
+                                    "Only %d of %d embeddings were persisted to '%s' for document '%s'. " +
+                                    "Check embedding model connectivity and vector store configuration.",
+                                    count, ids.size(), vectorTable, docTitle));
+                        }
+                    } finally {
+                        rs.close();
+                    }
+                } finally {
+                    stmt.close();
                 }
+            } finally {
+                pgArray.free();
             }
         } catch (SQLException e) {
             throw new IllegalStateException(
                     "Could not verify embedding storage: " + e.getMessage(), e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    private void deleteByDocumentId(UUID docId) {
+        List<KnowledgeChunkEntity> existingChunks = chunkJpa.findByDocumentId(docId);
+        if (!existingChunks.isEmpty()) {
+            deleteEmbeddingsByIds(existingChunks.stream().map(c -> c.embeddingId).toList());
+            chunkJpa.deleteAll(existingChunks);
+            log.debug("Deleted {} chunks for docId={}", existingChunks.size(), docId);
+        }
+        docJpa.deleteById(docId);
+    }
+
+    private void deleteEmbeddingsByIds(List<String> embeddingIds) {
+        String sql = "DELETE FROM " + vectorTable + " WHERE embedding_id = ANY(?)";
+        Object[] uuids = embeddingIds.stream().map(UUID::fromString).toArray();
+        Connection conn = DataSourceUtils.getConnection(dataSource);
+        try {
+            Array pgArray = conn.createArrayOf("uuid", uuids);
+            try {
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                try {
+                    stmt.setArray(1, pgArray);
+                    stmt.executeUpdate();
+                } finally {
+                    stmt.close();
+                }
+            } finally {
+                pgArray.free();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to delete embeddings: " + e.getMessage(), e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
         }
     }
 

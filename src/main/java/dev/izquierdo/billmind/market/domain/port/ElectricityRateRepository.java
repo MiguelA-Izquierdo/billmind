@@ -10,5 +10,7 @@ public interface ElectricityRateRepository {
 
     List<ElectricityRate> findAll();
 
+    List<ElectricityRate> findLatestPerTariff();
+
     void deleteAll();
 }

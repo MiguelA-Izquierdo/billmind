@@ -23,7 +23,7 @@ public class MarketOfferQueryAdapter implements MarketOfferQueryPort {
     @Override
     public List<MarketOffer> findBySupplyType(InvoiceType supplyType) {
         if (supplyType != InvoiceType.LUZ) return List.of();
-        return electricityRateRepository.findAll().stream()
+        return electricityRateRepository.findLatestPerTariff().stream()
                 .<MarketOffer>map(this::toMarketOffer)
                 .toList();
     }

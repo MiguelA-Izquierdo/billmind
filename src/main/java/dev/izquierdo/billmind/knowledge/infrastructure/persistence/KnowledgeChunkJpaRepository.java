@@ -18,5 +18,7 @@ public interface KnowledgeChunkJpaRepository extends JpaRepository<KnowledgeChun
             """, nativeQuery = true)
     List<KnowledgeChunkEntity> searchByContent(@Param("query") String query, @Param("limit") int limit);
 
+    List<KnowledgeChunkEntity> findByDocumentId(UUID documentId);
+
     List<KnowledgeChunkEntity> findByEmbeddingIdIn(Collection<String> embeddingIds);
 }

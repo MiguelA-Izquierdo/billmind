@@ -26,6 +26,10 @@ public class KnowledgeChunk {
         return new KnowledgeChunk(id, documentId, content, section, chunkIndex);
     }
 
+    public static KnowledgeChunk create(UUID id, UUID docId, String content, int index) {
+        return new KnowledgeChunk(id, docId, content, null, index);
+    }
+
     public UUID getId()         { return id; }
     public UUID getDocumentId() { return documentId; }
     public String getContent()  { return content; }

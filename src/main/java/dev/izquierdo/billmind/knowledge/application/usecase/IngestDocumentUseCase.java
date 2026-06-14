@@ -1,6 +1,7 @@
 package dev.izquierdo.billmind.knowledge.application.usecase;
 
 import dev.izquierdo.billmind.knowledge.application.command.IngestDocumentCommand;
+import dev.izquierdo.billmind.knowledge.domain.exceptions.EmptyDocumentException;
 import dev.izquierdo.billmind.knowledge.domain.model.KnowledgeChunk;
 import dev.izquierdo.billmind.knowledge.domain.model.KnowledgeDocument;
 import dev.izquierdo.billmind.knowledge.domain.port.DocumentChunker;
@@ -24,17 +25,23 @@ public class IngestDocumentUseCase {
     }
 
     public void execute(IngestDocumentCommand command) {
-        UUID docId = UUID.randomUUID();
+        UUID docId = command.docId();
+
         KnowledgeDocument document = KnowledgeDocument.create(
                 docId, command.docType(), command.title(), command.source(),
                 command.validFrom(), command.validTo());
 
         List<String> rawChunks = chunker.chunk(command.content());
 
+        if (rawChunks.isEmpty()) {
+            throw new EmptyDocumentException(command.source());
+        }
+
         List<KnowledgeChunk> chunks = IntStream.range(0, rawChunks.size())
-                .mapToObj(i -> KnowledgeChunk.create(UUID.randomUUID(), docId, rawChunks.get(i), null, i))
+                .mapToObj(i -> KnowledgeChunk.create(UUID.randomUUID(), docId, rawChunks.get(i), i))
                 .toList();
 
-        repository.save(document, chunks);
+        repository.upsert(document, chunks);
+
     }
 }

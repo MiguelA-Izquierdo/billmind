@@ -33,7 +33,7 @@ public class KnowledgeAdminController {
     @PostMapping("/ingest")
     public ResponseEntity<SuccessResponseDTO> ingest(@RequestBody IngestRequest request) {
         commandBus.dispatch(new IngestDocumentCommand(
-                request.docType(), request.title(), request.source(),
+                request.docId(), request.docType(), request.title(), request.source(),
                 request.content(), request.validFrom(), request.validTo()));
         return ResponseEntity.ok(SuccessResponseDTO.of(200, "Documento ingestado correctamente"));
     }
@@ -43,8 +43,12 @@ public class KnowledgeAdminController {
         if (!knowledgeRepository.isEmpty()) {
             return ResponseEntity.ok(SuccessResponseDTO.of(200, "La base de conocimiento ya contiene documentos"));
         }
-        KnowledgeSeedData.exampleDocuments()
-                .forEach(commandBus::dispatch);
+        try {
+            KnowledgeSeedData.exampleDocuments().forEach(commandBus::dispatch);
+        } catch (Exception e) {
+            knowledgeRepository.deleteAll();
+            throw e;
+        }
         return ResponseEntity.ok(SuccessResponseDTO.of(200, "Documentos de ejemplo ingestados correctamente"));
     }
 

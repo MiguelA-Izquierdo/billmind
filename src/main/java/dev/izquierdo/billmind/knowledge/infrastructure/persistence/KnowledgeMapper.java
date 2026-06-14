@@ -17,6 +17,18 @@ class KnowledgeMapper {
         return e;
     }
 
+    static KnowledgeDocument toDocDomain(KnowledgeDocumentEntity e) {
+        return KnowledgeDocument.reconstitute(
+                e.getId(),
+                e.getDocType(),
+                e.getTitle(),
+                e.getSource(),
+                e.getValidFrom(),
+                e.getValidTo(),
+                e.getCreatedAt()
+        );
+    }
+
     static KnowledgeChunkEntity toChunkEntity(KnowledgeChunk chunk, String embeddingId) {
         KnowledgeChunkEntity e = new KnowledgeChunkEntity();
         e.id          = chunk.getId();
@@ -26,5 +38,15 @@ class KnowledgeMapper {
         e.section     = chunk.getSection();
         e.chunkIndex  = chunk.getChunkIndex();
         return e;
+    }
+
+    static KnowledgeChunk toChunkDomain(KnowledgeChunkEntity e) {
+        return KnowledgeChunk.create(
+                e.getId(),
+                e.getDocumentId(),
+                e.getContent(),
+                e.getSection(),
+                e.getChunkIndex()
+        );
     }
 }

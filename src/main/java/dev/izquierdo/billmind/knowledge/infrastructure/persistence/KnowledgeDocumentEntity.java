@@ -36,8 +36,11 @@ public class KnowledgeDocumentEntity {
 
     protected KnowledgeDocumentEntity() {}
 
-    public UUID getId()         { return id; }
-    public DocType getDocType() { return docType; }
-    public String getTitle()    { return title; }
-    public String getSource()   { return source; }
+    public UUID getId()            { return id; }
+    public DocType getDocType()    { return docType; }
+    public String getTitle()       { return title; }
+    public String getSource()      { return source; }
+    public LocalDate getValidFrom(){ return validFrom; }
+    public LocalDate getValidTo()  { return validTo; }
+    public Instant getCreatedAt()  { return createdAt; }
 }

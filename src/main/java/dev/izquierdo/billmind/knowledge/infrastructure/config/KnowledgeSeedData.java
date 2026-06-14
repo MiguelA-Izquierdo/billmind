@@ -4,12 +4,14 @@ import dev.izquierdo.billmind.knowledge.application.command.IngestDocumentComman
 import dev.izquierdo.billmind.knowledge.domain.model.DocType;
 
 import java.util.List;
+import java.util.UUID;
 
 public class KnowledgeSeedData {
 
     public static List<IngestDocumentCommand> exampleDocuments() {
         return List.of(
                 new IngestDocumentCommand(
+                        UUID.fromString("a1b2c3d4-0001-0000-0000-000000000000"),
                         DocType.GLOSSARY,
                         "Glosario de Facturación Eléctrica",
                         "BillMind / Elaboración propia",
@@ -47,6 +49,7 @@ public class KnowledgeSeedData {
                         null, null
                 ),
                 new IngestDocumentCommand(
+                        UUID.fromString("a1b2c3d4-0002-0000-0000-000000000000"),
                         DocType.REE_GUIDE,
                         "Tarifa 2.0TD: Discriminación Horaria y Periodos de Facturación",
                         "REE / CNMC — Guía de la tarifa de acceso 2.0TD",
@@ -90,6 +93,7 @@ public class KnowledgeSeedData {
                         null, null
                 ),
                 new IngestDocumentCommand(
+                        UUID.fromString("a1b2c3d4-0003-0000-0000-000000000000"),
                         DocType.GENERAL,
                         "PVPC vs Tarifa Fija: Cuándo Conviene Cada Una",
                         "BillMind / Elaboración propia",
@@ -144,6 +148,7 @@ public class KnowledgeSeedData {
                         null, null
                 ),
                 new IngestDocumentCommand(
+                        UUID.fromString("a1b2c3d4-0004-0000-0000-000000000000"),
                         DocType.CNMC_CIRCULAR,
                         "Metodología de Cálculo de Peajes de Acceso a la Red",
                         "CNMC — Marco regulatorio de peajes de acceso y cargos del sistema eléctrico",
@@ -190,6 +195,7 @@ public class KnowledgeSeedData {
                         null, null
                 ),
                 new IngestDocumentCommand(
+                        UUID.fromString("a1b2c3d4-0005-0000-0000-000000000000"),
                         DocType.GENERAL,
                         "Cómo Leer y Entender tu Factura de Electricidad",
                         "BillMind / Guía práctica para el consumidor",
@@ -240,6 +246,7 @@ public class KnowledgeSeedData {
                 )
                 ,
                 new IngestDocumentCommand(
+                        UUID.fromString("a1b2c3d4-0006-0000-0000-000000000000"),
                         DocType.GENERAL,
                         "Preguntas Frecuentes sobre Facturas de Luz",
                         "BillMind / FAQ consumidor",

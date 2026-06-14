@@ -13,6 +13,8 @@ import dev.izquierdo.billmind.knowledge.infrastructure.persistence.KnowledgeChun
 import dev.izquierdo.billmind.knowledge.infrastructure.persistence.KnowledgeChunkJpaRepository;
 import dev.izquierdo.billmind.knowledge.infrastructure.persistence.KnowledgeDocumentEntity;
 import dev.izquierdo.billmind.knowledge.infrastructure.persistence.KnowledgeDocumentJpaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 @Repository
 public class HybridKnowledgeSearchRepository implements KnowledgeSearchRepository {
 
+    private static final Logger  log       = LoggerFactory.getLogger(HybridKnowledgeSearchRepository.class);
     private static final int    RRF_K     = 60;
     private static final double MIN_SCORE = 0.01;
 
@@ -116,6 +119,10 @@ public class HybridKnowledgeSearchRepository implements KnowledgeSearchRepositor
     private KnowledgeSearchResult toResult(KnowledgeChunkEntity chunk,
                                             KnowledgeDocumentEntity doc,
                                             double score) {
+        if (doc == null) {
+            log.warn("Orphaned chunk detected: chunkId={} references missing documentId={}",
+                    chunk.getId(), chunk.getDocumentId());
+        }
         return new KnowledgeSearchResult(
                 chunk.getId(),
                 chunk.getDocumentId(),

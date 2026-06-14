@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BillMind — Asistente</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/overlay.css">
+  <link rel="stylesheet" href="css/chat.css">
+  <link rel="stylesheet" href="css/comparison.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">Bill<span>Mind</span></div>
+  <div class="header-sep"></div>
+  <span class="header-title">Asistente</span>
+  <span class="session-label" id="session-label"></span>
+  <a class="hdr-link" href="/market-rates.html">↗ Tarifas</a>
+</header>
+
+<div class="upload-overlay" id="upload-overlay" aria-live="polite">
+  <div class="overlay-card">
+    <svg class="overlay-bolt" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/>
+    </svg>
+    <div class="overlay-message" id="overlay-message">Preparando…</div>
+    <div class="overlay-progress-track">
+      <div class="overlay-progress-fill" id="overlay-progress"></div>
+    </div>
+    <div class="overlay-hint">La IA está analizando tu factura, tardará unos segundos…</div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h3>Factura analizada</h3>
+      <select class="invoice-selector" id="invoice-select" disabled>
+        <option value="">Cargando facturas…</option>
+      </select>
+
+      <div class="upload-zone" id="upload-zone" style="display:none">
+        <strong>Sube tu factura</strong>
+        <p>PDF hasta 5 MB</p>
+        <button class="upload-btn" id="upload-btn">Seleccionar PDF</button>
+      </div>
+
+      <div class="upload-mini" id="upload-mini" style="display:none">
+        <button id="upload-mini-btn">+ Subir otra factura</button>
+      </div>
+
+      <input type="file" id="file-input" accept=".pdf,application/pdf" style="display:none">
+
+      <div class="invoice-card" id="invoice-card">
+        <div class="invoice-card-row">
+          <span class="ic-label">Tipo</span>
+          <span class="ic-value" id="ic-type">—</span>
+        </div>
+        <div class="invoice-card-row">
+          <span class="ic-label">Compañía</span>
+          <span class="ic-value" id="ic-company">—</span>
+        </div>
+        <div class="invoice-card-row">
+          <span class="ic-label">Periodo</span>
+          <span class="ic-value" id="ic-period">—</span>
+        </div>
+        <div class="invoice-card-row">
+          <span class="ic-label">Importe</span>
+          <span class="ic-value" id="ic-total">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-body">
+      <div class="sidebar-section">
+        <h4>Preguntas sugeridas</h4>
+        <button class="suggestion-btn" id="s1" disabled>¿Estoy pagando más de lo que debería por kWh?</button>
+        <button class="suggestion-btn" id="s2" disabled>¿Qué es el término de potencia y cómo afecta a mi factura?</button>
+        <button class="suggestion-btn" id="s3" disabled>¿Cuál es la diferencia entre tarifa plana y discriminación horaria?</button>
+        <button class="suggestion-btn" id="s4" disabled>¿Cuánto podría ahorrar cambiando de tarifa?</button>
+        <button class="suggestion-btn" id="s5" disabled>Explícame los cargos de la factura uno por uno.</button>
+      </div>
+      <div class="sidebar-section">
+        <h4>Estado del sistema</h4>
+        <div class="kb-status">
+          <span class="kb-dot pending" id="kb-dot"></span>
+          <span class="kb-text" id="kb-text">Verificando…</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="chat-area">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">⚡</div>
+        <h2>Asistente BillMind</h2>
+        <p>Selecciona una factura en el panel izquierdo y hazme cualquier pregunta sobre ella. Tengo acceso a normativa regulatoria (CNMC, REE, BOE) para darte respuestas precisas.</p>
+        <div class="welcome-notice">Selecciona una factura del panel izquierdo para empezar.</div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div id="error-banner"></div>
+      <div class="input-wrapper">
+        <textarea id="chat-input" placeholder="Escribe tu pregunta sobre la factura…" rows="1" disabled></textarea>
+        <button id="send-btn" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <p class="input-hint">El asistente usa tu factura completa + normativa regulatoria para responder · <kbd>Enter</kbd> envía · <kbd>Shift+Enter</kbd> nueva línea</p>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
