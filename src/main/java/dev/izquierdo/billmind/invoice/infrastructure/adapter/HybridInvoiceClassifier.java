@@ -2,7 +2,7 @@ package dev.izquierdo.billmind.invoice.infrastructure.adapter;
 
 import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceClassifier;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier.KeywordInvoiceClassifier;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier.LlmInvoiceClassifier;
@@ -29,11 +29,11 @@ public class HybridInvoiceClassifier implements InvoiceClassifier {
     @Override
     public InvoiceClassification classify(String text) {
         if (text.isBlank()) {
-            log.warn("Empty invoice text — classifying as OTRO");
-            return new InvoiceClassification(InvoiceType.OTRO, "DESCONOCIDA");
+            log.warn("Empty invoice text — classifying as OTHER");
+            return new InvoiceClassification(SupplyDomain.OTHER, "DESCONOCIDA");
         }
 
-        Optional<InvoiceType> keywordMatch = keywordClassifier.classify(text);
+        Optional<SupplyDomain> keywordMatch = keywordClassifier.classify(text);
         if (keywordMatch.isPresent()) {
             String company;
             try {

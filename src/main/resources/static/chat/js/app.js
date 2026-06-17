@@ -4,6 +4,7 @@ import { autoResize } from './utils.js';
 import { loadInvoices, updateInvoiceCard } from './invoices.js';
 import { trigger, onDragOver, onDragLeave, onDrop, uploadFile } from './uploader.js';
 import { sendMessage, checkBackendStatus } from './chat.js';
+import { initCharLimit } from './char-limit.js';
 import { loadComparison } from './comparison.js';
 
 // Session label
@@ -12,6 +13,7 @@ document.getElementById('session-label').textContent = 'Sesión: ' + SESSION_ID.
 // Invoice selector
 document.getElementById('invoice-select').addEventListener('change', function (e) {
   state.selectedInvoiceId = this.value || null;
+  state.conversationId    = null;
   updateInvoiceCard(state.selectedInvoiceId);
 
   const hasInvoice = !!state.selectedInvoiceId;
@@ -82,3 +84,4 @@ function enableSuggestions(on) {
 // Init
 loadInvoices();
 checkBackendStatus();
+initCharLimit();

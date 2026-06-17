@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.infrastructure.persistence;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -17,8 +17,8 @@ class ElectricityRateEntity {
     UUID id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "supply_type", nullable = false, length = 10)
-    InvoiceType supplyType;
+    @Column(name = "supply_type", nullable = false, length = 15)
+    SupplyDomain supplyType;
 
     @Column(name = "company", nullable = false)
     String company;

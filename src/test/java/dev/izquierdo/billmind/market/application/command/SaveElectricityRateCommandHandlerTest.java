@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.application.command;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.application.usecase.SaveElectricityRateUseCase;
 import dev.izquierdo.billmind.market.domain.model.ElectricityRate;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,7 @@ class SaveElectricityRateCommandHandlerTest {
         BigDecimal powerPriceP2 = new BigDecimal("0.035000");
 
         SaveElectricityRateCommand command = new SaveElectricityRateCommand(
-            id, InvoiceType.LUZ, "IBERDROLA", "2.0TD",
+            id, SupplyDomain.ELECTRICITY, "IBERDROLA", "2.0TD",
             pricePerKwh, valle, llano, punta,
             powerPrice, powerPriceP2,
             validFrom, validTo, "ES-MD", "REE", receivedAt
@@ -60,7 +60,7 @@ class SaveElectricityRateCommandHandlerTest {
 
         ElectricityRate saved = captor.getValue();
         assertEquals(id,              saved.getId());
-        assertEquals(InvoiceType.LUZ, saved.getSupplyType());
+        assertEquals(SupplyDomain.ELECTRICITY, saved.getSupplyType());
         assertEquals("IBERDROLA",     saved.getCompany());
         assertEquals("2.0TD",         saved.getTariffName());
         assertEquals(pricePerKwh,     saved.getPricePerKwh());
@@ -80,7 +80,7 @@ class SaveElectricityRateCommandHandlerTest {
     void shouldDelegateWithOptionalFieldsNull() {
         UUID id = UUID.randomUUID();
         SaveElectricityRateCommand command = new SaveElectricityRateCommand(
-            id, InvoiceType.GAS, "NATURGY", "Tarifa Gas",
+            id, SupplyDomain.GAS, "NATURGY", "Tarifa Gas",
             null, new BigDecimal("0.050000"), null, null,
             null, null,
             LocalDate.of(2025, 6, 1), null, null, "CNMC", null
@@ -93,7 +93,7 @@ class SaveElectricityRateCommandHandlerTest {
 
         ElectricityRate saved = captor.getValue();
         assertEquals(id,              saved.getId());
-        assertEquals(InvoiceType.GAS, saved.getSupplyType());
+        assertEquals(SupplyDomain.GAS, saved.getSupplyType());
         assertEquals("NATURGY",       saved.getCompany());
     }
 

@@ -1,0 +1,152 @@
+/* ── Char-limit toast — floating speech bubble ────────────── */
+.char-limit-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 9999;
+  width: 440px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.3) rotate(-8deg);
+  transform-origin: center center;
+}
+.char-limit-toast.clt-visible {
+  animation: clt-pop .55s cubic-bezier(.34,1.56,.64,1) forwards;
+  pointer-events: auto;
+}
+.char-limit-toast.clt-hiding {
+  animation: clt-bye .3s ease-in forwards;
+}
+@keyframes clt-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.25) rotate(-10deg); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06) rotate(1.5deg); }
+  80%  { transform: translate(-50%, -50%) scale(.97) rotate(-.5deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+}
+@keyframes clt-bye {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.4) rotate(6deg); }
+}
+
+/* ── Bubble ──────────────────────────────────────────────── */
+.clt-bubble {
+  background: var(--surface);
+  border: 2px solid rgba(108,111,245,.65);
+  border-radius: 24px;
+  padding: 28px 28px 24px;
+  box-shadow:
+    0 24px 64px rgba(0,0,0,.6),
+    0 0 0 1px rgba(108,111,245,.15),
+    0 0 80px rgba(108,111,245,.12),
+    inset 0 1px 0 rgba(255,255,255,.05);
+  position: relative;
+  overflow: hidden;
+}
+
+/* scanlines */
+.clt-bubble::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(108,111,245,.04) 3px,
+    rgba(108,111,245,.04) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Header row ──────────────────────────────────────────── */
+.clt-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.clt-bot {
+  font-size: 56px;
+  line-height: 1;
+  display: inline-block;
+  filter: drop-shadow(0 0 16px rgba(108,111,245,.8));
+}
+.clt-bot.clt-talk {
+  animation: clt-talk .55s ease;
+}
+@keyframes clt-talk {
+  0%   { transform: scale(1)    rotate(0); }
+  18%  { transform: scale(1.35) rotate(-15deg); }
+  36%  { transform: scale(1.25) rotate(12deg); }
+  54%  { transform: scale(1.12) rotate(-7deg); }
+  72%  { transform: scale(1.05) rotate(4deg); }
+  88%  { transform: scale(1.01) rotate(-1deg); }
+  100% { transform: scale(1)    rotate(0); }
+}
+.clt-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ── Badge de caracteres eliminados ─────────────────────── */
+.clt-deleted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(248,113,113,.18);
+  border: 1px solid rgba(248,113,113,.4);
+  border-radius: 10px;
+  padding: 6px 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--red);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 12px;
+  width: fit-content;
+}
+
+/* ── Mensaje con efecto typewriter ───────────────────────── */
+.clt-msg {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  min-height: 42px;
+  white-space: pre-wrap;
+}
+.clt-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 1px;
+  vertical-align: middle;
+  margin-left: 1px;
+  animation: blink .7s step-end infinite;
+}
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+
+/* ── Char counter ────────────────────────────────────────── */
+.input-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 7px;
+}
+.input-bottom .input-hint { margin-top: 0; }
+
+.char-counter {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity .2s, color .2s;
+  pointer-events: none;
+  user-select: none;
+  color: var(--muted);
+}
+.char-counter.clt-warn  { opacity: 1; color: var(--elec); }
+.char-counter.clt-limit { opacity: 1; color: var(--red); font-weight: 600; }

@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.persistence;
 
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.MobileLine;
@@ -24,7 +24,7 @@ class InvoiceEntityTest {
         UUID id = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
         Invoice invoice = Invoice.builder(id, "factura.pdf")
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .provider("IBERDROLA")
             .sessionId(sessionId)
             .build();
@@ -33,7 +33,7 @@ class InvoiceEntityTest {
 
         assertThat(entity.getId()).isEqualTo(id);
         assertThat(entity.getFileName()).isEqualTo("factura.pdf");
-        assertThat(entity.getSupplyType()).isEqualTo(InvoiceType.LUZ);
+        assertThat(entity.getSupplyType()).isEqualTo(SupplyDomain.ELECTRICITY);
         assertThat(entity.getProvider()).isEqualTo("IBERDROLA");
         assertThat(entity.getSessionId()).isEqualTo(sessionId);
         assertThat(entity.getUploadedAt()).isNotNull();
@@ -43,7 +43,7 @@ class InvoiceEntityTest {
     void shouldRoundtripToDomain() {
         UUID id = UUID.randomUUID();
         Invoice original = Invoice.builder(id, "factura_gas.pdf")
-            .supplyType(InvoiceType.GAS)
+            .supplyType(SupplyDomain.GAS)
             .provider("NATURGY")
             .sessionId(UUID.randomUUID())
             .build();
@@ -59,7 +59,7 @@ class InvoiceEntityTest {
     @Test
     void shouldHandleNullSessionId() {
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf")
-            .supplyType(InvoiceType.AGUA)
+            .supplyType(SupplyDomain.WATER)
             .provider("AGUAS")
             .build();
 
@@ -71,7 +71,7 @@ class InvoiceEntityTest {
     @Test
     void shouldReturnNullFieldsWhenNotYetExtracted() {
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf")
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .build();
 
         Invoice reconstructed = InvoiceEntity.from(invoice).toDomain();
@@ -87,7 +87,7 @@ class InvoiceEntityTest {
                 new BigDecimal("45.50"), new BigDecimal("405.000"), null, null, null,
                 new BigDecimal("0.140000"), null, null, null, new BigDecimal("3.300"));
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura_luz.pdf")
-                .supplyType(InvoiceType.LUZ)
+                .supplyType(SupplyDomain.ELECTRICITY)
                 .fields(fields)
                 .build();
 
@@ -107,7 +107,7 @@ class InvoiceEntityTest {
                 new BigDecimal("62.80"), new BigDecimal("120.000"),
                 new BigDecimal("139.500"), new BigDecimal("0.065000"));
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura_gas.pdf")
-                .supplyType(InvoiceType.GAS)
+                .supplyType(SupplyDomain.GAS)
                 .fields(fields)
                 .build();
 
@@ -126,7 +126,7 @@ class InvoiceEntityTest {
                 new BigDecimal("28.40"), new BigDecimal("18.500"),
                 new BigDecimal("1.250000"), new BigDecimal("5.20"));
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura_agua.pdf")
-                .supplyType(InvoiceType.AGUA)
+                .supplyType(SupplyDomain.WATER)
                 .fields(fields)
                 .build();
 
@@ -151,7 +151,7 @@ class InvoiceEntityTest {
                 List.of(new StreamingService("NETFLIX", "CON ANUNCIOS")),
                 new BigDecimal("39.80"));
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura_telco.pdf")
-                .supplyType(InvoiceType.TELCO)
+                .supplyType(SupplyDomain.TELECOM)
                 .fields(fields)
                 .build();
 

@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.domain.model;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 
 import java.math.BigDecimal;
@@ -12,7 +12,7 @@ import java.util.UUID;
 public class ElectricityRate {
 
     private final UUID id;
-    private final InvoiceType supplyType;
+    private final SupplyDomain supplyType;
     private final String company;
     private final String tariffName;
     private final BigDecimal pricePerKwh;
@@ -63,7 +63,7 @@ public class ElectricityRate {
     }
 
     public UUID getId()                           { return id; }
-    public InvoiceType getSupplyType()            { return supplyType; }
+    public SupplyDomain getSupplyType()            { return supplyType; }
     public String getCompany()                    { return company; }
     public String getTariffName()                 { return tariffName; }
     public BigDecimal getPricePerKwh()            { return pricePerKwh; }
@@ -80,7 +80,7 @@ public class ElectricityRate {
 
     public static final class Builder {
         private final UUID id;
-        private InvoiceType supplyType;
+        private SupplyDomain supplyType;
         private String company;
         private String tariffName;
         private BigDecimal pricePerKwh;
@@ -97,7 +97,7 @@ public class ElectricityRate {
 
         private Builder(UUID id) { this.id = id; }
 
-        public Builder supplyType(InvoiceType v)          { this.supplyType           = v; return this; }
+        public Builder supplyType(SupplyDomain v)          { this.supplyType           = v; return this; }
         public Builder company(String v)                  { this.company              = v; return this; }
         public Builder tariffName(String v)               { this.tariffName           = v; return this; }
         public Builder pricePerKwh(BigDecimal v)          { this.pricePerKwh          = v; return this; }

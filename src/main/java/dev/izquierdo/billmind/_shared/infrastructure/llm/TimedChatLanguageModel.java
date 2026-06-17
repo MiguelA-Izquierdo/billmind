@@ -1,5 +1,10 @@
 package dev.izquierdo.billmind._shared.infrastructure.llm;
 
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -10,6 +15,7 @@ import org.slf4j.MDC;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class TimedChatLanguageModel implements ChatModel {
 
@@ -37,6 +43,8 @@ public class TimedChatLanguageModel implements ChatModel {
         String operation = resolveOperation();
         String type      = MDC.get(MDC_TYPE);
         long   start     = System.nanoTime();
+        log.debug("[LLM][REQUEST] operation={}  role={}  provider={}  model={}  messages={}{}",
+                operation, role, provider, model, request.messages().size(), formatMessages(request));
         try {
             ChatResponse response = delegate.chat(request);
             logCall(operation, type, elapsedMs(start), response.tokenUsage(), null);
@@ -100,5 +108,20 @@ public class TimedChatLanguageModel implements ChatModel {
 
     private static long elapsedMs(long startNs) {
         return (System.nanoTime() - startNs) / 1_000_000;
+    }
+
+    private static String formatMessages(ChatRequest request) {
+        return request.messages().stream()
+                .map(m -> "\n  [" + m.type().name() + "] " + extractText(m))
+                .collect(Collectors.joining());
+    }
+
+    private static String extractText(ChatMessage msg) {
+        if (msg instanceof SystemMessage m) return m.text();
+        if (msg instanceof AiMessage    m) return m.text() != null ? m.text() : "[tool calls]";
+        if (msg instanceof UserMessage  m) return m.contents().stream()
+                .map(c -> c instanceof TextContent tc ? tc.text() : c.toString())
+                .collect(Collectors.joining("\n"));
+        return msg.toString();
     }
 }

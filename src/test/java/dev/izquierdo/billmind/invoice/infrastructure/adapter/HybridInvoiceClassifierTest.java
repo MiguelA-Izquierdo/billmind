@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter;
 
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier.KeywordInvoiceClassifier;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier.LlmInvoiceClassifier;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class HybridInvoiceClassifierTest {
     void shouldReturnOtroWhenTextIsBlank() {
         InvoiceClassification result = classifier.classify("   ");
 
-        assertThat(result.getType()).isEqualTo(InvoiceType.OTRO);
+        assertThat(result.getType()).isEqualTo(SupplyDomain.OTHER);
         assertThat(result.getCompany()).isEqualTo("DESCONOCIDA");
         verifyNoInteractions(keywordClassifier, llmClassifier);
     }
@@ -40,19 +40,19 @@ class HybridInvoiceClassifierTest {
 
     @Test
     void shouldUseKeywordTypeAndLlmCompanyWhenKeywordsMatch() {
-        when(keywordClassifier.classify(anyString())).thenReturn(Optional.of(InvoiceType.LUZ));
+        when(keywordClassifier.classify(anyString())).thenReturn(Optional.of(SupplyDomain.ELECTRICITY));
         when(llmClassifier.extractCompany(anyString())).thenReturn("IBERDROLA");
 
         InvoiceClassification result = classifier.classify("CUPS kwh potencia contratada electricidad");
 
-        assertThat(result.getType()).isEqualTo(InvoiceType.LUZ);
+        assertThat(result.getType()).isEqualTo(SupplyDomain.ELECTRICITY);
         assertThat(result.getCompany()).isEqualTo("IBERDROLA");
         verify(llmClassifier, never()).classify(anyString());
     }
 
     @Test
     void shouldCallOnlyExtractCompanyWhenKeywordsMatch() {
-        when(keywordClassifier.classify(anyString())).thenReturn(Optional.of(InvoiceType.GAS));
+        when(keywordClassifier.classify(anyString())).thenReturn(Optional.of(SupplyDomain.GAS));
         when(llmClassifier.extractCompany(anyString())).thenReturn("NATURGY");
 
         classifier.classify("gas natural m³ peaje de gas");
@@ -67,11 +67,11 @@ class HybridInvoiceClassifierTest {
     void shouldDelegateToLlmClassifierWhenNoKeywordMatch() {
         when(keywordClassifier.classify(anyString())).thenReturn(Optional.empty());
         when(llmClassifier.classify(anyString()))
-            .thenReturn(new InvoiceClassification(InvoiceType.OTRO, "DESCONOCIDA"));
+            .thenReturn(new InvoiceClassification(SupplyDomain.OTHER, "DESCONOCIDA"));
 
         InvoiceClassification result = classifier.classify("factura de arrendamiento enero 2025");
 
-        assertThat(result.getType()).isEqualTo(InvoiceType.OTRO);
+        assertThat(result.getType()).isEqualTo(SupplyDomain.OTHER);
         verify(llmClassifier).classify(anyString());
         verify(llmClassifier, never()).extractCompany(anyString());
     }
@@ -80,11 +80,11 @@ class HybridInvoiceClassifierTest {
     void shouldReturnLlmResultDirectlyWhenNoKeywords() {
         when(keywordClassifier.classify(anyString())).thenReturn(Optional.empty());
         when(llmClassifier.classify(anyString()))
-            .thenReturn(new InvoiceClassification(InvoiceType.TELCO, "MOVISTAR"));
+            .thenReturn(new InvoiceClassification(SupplyDomain.TELECOM, "MOVISTAR"));
 
         InvoiceClassification result = classifier.classify("texto ambiguo sin keywords claras");
 
-        assertThat(result.getType()).isEqualTo(InvoiceType.TELCO);
+        assertThat(result.getType()).isEqualTo(SupplyDomain.TELECOM);
         assertThat(result.getCompany()).isEqualTo("MOVISTAR");
     }
 }

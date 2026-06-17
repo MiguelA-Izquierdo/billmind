@@ -1,5 +1,6 @@
 package dev.izquierdo.billmind.knowledge.application.usecase;
 
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.knowledge.application.command.IngestDocumentCommand;
 import dev.izquierdo.billmind.knowledge.domain.model.DocType;
 import dev.izquierdo.billmind.knowledge.domain.model.KnowledgeChunk;
@@ -32,7 +33,7 @@ class IngestDocumentUseCaseTest {
     void shouldChunkAndSaveDocument() {
         UUID docId = UUID.randomUUID();
         IngestDocumentCommand cmd = new IngestDocumentCommand(
-                docId, DocType.GLOSSARY, "Glosario", "REE", "word1 word2 word3", null, null);
+                docId, DocType.GLOSSARY, SupplyDomain.ELECTRICITY, "Glosario", "REE", "word1 word2 word3", null, null);
         when(chunker.chunk(anyString())).thenReturn(List.of("word1 word2", "word2 word3"));
 
         useCase.execute(cmd);
@@ -53,7 +54,7 @@ class IngestDocumentUseCaseTest {
     @Test
     void shouldAssignUniqueIdsToChunks() {
         IngestDocumentCommand cmd = new IngestDocumentCommand(
-                UUID.randomUUID(), DocType.GENERAL, "T", "S", "content", null, null);
+                UUID.randomUUID(), DocType.GENERAL, SupplyDomain.ELECTRICITY, "T", "S", "content", null, null);
         when(chunker.chunk(anyString())).thenReturn(List.of("chunk A", "chunk B"));
 
         useCase.execute(cmd);
@@ -73,6 +74,6 @@ class IngestDocumentUseCaseTest {
     @Test
     void shouldRejectNullDocId() {
         assertThrows(IllegalArgumentException.class, () ->
-                new IngestDocumentCommand(null, DocType.GENERAL, "T", "S", "content", null, null));
+                new IngestDocumentCommand(null, DocType.GENERAL, SupplyDomain.ELECTRICITY, "T", "S", "content", null, null));
     }
 }

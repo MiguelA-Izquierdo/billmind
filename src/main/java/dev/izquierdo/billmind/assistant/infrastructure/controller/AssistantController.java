@@ -29,11 +29,16 @@ public class AssistantController {
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@RequestBody ChatRequest request) {
-        ChatCommand command = new ChatCommand(
-                sessionContext.getSessionId(),
-                request.invoiceId(),
-                request.message());
-
+        ChatCommand command;
+        try {
+            command = new ChatCommand(
+                    sessionContext.getSessionId(),
+                    request.invoiceId(),
+                    request.conversationId(),
+                    request.message());
+        } catch (IllegalArgumentException e) {
+            return ssePublisher.publishError(e.getMessage());
+        }
         return ssePublisher.publish(() -> chatUseCase.execute(command));
     }
 }

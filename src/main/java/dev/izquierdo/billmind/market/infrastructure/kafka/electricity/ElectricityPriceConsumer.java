@@ -2,7 +2,7 @@ package dev.izquierdo.billmind.market.infrastructure.kafka.electricity;
 
 import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.infrastructure.kafka.KafkaEvent;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.application.command.SaveElectricityRateCommand;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -97,7 +97,7 @@ public class ElectricityPriceConsumer {
             throw new InvalidElectricityRateException("source cannot be null");
         return new SaveElectricityRateCommand(
             id,
-            InvoiceType.LUZ,
+            SupplyDomain.ELECTRICITY,
             event.company(),
             event.tariffName(),
             event.pricePerKwh(),

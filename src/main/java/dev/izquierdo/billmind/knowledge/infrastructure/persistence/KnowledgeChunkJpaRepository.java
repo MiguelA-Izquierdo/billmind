@@ -10,10 +10,20 @@ import java.util.UUID;
 
 public interface KnowledgeChunkJpaRepository extends JpaRepository<KnowledgeChunkEntity, UUID> {
 
+    // OR-semantics BM25: extracts stemmed lexemes from the query tsvector and joins them with |,
+    // so a long conversational message matches any chunk that contains any relevant term.
+    // plainto_tsquery (AND) would require every term to appear in a single chunk, returning 0
+    // results for multi-sentence user messages.
     @Query(value = """
             SELECT * FROM knowledge_chunks
-            WHERE to_tsvector('spanish', unaccent(content)) @@ plainto_tsquery('spanish', unaccent(:query))
-            ORDER BY ts_rank(to_tsvector('spanish', unaccent(content)), plainto_tsquery('spanish', unaccent(:query))) DESC
+            WHERE to_tsvector('spanish', unaccent(content)) @@ (
+                SELECT string_agg(lexeme, ' | ')::tsquery
+                FROM unnest(to_tsvector('spanish', unaccent(:query)))
+            )
+            ORDER BY ts_rank(
+                to_tsvector('spanish', unaccent(content)),
+                (SELECT string_agg(lexeme, ' | ')::tsquery FROM unnest(to_tsvector('spanish', unaccent(:query))))
+            ) DESC
             LIMIT :limit
             """, nativeQuery = true)
     List<KnowledgeChunkEntity> searchByContent(@Param("query") String query, @Param("limit") int limit);

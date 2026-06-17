@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.infrastructure.persistence;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.domain.model.ElectricityRate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,7 +46,7 @@ class JpaElectricityRateRepositoryTest {
 
     private ElectricityRate buildRate(UUID id) {
         return ElectricityRate.builder(id)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.150000"))

@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.comparison.application.usecase;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind.comparison.application.ElectricityComparisonCalculator;
@@ -33,7 +33,7 @@ public class CompareInvoiceUseCase {
     }
 
     private Optional<ComparisonResult> compareElectricity(ElectricityFields fields) {
-        List<ElectricityMarketOffer> offers = marketOfferQueryPort.findBySupplyType(InvoiceType.LUZ)
+        List<ElectricityMarketOffer> offers = marketOfferQueryPort.findBySupplyType(SupplyDomain.ELECTRICITY)
                 .stream()
                 .filter(o -> o instanceof ElectricityMarketOffer)
                 .map(o -> (ElectricityMarketOffer) o)

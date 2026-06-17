@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.application.command;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -17,7 +17,7 @@ class SaveElectricityRateCommandTest {
     @Test
     void shouldThrowWhenIdIsNull() {
         assertThatThrownBy(() -> new SaveElectricityRateCommand(
-            null, InvoiceType.LUZ, "IBERDROLA", "2.0TD",
+            null, SupplyDomain.ELECTRICITY, "IBERDROLA", "2.0TD",
             new BigDecimal("0.15"), null, null, null, null, null,
             TODAY, null, null, "REE", null
         )).isInstanceOf(NullPointerException.class);
@@ -35,7 +35,7 @@ class SaveElectricityRateCommandTest {
     @Test
     void shouldThrowWhenCompanyIsNull() {
         assertThatThrownBy(() -> new SaveElectricityRateCommand(
-            ID, InvoiceType.LUZ, null, "2.0TD",
+            ID, SupplyDomain.ELECTRICITY, null, "2.0TD",
             new BigDecimal("0.15"), null, null, null, null, null,
             TODAY, null, null, "REE", null
         )).isInstanceOf(NullPointerException.class);
@@ -44,7 +44,7 @@ class SaveElectricityRateCommandTest {
     @Test
     void shouldThrowWhenTariffNameIsNull() {
         assertThatThrownBy(() -> new SaveElectricityRateCommand(
-            ID, InvoiceType.LUZ, "IBERDROLA", null,
+            ID, SupplyDomain.ELECTRICITY, "IBERDROLA", null,
             new BigDecimal("0.15"), null, null, null, null, null,
             TODAY, null, null, "REE", null
         )).isInstanceOf(NullPointerException.class);
@@ -53,7 +53,7 @@ class SaveElectricityRateCommandTest {
     @Test
     void shouldThrowWhenValidFromIsNull() {
         assertThatThrownBy(() -> new SaveElectricityRateCommand(
-            ID, InvoiceType.LUZ, "IBERDROLA", "2.0TD",
+            ID, SupplyDomain.ELECTRICITY, "IBERDROLA", "2.0TD",
             new BigDecimal("0.15"), null, null, null, null, null,
             null, null, null, "REE", null
         )).isInstanceOf(NullPointerException.class);
@@ -62,7 +62,7 @@ class SaveElectricityRateCommandTest {
     @Test
     void shouldThrowWhenSourceIsNull() {
         assertThatThrownBy(() -> new SaveElectricityRateCommand(
-            ID, InvoiceType.LUZ, "IBERDROLA", "2.0TD",
+            ID, SupplyDomain.ELECTRICITY, "IBERDROLA", "2.0TD",
             new BigDecimal("0.15"), null, null, null, null, null,
             TODAY, null, null, null, null
         )).isInstanceOf(NullPointerException.class);

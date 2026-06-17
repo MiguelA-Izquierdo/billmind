@@ -33,7 +33,7 @@ public class KnowledgeAdminController {
     @PostMapping("/ingest")
     public ResponseEntity<SuccessResponseDTO> ingest(@RequestBody IngestRequest request) {
         commandBus.dispatch(new IngestDocumentCommand(
-                request.docId(), request.docType(), request.title(), request.source(),
+                request.docId(), request.docType(), request.supplyDomain(), request.title(), request.source(),
                 request.content(), request.validFrom(), request.validTo()));
         return ResponseEntity.ok(SuccessResponseDTO.of(200, "Documento ingestado correctamente"));
     }

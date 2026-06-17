@@ -5,7 +5,7 @@ import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitize
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
@@ -103,14 +103,14 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
     private static final String JSON_REPAIR_INSTRUCTIONS =
             "The text below is malformed JSON. Return ONLY the corrected JSON — no prose, no markdown.";
 
-    // Registry: add a new InvoiceType here without touching extract().
+    // Registry: add a new SupplyDomain here without touching extract().
     private record ExtractionConfig(String instructions, Class<? extends InvoiceFields> fieldType) {}
 
-    private static final Map<InvoiceType, ExtractionConfig> CONFIGS = Map.of(
-            InvoiceType.LUZ,   new ExtractionConfig(ELECTRICITY_INSTRUCTIONS, ElectricityFields.class),
-            InvoiceType.GAS,   new ExtractionConfig(GAS_INSTRUCTIONS,         GasFields.class),
-            InvoiceType.AGUA,  new ExtractionConfig(WATER_INSTRUCTIONS,       WaterFields.class),
-            InvoiceType.TELCO, new ExtractionConfig(TELECOM_INSTRUCTIONS,     TelecomFields.class)
+    private static final Map<SupplyDomain, ExtractionConfig> CONFIGS = Map.of(
+            SupplyDomain.ELECTRICITY, new ExtractionConfig(ELECTRICITY_INSTRUCTIONS, ElectricityFields.class),
+            SupplyDomain.GAS,         new ExtractionConfig(GAS_INSTRUCTIONS,         GasFields.class),
+            SupplyDomain.WATER,       new ExtractionConfig(WATER_INSTRUCTIONS,       WaterFields.class),
+            SupplyDomain.TELECOM,     new ExtractionConfig(TELECOM_INSTRUCTIONS,     TelecomFields.class)
     );
 
     private final ChatModel              chatModel;
@@ -133,7 +133,7 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
     }
 
     @Override
-    public InvoiceFields extract(String invoiceText, InvoiceType type) {
+    public InvoiceFields extract(String invoiceText, SupplyDomain type) {
         ExtractionConfig config = CONFIGS.get(type);
         if (config == null) throw new IllegalArgumentException("No extraction config for: " + type);
 

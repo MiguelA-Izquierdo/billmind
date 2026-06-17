@@ -1,0 +1,212 @@
+[
+  {
+    "id": "P01",
+    "query": "¿Qué es el CUPS?",
+    "expectedDocTypes": ["GLOSSARY"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P02",
+    "query": "¿En qué consiste el término de potencia?",
+    "expectedDocTypes": ["GLOSSARY"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P03",
+    "query": "¿Qué diferencia hay entre potencia contratada y potencia demandada?",
+    "expectedDocTypes": ["GLOSSARY"],
+    "expectedMaxRank": 2,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P04",
+    "query": "¿Qué es el maxímetro y cuándo me penaliza?",
+    "expectedDocTypes": ["GLOSSARY"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P05",
+    "query": "¿Qué es el IEE y cómo se calcula?",
+    "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
+    "expectedMaxRank": 2,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P06",
+    "query": "¿Qué es el bono social eléctrico?",
+    "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
+    "expectedMaxRank": 2,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P07",
+    "query": "¿Qué es la telemedida?",
+    "expectedDocTypes": ["GLOSSARY"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P08",
+    "query": "¿A qué horas es más barata la luz en la tarifa 2.0TD?",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "BOE_REGULATION"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P09",
+    "query": "¿Cuáles son los horarios exactos de punta, llano y valle en la nueva tarifa?",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "BOE_REGULATION"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P10",
+    "query": "¿Los festivos de mi comunidad autónoma cuentan como valle en la tarifa 2.0TD?",
+    "expectedDocTypes": ["BOE_REGULATION", "GLOSSARY"],
+    "expectedMaxRank": 3,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P11",
+    "query": "¿Qué diferencia hay entre los peajes de acceso y los cargos del sistema?",
+    "expectedDocTypes": ["CNMC_CIRCULAR"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P12",
+    "query": "¿Qué potencias estándar puedo contratar en mi casa?",
+    "expectedDocTypes": ["GENERAL", "GLOSSARY"],
+    "expectedMaxRank": 2,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P13",
+    "query": "¿La tarifa 3.0TD tiene los mismos periodos que la 2.0TD?",
+    "expectedDocTypes": ["CNMC_CIRCULAR"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P14",
+    "query": "¿Qué es el PVPC?",
+    "expectedDocTypes": ["REE_GUIDE", "GLOSSARY"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P15",
+    "query": "¿Puedo cambiar de comercializadora sin pagar penalización?",
+    "expectedDocTypes": ["GENERAL"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P16",
+    "query": "¿Cuáles son las diferencias entre PVPC y mercado libre?",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P17",
+    "query": "¿Qué es un contrato indexado al pool?",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "expectedMaxRank": 3,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P18",
+    "query": "¿El precio de la luz es igual de noche que de día?",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "REE_GUIDE"],
+    "expectedMaxRank": 2,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P19",
+    "query": "¿Cómo se calcula el IVA en la factura de la luz?",
+    "expectedDocTypes": ["BOE_REGULATION", "GLOSSARY"],
+    "expectedMaxRank": 3,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P20",
+    "query": "¿Por qué mi factura tiene una lectura de regularización tan alta?",
+    "expectedDocTypes": ["GENERAL", "REE_GUIDE"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P21",
+    "query": "¿Qué consumo anual es normal para una familia de 4 personas?",
+    "expectedDocTypes": ["GENERAL"],
+    "expectedMaxRank": 1,
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "P22",
+    "query": "¿Cuánto consume una lavadora por ciclo y cuánto me cuesta?",
+    "expectedDocTypes": ["GENERAL"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P23",
+    "query": "¿Qué aparece en el bloque de impuestos de mi factura?",
+    "expectedDocTypes": ["GENERAL", "BOE_REGULATION"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P24",
+    "query": "¿Qué cambió en la factura eléctrica en junio de 2021?",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "P25",
+    "query": "¿Quién fija el precio de la luz en España?",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "REE_GUIDE", "BOE_REGULATION"],
+    "expectedMaxRank": 3,
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "P26",
+    "query": "¿Qué es el déficit tarifario?",
+    "expectedDocTypes": ["GLOSSARY", "CNMC_CIRCULAR"],
+    "expectedMaxRank": 2,
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "P27",
+    "query": "¿Por qué subió tanto la luz en 2021 y 2022?",
+    "expectedDocTypes": ["REE_GUIDE", "BOE_REGULATION"],
+    "expectedMaxRank": 3,
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "P28",
+    "query": "¿Qué es el tope al gas o mecanismo ibérico?",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "expectedMaxRank": 1,
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "P29",
+    "query": "¿El sábado es siempre más barato que el lunes?",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "REE_GUIDE"],
+    "expectedMaxRank": 2,
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "P30",
+    "query": "Si cambio de comercializadora, ¿cambian también los peajes que pago?",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "REE_GUIDE", "GLOSSARY"],
+    "expectedMaxRank": 2,
+    "difficulty": "MEDIA"
+  }
+]

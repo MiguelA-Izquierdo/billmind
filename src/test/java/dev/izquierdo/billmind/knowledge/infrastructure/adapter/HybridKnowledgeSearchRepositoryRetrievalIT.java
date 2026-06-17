@@ -28,10 +28,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 // Real stack: pgvector (TestContainers), AllMiniLM-L6-v2 (local ONNX), HybridKnowledgeSearchRepository.
 // Mocked: StartupReadinessChecker (health probes), InvoiceFieldExtractor (avoids LLM calls).
 // Kafka: disabled via kafka.enabled=false (default in test application.properties).
+// minVectorScore=0.3: AllMiniLM-L6-v2 scores lower on Spanish regulatory content than
+// production embedding models (OpenAI, nomic-embed-text). Production default is 0.5.
 @SpringBootTest
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "knowledge.seed.enabled=true"
+        "knowledge.seed.enabled=true",
+        "knowledge.search.min-vector-score=0.3"
 })
 class HybridKnowledgeSearchRepositoryRetrievalIT {
 

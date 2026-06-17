@@ -32,16 +32,16 @@ public class LlmInvoiceClassifier {
 
     private static final String FEW_SHOT_PROMPT =
             "Classify whether the text is a Spanish household utility invoice.\n" +
-            "Types: LUZ=electricity, GAS=natural gas, AGUA=water/sewage, TELCO=phone/internet.\n" +
-            "If it is not a utility invoice or you cannot determine it: OTRO.\n" +
+            "Types: ELECTRICITY=electricity, GAS=natural gas, WATER=water/sewage, TELECOM=phone/internet.\n" +
+            "If it is not a utility invoice or you cannot determine it: OTHER.\n" +
             "Extract the issuer in uppercase. If you cannot identify it: DESCONOCIDA.\n" +
             "Reply with JSON only: {\"tipo\":\"...\",\"compania\":\"...\"}\n\n" +
             "Texto: IBERDROLA CUPS ES0031 405 kWh potencia contratada 3.3kW\n" +
-            "JSON: {\"tipo\":\"LUZ\",\"compania\":\"IBERDROLA\"}\n\n" +
+            "JSON: {\"tipo\":\"ELECTRICITY\",\"compania\":\"IBERDROLA\"}\n\n" +
             "Texto: NATURGY 234 m³ consumo gas peaje transporte\n" +
             "JSON: {\"tipo\":\"GAS\",\"compania\":\"NATURGY\"}\n\n" +
             "Texto: Contrato de arrendamiento de local comercial firmado\n" +
-            "JSON: {\"tipo\":\"OTRO\",\"compania\":\"DESCONOCIDA\"}\n\n" +
+            "JSON: {\"tipo\":\"OTHER\",\"compania\":\"DESCONOCIDA\"}\n\n" +
             "Texto: %s\n" +
             "JSON:";
 

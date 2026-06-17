@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.comparison.infrastructure.adapter;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.comparison.domain.model.ElectricityMarketOffer;
 import dev.izquierdo.billmind.comparison.domain.model.MarketOffer;
 import dev.izquierdo.billmind.comparison.domain.port.MarketOfferQueryPort;
@@ -21,8 +21,8 @@ public class MarketOfferQueryAdapter implements MarketOfferQueryPort {
     }
 
     @Override
-    public List<MarketOffer> findBySupplyType(InvoiceType supplyType) {
-        if (supplyType != InvoiceType.LUZ) return List.of();
+    public List<MarketOffer> findBySupplyType(SupplyDomain supplyType) {
+        if (supplyType != SupplyDomain.ELECTRICITY) return List.of();
         return electricityRateRepository.findLatestPerTariff().stream()
                 .<MarketOffer>map(this::toMarketOffer)
                 .toList();

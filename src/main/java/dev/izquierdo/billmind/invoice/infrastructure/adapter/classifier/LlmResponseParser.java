@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitizer;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -24,21 +24,21 @@ public class LlmResponseParser {
 
     public InvoiceClassification parse(String response) {
         try {
-            JsonNode node    = objectMapper.readTree(jsonSanitizer.sanitize(response));
-            InvoiceType type = parseType(node.path("tipo").asText("OTRO"));
-            String company   = node.path("compania").asText("").trim();
+            JsonNode node      = objectMapper.readTree(jsonSanitizer.sanitize(response));
+            SupplyDomain type  = parseType(node.path("tipo").asText("OTHER"));
+            String company     = node.path("compania").asText("").trim();
             return new InvoiceClassification(type, company);
         } catch (Exception e) {
-            log.warn("Failed to parse LLM classification response, defaulting to OTRO. Response: {}", response);
-            return new InvoiceClassification(InvoiceType.OTRO, "");
+            log.warn("Failed to parse LLM classification response, defaulting to OTHER. Response: {}", response);
+            return new InvoiceClassification(SupplyDomain.OTHER, "");
         }
     }
 
-    private InvoiceType parseType(String rawType) {
+    private SupplyDomain parseType(String rawType) {
         try {
-            return InvoiceType.valueOf(rawType.toUpperCase().trim());
+            return SupplyDomain.valueOf(rawType.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
-            return InvoiceType.OTRO;
+            return SupplyDomain.OTHER;
         }
     }
 }

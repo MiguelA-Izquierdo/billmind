@@ -7,6 +7,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
+
 @Configuration
 @ConditionalOnProperty(name = "embedding.provider", havingValue = "ollama")
 public class OllamaEmbeddingModelConfig {
@@ -17,11 +19,15 @@ public class OllamaEmbeddingModelConfig {
     @Value("${embedding.ollama.model:nomic-embed-text}")
     private String model;
 
+    @Value("${embedding.ollama.timeout-seconds:120}")
+    private int timeoutSeconds;
+
     @Bean
     public EmbeddingModel embeddingModel() {
         return OllamaEmbeddingModel.builder()
                 .baseUrl(baseUrl)
                 .modelName(model)
+                .timeout(Duration.ofSeconds(timeoutSeconds))
                 .build();
     }
 }

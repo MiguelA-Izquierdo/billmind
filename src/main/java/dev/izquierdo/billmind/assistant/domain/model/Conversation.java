@@ -41,4 +41,9 @@ public class Conversation {
     public UUID getInvoiceId()                           { return invoiceId; }
     public Instant getCreatedAt()                        { return createdAt; }
     public List<ConversationMessage> getMessages()       { return Collections.unmodifiableList(messages); }
+
+    public List<ConversationMessage> getRecentMessages(int maxMessages) {
+        int from = Math.max(0, messages.size() - maxMessages);
+        return Collections.unmodifiableList(messages.subList(from, messages.size()));
+    }
 }

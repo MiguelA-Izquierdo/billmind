@@ -136,6 +136,17 @@ ollama pull mxbai-embed-large  # 1024d
 
 ---
 
+## Knowledge Base
+
+| Variable | Default | Description |
+|---|---|---|
+| `KNOWLEDGE_SEARCH_MIN_VECTOR_SCORE` | `0.5` | Minimum cosine similarity (0–1) a vector candidate must have to enter the RRF fusion step. Filters out semantically weak matches before ranking. Lower values increase recall at the cost of precision. Tune per embedding model: AllMiniLM-L6-v2 typically scores lower than OpenAI or nomic-embed-text on Spanish content. |
+| `KNOWLEDGE_SEARCH_MAX_RESULTS` | `5` | Maximum number of results returned per search query. |
+
+> **Tuning tip:** Start at `0.5` with OpenAI or nomic-embed-text. Drop to `0.3` if you observe low recall with AllMiniLM-L6-v2. Raise to `0.6–0.7` to enforce higher precision in production.
+
+---
+
 ## Vector Store (pgVector)
 
 | Variable | Default | Description |

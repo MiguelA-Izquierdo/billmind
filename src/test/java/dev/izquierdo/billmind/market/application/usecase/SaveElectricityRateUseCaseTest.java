@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.application.usecase;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.domain.model.ElectricityRate;
 import dev.izquierdo.billmind.market.domain.port.ElectricityRateRepository;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class SaveElectricityRateUseCaseTest {
     @Test
     void shouldDelegateToRepository() {
         ElectricityRate rate = ElectricityRate.builder(UUID.randomUUID())
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.150000"))

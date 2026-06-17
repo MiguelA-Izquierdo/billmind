@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.market.domain.model;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +19,7 @@ class ElectricityRateTest {
     @Test
     void shouldBuildElectricityRateWithAllRequiredFields() {
         ElectricityRate rate = ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.150000"))
@@ -28,7 +28,7 @@ class ElectricityRateTest {
             .build();
 
         assertThat(rate.getId()).isEqualTo(ID);
-        assertThat(rate.getSupplyType()).isEqualTo(InvoiceType.LUZ);
+        assertThat(rate.getSupplyType()).isEqualTo(SupplyDomain.ELECTRICITY);
         assertThat(rate.getCompany()).isEqualTo("IBERDROLA");
         assertThat(rate.getTariffName()).isEqualTo("2.0TD");
         assertThat(rate.getPricePerKwh()).isEqualByComparingTo("0.150000");
@@ -40,7 +40,7 @@ class ElectricityRateTest {
     @Test
     void shouldAllowNullOptionalFields() {
         ElectricityRate rate = ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.GAS)
+            .supplyType(SupplyDomain.GAS)
             .company("NATURGY")
             .tariffName("GAS-BASE")
             .pricePerKwh(new BigDecimal("0.080000"))
@@ -56,7 +56,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenIdIsNull() {
         assertThatThrownBy(() -> ElectricityRate.builder(null)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.15"))
@@ -81,7 +81,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenNoPriceIsProvided() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .validFrom(TODAY)
@@ -94,7 +94,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenCompanyIsNull() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.15"))
             .validFrom(TODAY)
@@ -106,7 +106,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenCompanyIsBlank() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("   ")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.15"))
@@ -119,7 +119,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenTariffNameIsBlank() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("   ")
             .pricePerKwh(new BigDecimal("0.15"))
@@ -132,7 +132,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenSourceIsNull() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.15"))
@@ -144,7 +144,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenSourceIsBlank() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.15"))
@@ -157,7 +157,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenPricePerKwhIsNegative() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("-0.01"))
@@ -170,7 +170,7 @@ class ElectricityRateTest {
     @Test
     void shouldThrowWhenValidToIsBeforeValidFrom() {
         assertThatThrownBy(() -> ElectricityRate.builder(ID)
-            .supplyType(InvoiceType.LUZ)
+            .supplyType(SupplyDomain.ELECTRICITY)
             .company("IBERDROLA")
             .tariffName("2.0TD")
             .pricePerKwh(new BigDecimal("0.15"))

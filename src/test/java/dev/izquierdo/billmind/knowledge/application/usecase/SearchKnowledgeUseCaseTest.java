@@ -1,5 +1,6 @@
 package dev.izquierdo.billmind.knowledge.application.usecase;
 
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.knowledge.application.query.SearchKnowledgeQuery;
 import dev.izquierdo.billmind.knowledge.domain.model.DocType;
 import dev.izquierdo.billmind.knowledge.domain.model.KnowledgeSearchResult;
@@ -26,7 +27,7 @@ class SearchKnowledgeUseCaseTest {
     @Test
     void shouldDelegateToSearchRepository() {
         KnowledgeSearchResult result = new KnowledgeSearchResult(
-                UUID.randomUUID(), UUID.randomUUID(), DocType.GLOSSARY,
+                UUID.randomUUID(), UUID.randomUUID(), DocType.GLOSSARY, SupplyDomain.ELECTRICITY,
                 "Glosario", "REE", null, "contenido", 0.95);
         when(searchRepository.search("PVPC", 5)).thenReturn(List.of(result));
 

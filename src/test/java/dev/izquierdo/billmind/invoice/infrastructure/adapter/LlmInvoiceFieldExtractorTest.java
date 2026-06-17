@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitizer;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
@@ -91,7 +91,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldExtractElectricityFields() {
         doReturn(ELECTRICITY_JSON).when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.LUZ);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
 
         assertThat(result).isInstanceOf(ElectricityFields.class);
         ElectricityFields fields = (ElectricityFields) result;
@@ -105,7 +105,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldExtractGasFields() {
         doReturn(GAS_JSON).when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.GAS);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.GAS);
 
         assertThat(result).isInstanceOf(GasFields.class);
         GasFields fields = (GasFields) result;
@@ -117,7 +117,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldExtractWaterFields() {
         doReturn(WATER_JSON).when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.AGUA);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.WATER);
 
         assertThat(result).isInstanceOf(WaterFields.class);
         WaterFields fields = (WaterFields) result;
@@ -129,7 +129,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldExtractTelecomFields() {
         doReturn(TELECOM_JSON).when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.TELCO);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.TELECOM);
 
         assertThat(result).isInstanceOf(TelecomFields.class);
         TelecomFields fields = (TelecomFields) result;
@@ -145,7 +145,7 @@ class LlmInvoiceFieldExtractorTest {
 
     @Test
     void shouldThrowForUnsupportedType() {
-        assertThatThrownBy(() -> extractor.extract("texto", InvoiceType.OTRO))
+        assertThatThrownBy(() -> extractor.extract("texto", SupplyDomain.OTHER))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -155,7 +155,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldParseResponseWrappedInMarkdownFence() {
         doReturn("```json\n" + ELECTRICITY_JSON + "\n```").when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.LUZ);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
 
         assertThat(result).isInstanceOf(ElectricityFields.class);
     }
@@ -164,7 +164,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldParseResponseWithLeadingProse() {
         doReturn("Aquí tienes los campos: " + ELECTRICITY_JSON).when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.LUZ);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
 
         assertThat(result).isInstanceOf(ElectricityFields.class);
     }
@@ -177,7 +177,7 @@ class LlmInvoiceFieldExtractorTest {
                 .doReturn(ELECTRICITY_JSON)
                 .when(chatModel).chat(anyString());
 
-        InvoiceFields result = extractor.extract("texto factura", InvoiceType.LUZ);
+        InvoiceFields result = extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
 
         assertThat(result).isInstanceOf(ElectricityFields.class);
         verify(chatModel, times(2)).chat(anyString());
@@ -189,7 +189,7 @@ class LlmInvoiceFieldExtractorTest {
                 .doReturn("still invalid json")
                 .when(chatModel).chat(anyString());
 
-        assertThatThrownBy(() -> extractor.extract("texto factura", InvoiceType.LUZ))
+        assertThatThrownBy(() -> extractor.extract("texto factura", SupplyDomain.ELECTRICITY))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
 
         verify(chatModel, times(2)).chat(anyString());
@@ -201,7 +201,7 @@ class LlmInvoiceFieldExtractorTest {
     void shouldCallValidatorAfterSuccessfulParse() {
         doReturn(ELECTRICITY_JSON).when(chatModel).chat(anyString());
 
-        extractor.extract("texto factura", InvoiceType.LUZ);
+        extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
 
         verify(validator).validate(any(ElectricityFields.class));
     }
@@ -212,7 +212,7 @@ class LlmInvoiceFieldExtractorTest {
         doThrow(new InvoiceFieldExtractionException(new RuntimeException("invalid dates")))
                 .when(validator).validate(any());
 
-        assertThatThrownBy(() -> extractor.extract("texto factura", InvoiceType.LUZ))
+        assertThatThrownBy(() -> extractor.extract("texto factura", SupplyDomain.ELECTRICITY))
                 .isInstanceOf(InvoiceFieldExtractionException.class);
 
         verify(chatModel, times(1)).chat(anyString());

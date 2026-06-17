@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.persistence;
 
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
@@ -32,8 +32,8 @@ public class InvoiceEntity {
     private String fileName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "supply_type", nullable = false, length = 10)
-    private InvoiceType supplyType;
+    @Column(name = "supply_type", nullable = false, length = 15)
+    private SupplyDomain supplyType;
 
     @Column(name = "provider", nullable = false)
     private String provider;
@@ -123,8 +123,8 @@ public class InvoiceEntity {
     protected InvoiceEntity() {}
 
     public static InvoiceEntity from(Invoice invoice) {
-        if (invoice.getSupplyType() == InvoiceType.OTRO) {
-            throw new IllegalStateException("Cannot persist invoice with type OTRO: id=" + invoice.getId());
+        if (invoice.getSupplyType() == SupplyDomain.OTHER) {
+            throw new IllegalStateException("Cannot persist invoice with type OTHER: id=" + invoice.getId());
         }
         InvoiceEntity entity = new InvoiceEntity();
         entity.id              = invoice.getId();
@@ -191,27 +191,27 @@ public class InvoiceEntity {
     private InvoiceFields buildFields() {
         if (billingPeriodStart == null) return null;
         return switch (supplyType) {
-            case LUZ   -> new ElectricityFields(billingPeriodStart, billingPeriodEnd, totalAmount,
-                                                consumptionKwh,
-                                                consumptionKwhP1, consumptionKwhP2, consumptionKwhP3,
-                                                pricePerKwh,
-                                                pricePerKwhP1, pricePerKwhP2, pricePerKwhP3,
-                                                contractedPowerKw);
-            case GAS   -> new GasFields(billingPeriodStart, billingPeriodEnd, totalAmount,
-                                        consumptionM3, consumptionKwh, pricePerKwh);
-            case AGUA  -> new WaterFields(billingPeriodStart, billingPeriodEnd, totalAmount,
-                                          consumptionM3, pricePerM3, sewageCharge);
-            case TELCO -> new TelecomFields(billingPeriodStart, billingPeriodEnd, totalAmount,
-                                            contractedSpeedMbps, mobileDataGb, includedMobileLines,
-                                            mobileLineCount, mobileLines, streamingServices, monthlyFee);
-            case OTRO  -> null;
+            case ELECTRICITY -> new ElectricityFields(billingPeriodStart, billingPeriodEnd, totalAmount,
+                                                      consumptionKwh,
+                                                      consumptionKwhP1, consumptionKwhP2, consumptionKwhP3,
+                                                      pricePerKwh,
+                                                      pricePerKwhP1, pricePerKwhP2, pricePerKwhP3,
+                                                      contractedPowerKw);
+            case GAS         -> new GasFields(billingPeriodStart, billingPeriodEnd, totalAmount,
+                                              consumptionM3, consumptionKwh, pricePerKwh);
+            case WATER       -> new WaterFields(billingPeriodStart, billingPeriodEnd, totalAmount,
+                                                consumptionM3, pricePerM3, sewageCharge);
+            case TELECOM     -> new TelecomFields(billingPeriodStart, billingPeriodEnd, totalAmount,
+                                                  contractedSpeedMbps, mobileDataGb, includedMobileLines,
+                                                  mobileLineCount, mobileLines, streamingServices, monthlyFee);
+            case OTHER       -> null;
         };
     }
 
     public UUID getId()                { return id; }
     public UUID getSessionId()         { return sessionId; }
     public String getFileName()        { return fileName; }
-    public InvoiceType getSupplyType() { return supplyType; }
+    public SupplyDomain getSupplyType() { return supplyType; }
     public String getProvider()        { return provider; }
     public Instant getUploadedAt()     { return uploadedAt; }
 }

@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.persistence;
 
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,7 +29,7 @@ class JpaInvoiceRepositoryTest {
     @Test
     void shouldDelegateToJpaOnSave() {
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf")
-                .supplyType(InvoiceType.LUZ)
+                .supplyType(SupplyDomain.ELECTRICITY)
                 .provider("IBERDROLA")
                 .sessionId(UUID.randomUUID())
                 .build();
@@ -43,7 +43,7 @@ class JpaInvoiceRepositoryTest {
     void shouldReturnMappedDomainObjectWhenFound() {
         UUID id = UUID.randomUUID();
         Invoice original = Invoice.builder(id, "factura.pdf")
-                .supplyType(InvoiceType.GAS)
+                .supplyType(SupplyDomain.GAS)
                 .provider("NATURGY")
                 .sessionId(UUID.randomUUID())
                 .build();
@@ -53,7 +53,7 @@ class JpaInvoiceRepositoryTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getId()).isEqualTo(id);
-        assertThat(result.get().getSupplyType()).isEqualTo(InvoiceType.GAS);
+        assertThat(result.get().getSupplyType()).isEqualTo(SupplyDomain.GAS);
     }
 
     @Test
@@ -69,8 +69,8 @@ class JpaInvoiceRepositoryTest {
         UUID id1 = UUID.randomUUID();
         UUID id2 = UUID.randomUUID();
         List<InvoiceEntity> entities = List.of(
-                InvoiceEntity.from(Invoice.builder(id1, "f1.pdf").sessionId(sessionId).supplyType(InvoiceType.LUZ).provider("A").build()),
-                InvoiceEntity.from(Invoice.builder(id2, "f2.pdf").sessionId(sessionId).supplyType(InvoiceType.AGUA).provider("B").build())
+                InvoiceEntity.from(Invoice.builder(id1, "f1.pdf").sessionId(sessionId).supplyType(SupplyDomain.ELECTRICITY).provider("A").build()),
+                InvoiceEntity.from(Invoice.builder(id2, "f2.pdf").sessionId(sessionId).supplyType(SupplyDomain.WATER).provider("B").build())
         );
         when(jpa.findBySessionId(sessionId)).thenReturn(entities);
 

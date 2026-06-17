@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -16,13 +16,13 @@ class KeywordInvoiceClassifierTest {
     @Test
     void shouldClassifyLuzWithSufficientKeywords() {
         String text = "CUPS ES0031 Potencia contratada 3,3 kW energía eléctrica término de energía";
-        assertThat(classifier.classify(text)).contains(InvoiceType.LUZ);
+        assertThat(classifier.classify(text)).contains(SupplyDomain.ELECTRICITY);
     }
 
     @Test
     void shouldClassifyLuzCaseInsensitive() {
         String text = "Consumo en KWh y peaje de acceso contratado";
-        assertThat(classifier.classify(text)).contains(InvoiceType.LUZ);
+        assertThat(classifier.classify(text)).contains(SupplyDomain.ELECTRICITY);
     }
 
     // ── GAS ──────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ class KeywordInvoiceClassifierTest {
     @Test
     void shouldClassifyGas() {
         String text = "Consumo gas natural 234 m³ PCS peaje de gas aplicado";
-        assertThat(classifier.classify(text)).contains(InvoiceType.GAS);
+        assertThat(classifier.classify(text)).contains(SupplyDomain.GAS);
     }
 
     // ── AGUA ─────────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ class KeywordInvoiceClassifierTest {
     @Test
     void shouldClassifyAgua() {
         String text = "Servicio de abastecimiento saneamiento y canon del agua cuota de servicio agua";
-        assertThat(classifier.classify(text)).contains(InvoiceType.AGUA);
+        assertThat(classifier.classify(text)).contains(SupplyDomain.WATER);
     }
 
     // ── TELCO ────────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ class KeywordInvoiceClassifierTest {
     @Test
     void shouldClassifyTelco() {
         String text = "Tarifa plana internet fibra 600 MB datos nacionales llamadas ilimitadas";
-        assertThat(classifier.classify(text)).contains(InvoiceType.TELCO);
+        assertThat(classifier.classify(text)).contains(SupplyDomain.TELECOM);
     }
 
     // ── Sin clasificación ─────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ class KeywordInvoiceClassifierTest {
     void shouldReturnTypeWithHighestScore() {
         // Texto con keywords de LUZ (3) y GAS (1) → gana LUZ
         String text = "CUPS kwh potencia contratada electricidad gas natural";
-        Optional<InvoiceType> result = classifier.classify(text);
-        assertThat(result).contains(InvoiceType.LUZ);
+        Optional<SupplyDomain> result = classifier.classify(text);
+        assertThat(result).contains(SupplyDomain.ELECTRICITY);
     }
 }

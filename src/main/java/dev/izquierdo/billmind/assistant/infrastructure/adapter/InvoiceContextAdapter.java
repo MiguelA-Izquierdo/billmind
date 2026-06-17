@@ -1,6 +1,7 @@
 package dev.izquierdo.billmind.assistant.infrastructure.adapter;
 
 import dev.izquierdo.billmind.assistant.domain.port.InvoiceContextPort;
+import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceRepository;
 import org.springframework.stereotype.Component;
 
@@ -17,8 +18,7 @@ public class InvoiceContextAdapter implements InvoiceContextPort {
     }
 
     @Override
-    public Optional<String> loadRawText(UUID invoiceId) {
-        return invoiceRepository.findById(invoiceId)
-                .map(invoice -> invoice.getRawTextRedacted());
+    public Optional<Invoice> loadInvoice(UUID invoiceId) {
+        return invoiceRepository.findById(invoiceId);
     }
 }

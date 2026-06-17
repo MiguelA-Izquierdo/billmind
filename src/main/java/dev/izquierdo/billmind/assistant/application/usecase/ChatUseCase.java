@@ -1,5 +1,6 @@
 package dev.izquierdo.billmind.assistant.application.usecase;
 
+import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind.assistant.application.command.ChatCommand;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
 import dev.izquierdo.billmind.assistant.domain.model.Conversation;
@@ -10,6 +11,7 @@ import dev.izquierdo.billmind.assistant.domain.port.AssistantLlmPort;
 import dev.izquierdo.billmind.assistant.domain.port.AssistantRepository;
 import dev.izquierdo.billmind.assistant.domain.port.InvoiceContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.RegulationSearchPort;
+import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -39,19 +41,23 @@ public class ChatUseCase {
     }
 
     public ChatResult execute(ChatCommand command) {
-        String invoiceText = command.invoiceId() != null
-                ? invoiceContextPort.loadRawText(command.invoiceId()).orElse(null)
+        Conversation conversation = (command.conversationId() != null)
+                ? repository.findById(command.conversationId())
+                        .orElseGet(() -> Conversation.create(command.sessionId(), command.invoiceId()))
+                : Conversation.create(command.sessionId(), command.invoiceId());
+
+        InvoiceFields invoiceFields = command.invoiceId() != null
+                ? invoiceContextPort.loadInvoice(command.invoiceId()).map(Invoice::getFields).orElse(null)
                 : null;
 
         List<RegulatorySnippet> regulatoryContext = regulationSearchPort.search(command.message(), maxKnowledgeResults);
 
-        ChatResult result = llmPort.answer(invoiceText, regulatoryContext, command.message());
+        ChatResult result = llmPort.answer(invoiceFields, regulatoryContext, command.message(), conversation.getRecentMessages(6));
 
-        Conversation conversation = Conversation.create(command.sessionId(), command.invoiceId());
         conversation.addMessage(ConversationMessage.create(MessageRole.USER, command.message()));
         conversation.addMessage(ConversationMessage.create(MessageRole.ASSISTANT, result.answer()));
         repository.save(conversation);
 
-        return result;
+        return new ChatResult(conversation.getId(), result.answer(), result.citations());
     }
 }

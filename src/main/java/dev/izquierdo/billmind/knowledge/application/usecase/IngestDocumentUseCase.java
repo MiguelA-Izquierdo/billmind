@@ -28,7 +28,7 @@ public class IngestDocumentUseCase {
         UUID docId = command.docId();
 
         KnowledgeDocument document = KnowledgeDocument.create(
-                docId, command.docType(), command.title(), command.source(),
+                docId, command.docType(), command.supplyDomain(), command.title(), command.source(),
                 command.validFrom(), command.validTo());
 
         List<String> rawChunks = chunker.chunk(command.content());

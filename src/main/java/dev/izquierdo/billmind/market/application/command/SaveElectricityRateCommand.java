@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.market.application.command;
 
 import dev.izquierdo.billmind._shared.application.command.Command;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public record SaveElectricityRateCommand(
         UUID id,
-        InvoiceType supplyType,
+        SupplyDomain supplyType,
         String company,
         String tariffName,
         BigDecimal pricePerKwh,

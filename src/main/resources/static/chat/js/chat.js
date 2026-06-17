@@ -32,7 +32,7 @@ export async function sendMessage() {
         'X-Session-Id': SESSION_ID,
         'Accept':       'text/event-stream',
       },
-      body: JSON.stringify({ invoiceId: state.selectedInvoiceId, message: text }),
+      body: JSON.stringify({ invoiceId: state.selectedInvoiceId, conversationId: state.conversationId, message: text }),
     });
 
     removeThinking(thinkingId);
@@ -66,10 +66,11 @@ export async function sendMessage() {
         if (data === '[DONE]') break;
         try {
           const chunk = JSON.parse(data);
-          if (chunk.type === 'token')     appendToken(msgId, chunk.content);
-          if (chunk.type === 'citation')  citations.push(chunk);
-          if (chunk.type === 'citations') { citations = chunk.items ?? []; renderCitations(msgId, citations); }
-          if (chunk.type === 'error')     appendToken(msgId, chunk.content);
+          if (chunk.type === 'conversation') state.conversationId = chunk.id;
+          if (chunk.type === 'token')        appendToken(msgId, chunk.content);
+          if (chunk.type === 'citation')     citations.push(chunk);
+          if (chunk.type === 'citations')    { citations = chunk.items ?? []; renderCitations(msgId, citations); }
+          if (chunk.type === 'error')        appendToken(msgId, chunk.content);
         } catch {
           appendToken(msgId, data);
         }

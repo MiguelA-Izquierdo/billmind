@@ -7,13 +7,14 @@ class KnowledgeMapper {
 
     static KnowledgeDocumentEntity toDocEntity(KnowledgeDocument doc) {
         KnowledgeDocumentEntity e = new KnowledgeDocumentEntity();
-        e.id        = doc.getId();
-        e.docType   = doc.getDocType();
-        e.title     = doc.getTitle();
-        e.source    = doc.getSource();
-        e.validFrom = doc.getValidFrom();
-        e.validTo   = doc.getValidTo();
-        e.createdAt = doc.getCreatedAt();
+        e.id           = doc.getId();
+        e.docType      = doc.getDocType();
+        e.supplyDomain = doc.getSupplyDomain();
+        e.title        = doc.getTitle();
+        e.source       = doc.getSource();
+        e.validFrom    = doc.getValidFrom();
+        e.validTo      = doc.getValidTo();
+        e.createdAt    = doc.getCreatedAt();
         return e;
     }
 
@@ -21,6 +22,7 @@ class KnowledgeMapper {
         return KnowledgeDocument.reconstitute(
                 e.getId(),
                 e.getDocType(),
+                e.getSupplyDomain(),
                 e.getTitle(),
                 e.getSource(),
                 e.getValidFrom(),

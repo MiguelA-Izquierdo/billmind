@@ -11,7 +11,7 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import dev.izquierdo.billmind._shared.infrastructure.config.SecurityConfig;
@@ -78,7 +78,7 @@ class InvoiceControllerTest {
 
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura.pdf")
                 .sessionId(SESSION_ID)
-                .supplyType(InvoiceType.LUZ)
+                .supplyType(SupplyDomain.ELECTRICITY)
                 .build();
         when(queryBus.dispatch(any())).thenReturn(invoice);
 
@@ -137,7 +137,7 @@ class InvoiceControllerTest {
 
     @Test
     void uploadInvoice_withUnsupportedSupplyType_returns422() throws Exception {
-        doThrow(new UnsupportedSupplyTypeException(InvoiceType.GAS)).when(commandBus).dispatch(any());
+        doThrow(new UnsupportedSupplyTypeException(SupplyDomain.GAS)).when(commandBus).dispatch(any());
 
         mockMvc.perform(multipart("/api/v1/invoices")
                         .file(validPdf("factura-gas.pdf"))
@@ -221,7 +221,7 @@ class InvoiceControllerTest {
         UUID invoiceId = UUID.randomUUID();
         Invoice invoice = Invoice.builder(invoiceId, "factura.pdf")
                 .sessionId(SESSION_ID)
-                .supplyType(InvoiceType.LUZ)
+                .supplyType(SupplyDomain.ELECTRICITY)
                 .provider("IBERDROLA")
                 .build();
         when(queryBus.dispatch(any())).thenReturn(invoice);
@@ -231,7 +231,7 @@ class InvoiceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(invoiceId.toString()))
                 .andExpect(jsonPath("$.data.fileName").value("factura.pdf"))
-                .andExpect(jsonPath("$.data.supplyType").value("LUZ"));
+                .andExpect(jsonPath("$.data.supplyType").value("ELECTRICITY"));
     }
 
     @Test
@@ -251,7 +251,7 @@ class InvoiceControllerTest {
         UUID invoiceId = UUID.randomUUID();
         Invoice invoice = Invoice.builder(invoiceId, "factura.pdf")
                 .sessionId(SESSION_ID)
-                .supplyType(InvoiceType.GAS)
+                .supplyType(SupplyDomain.GAS)
                 .provider("NATURGY")
                 .build();
         when(queryBus.dispatch(any())).thenReturn(List.of(invoice));

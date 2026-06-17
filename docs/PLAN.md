@@ -41,10 +41,8 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | `ElectricityPriceConsumer` — Kafka listener on `market.electricity-price-updated`; future `GasPriceConsumer`, etc. follow the same per-supply-type pattern | 2 | Prices arrive in real-time; the external producer is a separate service |
 | `comparison/` bounded context — deterministic savings engine | 3 | Core product value: quantify overpayment immediately on upload |
 | Comparison result embedded in `POST /api/v1/invoices` response | 3 | No extra step — savings visible the moment the invoice is processed |
-| `comparisons` table | 3 | Persist results for history and future re-evaluation |
 | `assistant/` bounded context | 5 | Explains the savings, answers follow-up questions |
-| SSE streaming | 5 | Real LLM UX |
-| Persistent conversational memory | 5 | Multi-turn history; conversation tied to session |
+| SSE streaming + `conversationId` handshake | 5 | Real LLM UX with in-memory multi-turn |
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | Langfuse self-hosted | 6 | LLM observability |
 | Spring Security + JWT + rate limiting | 7 | Phase 2 |
@@ -73,12 +71,13 @@ electricity_rates (id, supply_type, company, tariff_name,
               contracted_power_price, contracted_power_price_p2,
               valid_from, valid_to, region, source, received_at)
 
-comparisons (id, invoice_id FK, session_id FK, result_json,
-             tools_called[], created_at, model_used)
-
 knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
    └── vector_store (chunks + embedding + metadata
                     {doc_id, doc_type, source, section})
+
+-- NOT persisted (Phase 1 decision):
+-- comparisons  → recalculated on-the-fly from invoice fields + live electricity_rates
+-- conversations → InMemoryAssistantRepository; Phase 1 is anonymous, no history UX needed
 
 eval_runs (id, golden_set_version, faithfulness, context_precision,
            answer_relevancy, created_at)  -- Milestone 6
@@ -185,7 +184,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Engineering highlights:** event-driven market price ingestion via Kafka (KRaft) with flat-rate and TOU pricing support, idempotent upsert, DLT + domain-error topics, TestContainers integration tests; hybrid pgVector + BM25 retrieval with RRF, automated IVFFlat index lifecycle, recall@k / MRR quality gate in CI.
 
-### Milestone 3 — `comparison/` module — Savings Engine ← NEXT
+### Milestone 3 — `comparison/` module — Savings Engine ✓ COMPLETE
 
 **Objective:** deliver the core product value: quantify exactly how much the user is overpaying and what they should switch to. The comparison result is returned synchronously with the invoice upload — no extra step required from the user.
 
@@ -193,21 +192,20 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Deliverables:**
 
-- Bounded context `comparison/` fully implemented (currently skeleton only).
-  - Domain: `ComparisonResult` value object — `userPricePerKwh`, `bestRate` (company, tariffName, pricePerKwh), `alternativeRates` (up to 3 ranked alternatives), `annualKwhEstimate`, `annualSavingsEuros`, `comparedAt`.
-  - Port `ElectricityRateQueryPort` — queries `electricity_rates` for the best available rates for a given supply type.
-  - `CompareInvoiceUseCase` — deterministic arithmetic, no LLM: finds cheapest flat-rate and TOU options in `electricity_rates`, estimates annual kWh from the billing period, computes savings vs user's extracted `pricePerKwh`. The LLM never does numerical math.
+- Bounded context `comparison/` fully implemented.
+  - Domain: `ComparisonResult` sealed interface → `ElectricityComparisonResult` record with `userPricePerKwh`, `userIsTou`, `annualKwhEstimate`, `flatBlock` and `touBlock` (`ElectricityOfferBlock`: bestCompany, bestTariffName, bestPricePerKwh, annualSavingsEuros, up to 3 alternatives).
+  - Port `MarketOfferQueryPort` + `MarketOfferQueryAdapter` — queries `electricity_rates` and maps rows to `ElectricityMarketOffer`.
+  - `ElectricityComparisonCalculator` — deterministic arithmetic, no LLM: finds cheapest flat-rate and TOU options, estimates annual kWh from the billing period, computes per-period TOU weighting from actual consumption when available (falls back to residential profile 30/40/30). The LLM never does numerical math.
+  - `CompareInvoiceUseCase` — delegates to the calculator, returns `Optional<ComparisonResult>`.
   - Graceful degradation: if `electricity_rates` is empty (producer not yet running), `ComparisonResult` is `null` — no error, no blocking.
-  - `comparisons` table — stores each result with `invoiceId`, `sessionId`, result JSON, and `comparedAt`.
-  - `POST /api/v1/invoices/{id}/comparison` — explicit re-run endpoint.
-  - **Synchronous integration with upload:** `UploadInvoiceUseCase` calls `CompareInvoiceUseCase` after extraction; the `POST /api/v1/invoices` response includes a `comparison` field (nullable).
-  - Static HTML updated: savings card displayed immediately after successful upload showing `userPricePerKwh`, `bestRate`, `annualSavingsEuros`. Hidden when `comparison` is null.
+  - **No `comparisons` table** — results are recalculated on-the-fly from the persisted invoice fields + live `electricity_rates`. This keeps the schema minimal and always reflects the most current market data. Persisting comparison snapshots would add complexity with no user-facing benefit in Phase 1.
+  - `GET /api/v1/invoices/{id}/comparison` — on-demand re-run endpoint (used when selecting an invoice from the list).
+  - **Synchronous integration with upload:** `InvoiceController` calls `CompareInvoiceUseCase` after command dispatch; the `POST /api/v1/invoices` response includes a `comparison` field (nullable).
+  - Static HTML: savings card rendered immediately after upload; animated counter; flat-rate and TOU blocks; hidden when `comparison` is null.
 
 **Dependencies:** Milestone 1 (extracted invoice fields including `pricePerKwh` and `consumptionKwh`), Milestone 2 (`electricity_rates` table — data populated by Kafka producer when running).
 
-**Note on the LangChain4j tool-calling agent:** the original design used `AiServices` with `@Tool` methods for the comparison. That approach is deferred — deterministic arithmetic is faster, cheaper, testable, and delivers the same value. The agent layer can be added later if reasoning over multiple tariff dimensions becomes complex.
-
-**Engineering highlights:** deterministic savings calculation (arithmetic, not LLM), graceful null when market data is absent, synchronous result embedded in upload response, savings card in static HTML.
+**Engineering highlights:** deterministic savings calculation (arithmetic, not LLM), per-period TOU weighting with residential-profile fallback, graceful null when market data is absent, synchronous result embedded in upload response, animated savings card in static HTML.
 
 ### Milestone 4 — Market Price Producer *(separate service, developed independently)*
 
@@ -226,26 +224,26 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Engineering highlights:** event publishing decouples data sourcing from BillMind's ingestion; any future price source (scraper, third-party API, manual upload) can replace or extend this producer without touching BillMind.
 
-### Milestone 5 — `assistant/` module — Conversational RAG
+### Milestone 5 — `assistant/` module — Conversational RAG ✓ COMPLETE
 
 **Objective:** deliver conversational invoice analysis — the layer that explains the comparison result and answers follow-up questions. By this point the user already knows their savings figure; the chat exists to help them understand why and how to act.
 
 **Deliverables:**
 
-- Bounded context `assistant/` fully implemented (currently: domain model + SSE streaming wired, `InMemoryAssistantRepository` — persistence missing).
-  - `conversations` and `messages` tables; `JpaAssistantRepository` replacing `InMemoryAssistantRepository`.
-  - `AskAssistantUseCase` with dual context strategy:
-    - User's invoice full text → passed directly in the prompt (no retrieval needed, fits in context window).
+- Bounded context `assistant/` fully implemented.
+  - Domain: `Conversation`, `ConversationMessage`, `MessageRole`, `ChatResult`, `RegulatorySnippet`. Ports: `AssistantRepository`, `AssistantLlmPort`, `InvoiceContextPort`, `RegulationSearchPort`.
+  - `ChatUseCase` with dual context strategy:
+    - User's invoice full text → passed in the system prompt (no retrieval needed, fits in context window).
     - Regulatory knowledge base → semantic RAG retrieval (CNMC, REE, BOE documents from Milestone 2).
-  - `POST /api/v1/assistant/chat` with SSE streaming (already wired; needs persistent memory).
-  - `GET /conversations/{id}` — returns conversation history; responds only if `X-Session-Id` matches.
-  - Mandatory citations (regulatory source cited in every answer that references regulation).
-  - Prompt-injection guardrails on input.
-  - Static HTML chat page connected to the comparison result: pre-populated suggestion "¿Cómo cambio a [bestRate.tariffName] de [bestRate.company]?" using the comparison data from Milestone 3.
+  - Multi-turn conversation: `conversationId` returned as first SSE event; subsequent requests include it to continue the same thread. `ChatUseCase` finds the existing `Conversation` or creates a new one; history is passed to the LLM as alternating `UserMessage`/`AiMessage`.
+  - **No DB persistence for conversations** — `InMemoryAssistantRepository` is sufficient for Phase 1 anonymous use. Conversations are scoped to the server process lifetime; refreshing the browser starts a fresh thread, which is acceptable without user accounts. DB persistence is a Phase 2 concern alongside JWT auth.
+  - `POST /api/v1/assistant/chat` with SSE streaming: emits `conversation` (id), `token` (streamed text), `citations`, `[DONE]`.
+  - Citations wired: `ChatResult` carries `List<ChatCitation>` from the retrieved regulatory snippets; rendered as chips in the UI.
+  - Static HTML: full chat UI with invoice selector, suggestions, SSE token streaming, citation chips, comparison savings card.
 
-**Dependencies:** Milestone 1 (invoice fields), Milestone 2 (knowledge base), Milestone 3 (comparison result available as context seed for the first message).
+**Dependencies:** Milestone 1 (invoice fields), Milestone 2 (knowledge base), Milestone 3 (comparison result shown alongside chat).
 
-**Engineering highlights:** persistent multi-turn conversation history, dual-context RAG (direct invoice text + regulatory retrieval), SSE streaming, citation enforcement, prompt-injection guardrails.
+**Engineering highlights:** in-memory multi-turn conversation history, dual-context RAG (invoice text in system prompt + regulatory retrieval), SSE streaming with conversationId handshake, citation rendering.
 
 ### Milestone 6 — Evaluation Harness + Observability
 

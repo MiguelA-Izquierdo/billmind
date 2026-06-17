@@ -2,7 +2,7 @@ package dev.izquierdo.billmind.market.infrastructure.kafka.electricity;
 
 import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.infrastructure.kafka.KafkaEvent;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.market.application.command.SaveElectricityRateCommand;
 import dev.izquierdo.billmind.market.domain.exceptions.InvalidElectricityRateException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -63,7 +63,7 @@ class ElectricityPriceConsumerTest {
         verify(commandBus).dispatch(captor.capture());
         SaveElectricityRateCommand command = captor.getValue();
         assertThat(command.id()).isEqualTo(UUID.fromString(EVENT_ID));
-        assertThat(command.supplyType()).isEqualTo(InvoiceType.LUZ);
+        assertThat(command.supplyType()).isEqualTo(SupplyDomain.ELECTRICITY);
         assertThat(command.company()).isEqualTo("IBERDROLA");
         assertThat(command.tariffName()).isEqualTo("2.0TD");
         assertThat(command.pricePerKwh()).isEqualByComparingTo("0.150000");

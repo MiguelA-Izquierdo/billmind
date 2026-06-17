@@ -1,6 +1,6 @@
 package dev.izquierdo.billmind.invoice.domain.model;
 
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 
 import java.time.Instant;
@@ -11,7 +11,7 @@ public class Invoice {
     private final UUID id;
     private final String fileName;
     private final Instant uploadedAt;
-    private final InvoiceType supplyType;
+    private final SupplyDomain supplyType;
     private final String provider;
     private final UUID sessionId;
     private final InvoiceFields fields;
@@ -81,7 +81,7 @@ public class Invoice {
     public UUID getId()                        { return id; }
     public String getFileName()                { return fileName; }
     public Instant getUploadedAt()             { return uploadedAt; }
-    public InvoiceType getSupplyType()         { return supplyType; }
+    public SupplyDomain getSupplyType()         { return supplyType; }
     public String getProvider()                { return provider; }
     public UUID getSessionId()                 { return sessionId; }
     public InvoiceFields getFields()           { return fields; }
@@ -91,7 +91,7 @@ public class Invoice {
         private final UUID id;
         private final String fileName;
         private Instant uploadedAt;
-        private InvoiceType supplyType;
+        private SupplyDomain supplyType;
         private String provider;
         private UUID sessionId;
         private InvoiceFields fields;
@@ -103,7 +103,7 @@ public class Invoice {
         }
 
         public Builder uploadedAt(Instant uploadedAt)             { this.uploadedAt      = uploadedAt;      return this; }
-        public Builder supplyType(InvoiceType supplyType)         { this.supplyType      = supplyType;      return this; }
+        public Builder supplyType(SupplyDomain supplyType)         { this.supplyType      = supplyType;      return this; }
         public Builder provider(String provider)                  { this.provider        = provider;        return this; }
         public Builder sessionId(UUID sessionId)                  { this.sessionId       = sessionId;       return this; }
         public Builder fields(InvoiceFields fields)               { this.fields          = fields;          return this; }

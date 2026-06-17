@@ -39,15 +39,15 @@
   .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 7px 18px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; display: flex; align-items: center; gap: 7px; position: relative; }
   .filter-btn:not(.disabled):hover { border-color: var(--accent); color: var(--text); }
   .filter-btn.active { color: #fff; }
-  .filter-btn[data-type="LUZ"].active   { background: var(--elec); border-color: var(--elec); }
-  .filter-btn[data-type="GAS"].active   { background: var(--gas); border-color: var(--gas); color: #0f1117; }
-  .filter-btn[data-type="AGUA"].active  { background: var(--water); border-color: var(--water); color: #0f1117; }
-  .filter-btn[data-type="TELCO"].active { background: var(--tel); border-color: var(--tel); }
+  .filter-btn[data-type="ELECTRICITY"].active { background: var(--elec); border-color: var(--elec); }
+  .filter-btn[data-type="GAS"].active         { background: var(--gas); border-color: var(--gas); color: #0f1117; }
+  .filter-btn[data-type="WATER"].active       { background: var(--water); border-color: var(--water); color: #0f1117; }
+  .filter-btn[data-type="TELECOM"].active     { background: var(--tel); border-color: var(--tel); }
   .filter-btn .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .filter-btn[data-type="LUZ"] .dot   { background: var(--elec); }
-  .filter-btn[data-type="GAS"] .dot   { background: var(--gas); }
-  .filter-btn[data-type="AGUA"] .dot  { background: var(--water); }
-  .filter-btn[data-type="TELCO"] .dot { background: var(--tel); }
+  .filter-btn[data-type="ELECTRICITY"] .dot { background: var(--elec); }
+  .filter-btn[data-type="GAS"] .dot         { background: var(--gas); }
+  .filter-btn[data-type="WATER"] .dot       { background: var(--water); }
+  .filter-btn[data-type="TELECOM"] .dot     { background: var(--tel); }
   .filter-btn.disabled { cursor: not-allowed; opacity: .45; }
   .filter-btn.disabled .soon { font-size: 9px; background: var(--surf2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); margin-left: 2px; }
 
@@ -69,25 +69,25 @@
   .rates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
   .rate-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; cursor: pointer; transition: border-color .15s, transform .1s, box-shadow .15s; position: relative; overflow: hidden; }
   .rate-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; }
-  .rate-card[data-type="LUZ"]::before   { background: var(--elec); }
-  .rate-card[data-type="GAS"]::before   { background: var(--gas); }
-  .rate-card[data-type="AGUA"]::before  { background: var(--water); }
-  .rate-card[data-type="TELCO"]::before { background: var(--tel); }
+  .rate-card[data-type="ELECTRICITY"]::before { background: var(--elec); }
+  .rate-card[data-type="GAS"]::before         { background: var(--gas); }
+  .rate-card[data-type="WATER"]::before       { background: var(--water); }
+  .rate-card[data-type="TELECOM"]::before     { background: var(--tel); }
   .rate-card:hover { border-color: #444763; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
 
   .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px; }
   .tariff-name { font-size: 15px; font-weight: 600; flex: 1; }
   .supply-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
-  [data-type="LUZ"] .supply-badge   { background: rgba(245,166,35,.15); color: var(--elec); }
-  [data-type="GAS"] .supply-badge   { background: rgba(78,205,196,.15); color: var(--gas); }
-  [data-type="AGUA"] .supply-badge  { background: rgba(69,183,209,.15); color: var(--water); }
-  [data-type="TELCO"] .supply-badge { background: rgba(167,139,250,.15); color: var(--tel); }
+  [data-type="ELECTRICITY"] .supply-badge { background: rgba(245,166,35,.15); color: var(--elec); }
+  [data-type="GAS"] .supply-badge         { background: rgba(78,205,196,.15); color: var(--gas); }
+  [data-type="WATER"] .supply-badge       { background: rgba(69,183,209,.15); color: var(--water); }
+  [data-type="TELECOM"] .supply-badge     { background: rgba(167,139,250,.15); color: var(--tel); }
 
   .price-main { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
-  [data-type="LUZ"] .price-main   { color: var(--elec); }
-  [data-type="GAS"] .price-main   { color: var(--gas); }
-  [data-type="AGUA"] .price-main  { color: var(--water); }
-  [data-type="TELCO"] .price-main { color: var(--tel); }
+  [data-type="ELECTRICITY"] .price-main { color: var(--elec); }
+  [data-type="GAS"] .price-main         { color: var(--gas); }
+  [data-type="WATER"] .price-main       { color: var(--water); }
+  [data-type="TELECOM"] .price-main     { color: var(--tel); }
   .price-unit { font-size: 13px; color: var(--muted); font-weight: 400; }
 
   .card-details { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -184,10 +184,10 @@
 </div>
 
 <div class="filters" id="filters">
-  <button class="filter-btn active" data-type="LUZ"><span class="dot"></span> Electricidad</button>
+  <button class="filter-btn active" data-type="ELECTRICITY"><span class="dot"></span> Electricidad</button>
   <button class="filter-btn disabled" data-type="GAS"><span class="dot"></span> Gas <span class="soon">Próximamente</span></button>
-  <button class="filter-btn disabled" data-type="AGUA"><span class="dot"></span> Agua <span class="soon">Próximamente</span></button>
-  <button class="filter-btn disabled" data-type="TELCO"><span class="dot"></span> Telecom <span class="soon">Próximamente</span></button>
+  <button class="filter-btn disabled" data-type="WATER"><span class="dot"></span> Agua <span class="soon">Próximamente</span></button>
+  <button class="filter-btn disabled" data-type="TELECOM"><span class="dot"></span> Telecom <span class="soon">Próximamente</span></button>
 </div>
 
 <div class="stats" id="stats"></div>
@@ -197,7 +197,7 @@
 
 <script>
 const TODAY = new Date().toISOString().slice(0, 10);
-const supplyLabels = { LUZ: 'Electricidad', GAS: 'Gas', AGUA: 'Agua', TELCO: 'Telecom' };
+const supplyLabels = { ELECTRICITY: 'Electricidad', GAS: 'Gas', WATER: 'Agua', TELECOM: 'Telecom' };
 
 function getSessionId() {
   let id = localStorage.getItem('billmind-session-id');
@@ -211,7 +211,7 @@ document.getElementById('session-label').textContent = 'Sesión: ' + SESSION_ID.
 // tariffGroups: Map<key, [rates ordenados por receivedAt desc]>
 let allRates = [];
 let tariffGroups = new Map();
-let activeFilter = 'LUZ';
+let activeFilter = 'ELECTRICITY';
 
 // ── Colors ────────────────────────────────────────────────
 const PALETTE = [
@@ -312,7 +312,7 @@ function renderStats(filter) {
 function renderCard(r) {
   const key = `${r.company}||${r.supplyType}||${r.tariffName}`;
   const history = tariffGroups.get(key) ?? [r];
-  const isTelecom = r.supplyType === 'TELCO';
+  const isTelecom = r.supplyType === 'TELECOM';
   const isMulti   = r.pricePerKwh == null;
 
   let priceHtml;
@@ -370,7 +370,7 @@ function openDrawer(key) {
   document.getElementById('drawer-title').textContent = latest.tariffName;
   document.getElementById('drawer-subtitle').textContent = latest.company + ' · ' + (supplyLabels[latest.supplyType] ?? latest.supplyType);
 
-  const isTelecom = latest.supplyType === 'TELCO';
+  const isTelecom = latest.supplyType === 'TELECOM';
   const isMulti   = latest.pricePerKwh == null && !isTelecom;
 
   const rows = history.map((r, i) => {

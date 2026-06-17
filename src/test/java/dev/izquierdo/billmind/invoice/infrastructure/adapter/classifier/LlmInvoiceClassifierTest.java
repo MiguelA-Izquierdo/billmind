@@ -1,7 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier;
 
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class LlmInvoiceClassifierTest {
 
     @Test
     void shouldReturnParsedClassificationFromLlmResponse() {
-        InvoiceClassification expected = new InvoiceClassification(InvoiceType.LUZ, "IBERDROLA");
+        InvoiceClassification expected = new InvoiceClassification(SupplyDomain.ELECTRICITY, "IBERDROLA");
         when(chatModel.chat(anyString())).thenReturn("{\"tipo\":\"LUZ\",\"compania\":\"IBERDROLA\"}");
         when(responseParser.parse(anyString())).thenReturn(expected);
 
@@ -43,7 +43,7 @@ class LlmInvoiceClassifierTest {
     void shouldTruncateTextToHeaderCharsBeforeClassifying() {
         String longText = "A".repeat(300);
         when(chatModel.chat(anyString())).thenReturn("{}");
-        when(responseParser.parse(anyString())).thenReturn(new InvoiceClassification(InvoiceType.OTRO, "DESCONOCIDA"));
+        when(responseParser.parse(anyString())).thenReturn(new InvoiceClassification(SupplyDomain.OTHER, "DESCONOCIDA"));
 
         classifier.classify(longText);
 
@@ -103,7 +103,7 @@ class LlmInvoiceClassifierTest {
     @Test
     void shouldCollapseFragmentedTextBeforeClassifying() {
         when(chatModel.chat(anyString())).thenReturn("{}");
-        when(responseParser.parse(anyString())).thenReturn(new InvoiceClassification(InvoiceType.OTRO, "DESCONOCIDA"));
+        when(responseParser.parse(anyString())).thenReturn(new InvoiceClassification(SupplyDomain.OTHER, "DESCONOCIDA"));
 
         // >50% single-char tokens → should be collapsed ("I B E R D R O L A" → "IBERDROLA")
         String fragmented = "I B E R D R O L A CUPS E S 0 0 3 1 factura";
@@ -118,7 +118,7 @@ class LlmInvoiceClassifierTest {
     @Test
     void shouldNotCollapseNormalText() {
         when(chatModel.chat(anyString())).thenReturn("{}");
-        when(responseParser.parse(anyString())).thenReturn(new InvoiceClassification(InvoiceType.OTRO, "DESCONOCIDA"));
+        when(responseParser.parse(anyString())).thenReturn(new InvoiceClassification(SupplyDomain.OTHER, "DESCONOCIDA"));
 
         String normal = "IBERDROLA factura de electricidad período enero 2024 importe total";
         classifier.classify(normal);

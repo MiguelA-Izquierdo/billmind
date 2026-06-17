@@ -3,8 +3,27 @@ import { state } from './state.js';
 import { showOverlay, hideOverlay } from './overlay.js';
 import { showBanner, showComparisonResult } from './messages.js';
 import { loadInvoices } from './invoices.js';
+import { showBotToast } from './char-limit.js';
 
 const UPLOAD_ENDPOINT = '/api/v1/invoices';
+
+const SECTOR_NAMES = {
+  GAS:    'gas',
+  WATER:  'agua',
+  TELECOM: 'telefonía',
+  OTHER:  null,
+};
+
+function buildRejectionToast(backendMessage) {
+  const match  = backendMessage?.match(/suministro '(\w+)'/);
+  const type   = match?.[1];
+  const sector = SECTOR_NAMES[type];
+
+  if (sector) {
+    return `Sector de ${sector} detectado. Lo tenemos en el radar y lo estamos investigando. De momento, solo proceso facturas de electricidad.`;
+  }
+  return 'Esto no parece una factura de suministro del hogar. Más sectores en camino, ¡paciencia, humano!';
+}
 
 export function trigger() {
   document.getElementById('file-input').click();
@@ -53,7 +72,11 @@ export async function uploadFile(file) {
     const body = await res.json();
 
     if (!res.ok) {
-      showBanner(body.message ?? 'Error al subir la factura (HTTP ' + res.status + ')', 'error');
+      if (res.status === 422 && body.message?.includes('suministro')) {
+        showBotToast(buildRejectionToast(body.message));
+      } else {
+        showBanner(body.message ?? 'Error al subir la factura (HTTP ' + res.status + ')', 'error');
+      }
       hideOverlay(false);
       return;
     }

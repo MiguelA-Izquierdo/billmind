@@ -2,6 +2,7 @@ package dev.izquierdo.billmind.knowledge.application.command;
 
 import dev.izquierdo.billmind.knowledge.domain.model.DocType;
 import dev.izquierdo.billmind._shared.application.command.Command;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import java.util.UUID;
 public record IngestDocumentCommand(
         UUID docId,
         DocType docType,
+        SupplyDomain supplyDomain,
         String title,
         String source,
         String content,
@@ -19,6 +21,7 @@ public record IngestDocumentCommand(
     public IngestDocumentCommand {
         if (docId == null)                        throw new IllegalArgumentException("docId cannot be null");
         if (docType == null)                      throw new IllegalArgumentException("docType cannot be null");
+        if (supplyDomain == null)                 throw new IllegalArgumentException("supplyDomain cannot be null");
         if (title == null || title.isBlank())     throw new IllegalArgumentException("title cannot be blank");
         if (source == null || source.isBlank())   throw new IllegalArgumentException("source cannot be blank");
         if (content == null || content.isBlank()) throw new IllegalArgumentException("content cannot be blank");

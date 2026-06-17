@@ -4,7 +4,7 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceExcepti
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
-import dev.izquierdo.billmind._shared.domain.model.InvoiceType;
+import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceClassifier;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceFieldExtractor;
@@ -57,7 +57,7 @@ class UploadInvoiceUseCaseTest {
     void shouldSaveEnrichedInvoiceWhenValidSupplyInvoice() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("texto factura");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.LUZ, "IBERDROLA"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.ELECTRICITY, "IBERDROLA"));
         when(piiRedactor.redact(anyString())).thenReturn("texto redactado");
         when(fieldExtractor.extract(anyString(), any()))
                 .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null));
@@ -71,7 +71,7 @@ class UploadInvoiceUseCaseTest {
     void shouldThrowWhenNotASupplyInvoice() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("contrato de arrendamiento");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.OTRO, "MERCADONA"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.OTHER, "MERCADONA"));
 
         assertThatThrownBy(() -> uploadInvoiceUseCase.upload(invoice, pdfContent))
                 .isInstanceOf(NotASupplyInvoiceException.class);
@@ -83,7 +83,7 @@ class UploadInvoiceUseCaseTest {
     void shouldThrowWhenSupplyTypeIsGas() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("texto factura gas");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.GAS, "NATURGY"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.GAS, "NATURGY"));
 
         assertThatThrownBy(() -> uploadInvoiceUseCase.upload(invoice, pdfContent))
                 .isInstanceOf(UnsupportedSupplyTypeException.class);
@@ -95,7 +95,7 @@ class UploadInvoiceUseCaseTest {
     void shouldThrowWhenSupplyTypeIsAgua() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("texto factura agua");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.AGUA, "AGUAS DE MADRID"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.WATER, "AGUAS DE MADRID"));
 
         assertThatThrownBy(() -> uploadInvoiceUseCase.upload(invoice, pdfContent))
                 .isInstanceOf(UnsupportedSupplyTypeException.class);
@@ -107,7 +107,7 @@ class UploadInvoiceUseCaseTest {
     void shouldThrowWhenSupplyTypeIsTelco() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("texto factura telco");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.TELCO, "MOVISTAR"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.TELECOM, "MOVISTAR"));
 
         assertThatThrownBy(() -> uploadInvoiceUseCase.upload(invoice, pdfContent))
                 .isInstanceOf(UnsupportedSupplyTypeException.class);
@@ -119,7 +119,7 @@ class UploadInvoiceUseCaseTest {
     void shouldNotCallFieldExtractorWhenNotASupplyInvoice() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("contrato de arrendamiento");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.OTRO, "MERCADONA"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.OTHER, "MERCADONA"));
 
         assertThatThrownBy(() -> uploadInvoiceUseCase.upload(invoice, pdfContent))
                 .isInstanceOf(NotASupplyInvoiceException.class);
@@ -131,7 +131,7 @@ class UploadInvoiceUseCaseTest {
     void shouldNotCallFieldExtractorWhenSupplyTypeNotSupported() {
         when(invoiceParser.extractText(pdfContent)).thenReturn("texto factura gas");
         when(invoiceClassifier.classify(anyString()))
-                .thenReturn(new InvoiceClassification(InvoiceType.GAS, "NATURGY"));
+                .thenReturn(new InvoiceClassification(SupplyDomain.GAS, "NATURGY"));
 
         assertThatThrownBy(() -> uploadInvoiceUseCase.upload(invoice, pdfContent))
                 .isInstanceOf(UnsupportedSupplyTypeException.class);

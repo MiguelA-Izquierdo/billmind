@@ -25,12 +25,23 @@ public class ChatSsePublisher {
         this.objectMapper = objectMapper;
     }
 
+    public SseEmitter publishError(String errorMessage) {
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+        try {
+            send(emitter, Map.of("type", "error", "content", errorMessage));
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+        } catch (Exception ignored) {}
+        return emitter;
+    }
+
     public SseEmitter publish(Supplier<ChatResult> chatSupplier) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
 
         executor.execute(() -> {
             try {
                 ChatResult result = chatSupplier.get();
+                send(emitter, Map.of("type", "conversation", "id", result.conversationId().toString()));
                 send(emitter, Map.of("type", "token", "content", result.answer()));
                 send(emitter, Map.of("type", "citations", "items",
                         result.citations().stream()
