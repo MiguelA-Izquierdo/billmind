@@ -4,7 +4,8 @@ import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.application.query.QueryBus;
 import dev.izquierdo.billmind._shared.infrastructure.dto.SuccessResponseDTO;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
-import dev.izquierdo.billmind.comparison.application.usecase.CompareInvoiceUseCase;
+import dev.izquierdo.billmind.comparison.application.query.CompareInvoiceQuery;
+import dev.izquierdo.billmind.comparison.domain.model.ComparisonResult;
 import dev.izquierdo.billmind.comparison.infrastructure.controller.dto.ComparisonResponseDTO;
 import dev.izquierdo.billmind.invoice.application.command.UploadInvoiceCommand;
 import dev.izquierdo.billmind.invoice.application.query.GetInvoiceQuery;
@@ -20,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -31,15 +33,12 @@ public class InvoiceController {
     private final CommandBus commandBus;
     private final QueryBus queryBus;
     private final SessionContext sessionContext;
-    private final CompareInvoiceUseCase compareInvoiceUseCase;
 
     public InvoiceController(CommandBus commandBus, QueryBus queryBus,
-                              SessionContext sessionContext,
-                              CompareInvoiceUseCase compareInvoiceUseCase) {
-        this.commandBus           = commandBus;
-        this.queryBus             = queryBus;
-        this.sessionContext       = sessionContext;
-        this.compareInvoiceUseCase = compareInvoiceUseCase;
+                              SessionContext sessionContext) {
+        this.commandBus     = commandBus;
+        this.queryBus       = queryBus;
+        this.sessionContext = sessionContext;
     }
 
     @PostMapping
@@ -56,7 +55,8 @@ public class InvoiceController {
         if (invoice.getFields() == null) {
             log.info("Comparison skipped for invoice={} — field extraction produced no data", invoiceId);
         } else {
-            comparison = compareInvoiceUseCase.compare(invoice.getFields())
+            Optional<ComparisonResult> comparisonResult = queryBus.dispatch(new CompareInvoiceQuery(invoice.getFields()));
+            comparison = comparisonResult
                     .map(result -> {
                         log.debug("Comparison completed for invoice={} savings={}€ bestRate={}/{}",
                                 invoiceId, result.annualSavingsEuros(),
@@ -96,7 +96,8 @@ public class InvoiceController {
         if (invoice.getFields() == null) {
             return ResponseEntity.ok(SuccessResponseDTO.of(200, "Sin datos de extracción para comparar.", null));
         }
-        ComparisonResponseDTO comparison = compareInvoiceUseCase.compare(invoice.getFields())
+        Optional<ComparisonResult> comparisonResult = queryBus.dispatch(new CompareInvoiceQuery(invoice.getFields()));
+        ComparisonResponseDTO comparison = comparisonResult
                 .map(r -> {
                     log.debug("Comparison on select invoice={} savings={}€", id, r.annualSavingsEuros());
                     return ComparisonResponseDTO.from(r);

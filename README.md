@@ -105,6 +105,8 @@ src/main/java/dev/izquierdo/billmind/
 │   ├── application/            # CommandBus, QueryBus
 │   ├── domain/                 # DomainEvent, DomainEventPublisher, exceptions
 │   └── infrastructure/
+│       ├── auth/               # JwtAuthFilter, AdminRoutesService (external auth delegation)
+│       ├── adapter/            # ExternalAuthAdapter — calls external /introspect
 │       ├── dto/                # ErrorResponseDTO, SuccessResponseDTO
 │       ├── llm/                # TimedChatLanguageModel, ModelPricingRegistry
 │       ├── session/            # SessionContext, SessionFilter, SessionService
@@ -134,6 +136,16 @@ src/main/java/dev/izquierdo/billmind/
 ├── comparison/                 # Bounded Context: price comparison agent     [Roadmap M5]
 └── market/                     # Bounded Context: market rate ingestion      [Active — M2]
 ```
+
+---
+
+## Authentication model
+
+**Anonymous endpoints (Phase 1):** every request carries a client-generated UUID in `X-Session-Id`. The backend uses it to correlate resources (invoices, conversations) but does not authenticate the caller.
+
+**Admin endpoints:** BillMind never validates tokens itself. Authentication is fully delegated to an external user microservice. On each admin request `JwtAuthFilter` extracts the `Authorization: Bearer <token>` header and calls `GET <AUTH_EXTERNAL_URL>/introspect` on the external service. A `200` response authorises the request; any other response or connectivity error fails closed. Currently the only admin endpoint is `DELETE /api/v1/market-rates`. More admin routes are registered in `AdminRoutesService` without touching the filter.
+
+**Milestone 7:** user authentication will extend the same delegation model to user-facing endpoints rather than adding local JWT validation to BillMind.
 
 ---
 

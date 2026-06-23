@@ -11,5 +11,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addViewControllers(ViewControllerRegistry registry) {
         registry.addRedirectViewController("/chat", "/chat/index.html");
         registry.addRedirectViewController("/chat/", "/chat/index.html");
+        registry.addRedirectViewController("/market-rates", "/market-rates.html");
     }
 }

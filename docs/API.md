@@ -27,13 +27,27 @@ User-facing `message` strings are in Spanish.
 
 ## Authentication
 
-Phase 1 is anonymous. Every request must include an `X-Session-Id` header with a client-generated UUID. The backend correlates resources (invoices, conversations) to that UUID without authenticating it.
+BillMind never validates tokens itself — all authentication is delegated to an external user microservice (`AUTH_EXTERNAL_URL`).
+
+### Anonymous endpoints (Phase 1)
+
+Every request must include an `X-Session-Id` header with a client-generated UUID. The backend correlates resources (invoices, conversations) to that UUID without authenticating the caller.
 
 | Header | Example | Description |
 |---|---|---|
 | `X-Session-Id` | `550e8400-e29b-41d4-a716-446655440000` | Client-generated UUID identifying the visitor session |
 
 Missing or malformed `X-Session-Id` returns `400 Bad Request`.
+
+### Admin endpoints
+
+Admin operations require a Bearer token issued by the external user microservice.
+
+| Header | Example | Description |
+|---|---|---|
+| `Authorization` | `Bearer eyJ…` | JWT issued by the external auth service |
+
+On each admin request BillMind calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the Bearer token. A `200` response authorises the request; `401`/`403` or any connectivity error returns `401`/`403` to the caller respectively. Admin routes do **not** require `X-Session-Id`.
 
 ---
 
@@ -189,6 +203,42 @@ Returns a single invoice. Only responds if the `X-Session-Id` header matches the
 ```bash
 curl http://localhost:8082/api/v1/invoices/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
   -H "X-Session-Id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+---
+
+### DELETE /api/v1/market-rates
+
+Deletes all electricity rate records from the database. **Admin endpoint** — requires a valid Bearer token.
+
+**Headers**
+
+| Header | Required | Description |
+|---|---|---|
+| `Authorization` | Yes | `Bearer <token>` issued by the external auth service |
+
+**Responses**
+
+`200 OK`:
+```json
+{ "success": true, "status": 200, "message": "Todas las tarifas de mercado han sido eliminadas" }
+```
+
+`401 Unauthorized` — missing or absent `Authorization` header:
+```json
+{ "success": false, "status": 401, "message": "Se requiere autenticación para realizar esta operación" }
+```
+
+`403 Forbidden` — token present but rejected by the external auth service:
+```json
+{ "success": false, "status": 403, "message": "No tienes permisos para realizar esta operación" }
+```
+
+**Example**
+
+```bash
+curl -X DELETE http://localhost:8082/api/v1/market-rates \
+  -H "Authorization: Bearer eyJ…"
 ```
 
 ---

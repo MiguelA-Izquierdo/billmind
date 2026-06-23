@@ -140,6 +140,32 @@
   .modal-confirm { background: #ef4444; border: 1px solid #ef4444; color: #fff; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
   .modal-confirm:hover { background: #dc2626; }
 
+  /* ── Bot toast (portado de char-limit) ── */
+  .clt-toast { position: fixed; top: 50%; left: 50%; z-index: 9999; width: 440px; max-width: 92vw; pointer-events: none; opacity: 0; transform: translate(-50%,-50%) scale(.3) rotate(-8deg); transform-origin: center center; }
+  .clt-toast.clt-visible { animation: clt-pop .55s cubic-bezier(.34,1.56,.64,1) forwards; pointer-events: auto; }
+  .clt-toast.clt-hiding  { animation: clt-bye .3s ease-in forwards; }
+  @keyframes clt-pop { 0% { opacity:0; transform:translate(-50%,-50%) scale(.25) rotate(-10deg); } 60% { opacity:1; transform:translate(-50%,-50%) scale(1.06) rotate(1.5deg); } 80% { transform:translate(-50%,-50%) scale(.97) rotate(-.5deg); } 100% { opacity:1; transform:translate(-50%,-50%) scale(1) rotate(0); } }
+  @keyframes clt-bye { 0% { opacity:1; transform:translate(-50%,-50%) scale(1) rotate(0); } 100% { opacity:0; transform:translate(-50%,-50%) scale(.4) rotate(6deg); } }
+  .clt-bubble { background:var(--surface); border:2px solid rgba(108,111,245,.65); border-radius:24px; padding:28px 28px 24px; box-shadow:0 24px 64px rgba(0,0,0,.6),0 0 80px rgba(108,111,245,.12),inset 0 1px 0 rgba(255,255,255,.05); position:relative; overflow:hidden; }
+  .clt-bubble::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(108,111,245,.04) 3px,rgba(108,111,245,.04) 4px); pointer-events:none; border-radius:inherit; }
+  .clt-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .clt-bot { font-size:56px; line-height:1; display:inline-block; filter:drop-shadow(0 0 16px rgba(108,111,245,.8)); }
+  .clt-bot.clt-talk { animation:clt-talk .55s ease; }
+  @keyframes clt-talk { 0% { transform:scale(1) rotate(0); } 18% { transform:scale(1.35) rotate(-15deg); } 36% { transform:scale(1.25) rotate(12deg); } 54% { transform:scale(1.12) rotate(-7deg); } 72% { transform:scale(1.05) rotate(4deg); } 88% { transform:scale(1.01) rotate(-1deg); } 100% { transform:scale(1) rotate(0); } }
+  .clt-label { font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--accent); }
+  .clt-close { margin-left:auto; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:0 2px; line-height:1; flex-shrink:0; transition:color .15s; }
+  .clt-close:hover { color:var(--text); }
+  .clt-msg { font-size:13px; color:var(--muted); line-height:1.6; min-height:42px; white-space:pre-wrap; margin-top:4px; }
+  .clt-cursor { display:inline-block; width:2px; height:12px; background:var(--accent); border-radius:1px; vertical-align:middle; margin-left:1px; animation:cur-blink .7s step-end infinite; }
+  @keyframes cur-blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+  .clt-auth { margin-top:14px; display:flex; gap:8px; }
+  .clt-token-input { flex:1; min-width:0; background:var(--surf2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 12px; font-size:12px; font-family:'SF Mono','Fira Mono',monospace; outline:none; transition:border-color .15s; }
+  .clt-token-input:focus { border-color:var(--accent); }
+  .clt-token-input::placeholder { color:var(--muted); opacity:.6; }
+  .clt-retry-btn { background:var(--accent); border:none; color:#fff; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; transition:opacity .15s; }
+  .clt-retry-btn:hover { opacity:.85; }
+  .clt-retry-btn:disabled { opacity:.4; cursor:not-allowed; }
+
   /* ── States ── */
   .state-box { text-align: center; padding: 64px 32px; color: var(--muted); }
   .state-box .icon { font-size: 48px; margin-bottom: 12px; }
@@ -147,6 +173,7 @@
   .state-box.error p { color: #f87171; }
   .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 16px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
 </style>
 </head>
 <body>
@@ -157,6 +184,22 @@
   <button class="hdr-btn" onclick="loadRates()">↺ Recargar</button>
   <button class="hdr-btn" id="delete-btn" onclick="openConfirm()">🗑 Eliminar registros</button>
 </header>
+
+<!-- Bot toast -->
+<div id="bot-toast" class="clt-toast" aria-live="assertive" aria-atomic="true">
+  <div class="clt-bubble">
+    <div class="clt-header">
+      <span class="clt-bot" id="clt-bot">🤖</span>
+      <span class="clt-label">BillMind Bot</span>
+      <button class="clt-close" id="clt-close" onclick="closeBotToast()">✕</button>
+    </div>
+    <p class="clt-msg" id="clt-msg"></p>
+    <div class="clt-auth" id="clt-auth" style="display:none">
+      <input type="password" id="clt-token" class="clt-token-input" placeholder="eyJ…" autocomplete="off" onkeydown="if(event.key==='Enter') retryWithToken()"/>
+      <button class="clt-retry-btn" id="clt-retry-btn" onclick="retryWithToken()">Reintentar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Delete confirm modal -->
 <div class="modal-overlay" id="modal">
@@ -461,9 +504,70 @@ document.getElementById('filters').addEventListener('click', e => {
   render(btn.dataset.type);
 });
 
+// ── Bot toast ─────────────────────────────────────────────
+let _botHide = null;
+let _botType = null;
+
+// opts: { sticky: bool, showAuth: bool }
+function showBotToast(text, opts = {}) {
+  const { sticky = false, showAuth = false } = opts;
+  const toast = document.getElementById('bot-toast');
+  const bot   = document.getElementById('clt-bot');
+  const msg   = document.getElementById('clt-msg');
+  const auth  = document.getElementById('clt-auth');
+  if (!toast || !bot || !msg) return;
+
+  clearTimeout(_botHide);
+  clearTimeout(_botType);
+  toast.classList.remove('clt-visible', 'clt-hiding');
+  bot.classList.remove('clt-talk');
+  msg.textContent = '';
+  void toast.offsetWidth;
+
+  auth.style.display = showAuth ? '' : 'none';
+  if (showAuth) {
+    document.getElementById('clt-token').value = '';
+    setTimeout(() => document.getElementById('clt-token').focus(), 600);
+  }
+
+  toast.classList.add('clt-visible');
+  bot.classList.add('clt-talk');
+
+  let i = 0;
+  const cursor = document.createElement('span');
+  cursor.className = 'clt-cursor';
+  msg.appendChild(cursor);
+  const type = () => {
+    if (i < text.length) { cursor.before(text[i++]); _botType = setTimeout(type, 22); }
+    else setTimeout(() => cursor.remove(), 700);
+  };
+  _botType = setTimeout(type, 320);
+
+  if (!sticky) {
+    _botHide = setTimeout(() => {
+      toast.classList.remove('clt-visible');
+      toast.classList.add('clt-hiding');
+    }, 6000);
+  }
+}
+
+function closeBotToast() {
+  clearTimeout(_botHide);
+  clearTimeout(_botType);
+  const toast = document.getElementById('bot-toast');
+  toast.classList.remove('clt-visible');
+  toast.classList.add('clt-hiding');
+}
+
 // ── Delete ────────────────────────────────────────────────
 function openConfirm()  { document.getElementById('modal').classList.add('open'); }
 function closeConfirm() { document.getElementById('modal').classList.remove('open'); }
+
+async function deleteRates(token) {
+  const headers = { 'X-Session-Id': SESSION_ID };
+  if (token) headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+  return fetch('/api/v1/market-rates', { method: 'DELETE', headers });
+}
 
 async function confirmDelete() {
   closeConfirm();
@@ -471,7 +575,15 @@ async function confirmDelete() {
   btn.disabled = true;
   btn.textContent = 'Eliminando…';
   try {
-    const res = await fetch('/api/v1/market-rates', { method: 'DELETE', headers: { 'X-Session-Id': SESSION_ID } });
+    const res = await deleteRates(null);
+    if (res.status === 401) {
+      showBotToast('Token de autenticación no detectado. Protocolo de seguridad activado. El robot no borra nada sin credenciales.', { sticky: true, showAuth: true });
+      return;
+    }
+    if (res.status === 403) {
+      showBotToast('Credenciales insuficientes para operación destructiva. Solo administradores autorizados. Intento registrado.');
+      return;
+    }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     allRates = [];
     tariffGroups = new Map();
@@ -482,6 +594,33 @@ async function confirmDelete() {
   } finally {
     btn.disabled = false;
     btn.textContent = '🗑 Eliminar registros';
+  }
+}
+
+async function retryWithToken() {
+  const token   = document.getElementById('clt-token').value.trim();
+  const retryBtn = document.getElementById('clt-retry-btn');
+  if (!token) return;
+
+  retryBtn.disabled = true;
+  retryBtn.textContent = '…';
+  try {
+    const res = await deleteRates(token);
+    if (res.ok) {
+      closeBotToast();
+      allRates = [];
+      tariffGroups = new Map();
+      render(activeFilter);
+    } else {
+      showBotToast('No se pudo verificar tu acceso. Asegúrate de que el token es correcto o contacta con el administrador del servicio de autenticación.', { sticky: true, showAuth: true });
+    }
+  } catch (err) {
+    closeBotToast();
+    document.getElementById('main').innerHTML =
+      `<div class="state-box error"><div class="icon">⚠️</div><p>Error al eliminar: ${err.message}</p></div>`;
+  } finally {
+    retryBtn.disabled = false;
+    retryBtn.textContent = 'Reintentar';
   }
 }
 

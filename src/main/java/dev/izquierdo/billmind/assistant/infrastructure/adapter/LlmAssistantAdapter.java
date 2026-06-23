@@ -5,9 +5,11 @@ import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult.ChatCitation;
 import dev.izquierdo.billmind.assistant.domain.model.ConversationMessage;
+import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 import dev.izquierdo.billmind.assistant.domain.model.MessageRole;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
 import dev.izquierdo.billmind.assistant.domain.port.AssistantLlmPort;
@@ -35,18 +37,23 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
             Help users understand their invoices by answering questions clearly and accurately.
 
             Rules:
-            1. Base your answers ONLY on the invoice data and regulatory context provided below. Do not invent data.
+            1. Base your answers ONLY on the invoice data, market rates, and regulatory context provided below. Do not invent data.
             2. When referencing regulatory information, cite the source document title \
             (e.g. "según la guía de la tarifa 2.0TD de REE").
             3. Use the actual figures from the user's invoice when available.
-            4. If the question cannot be answered from the provided context, say so clearly.
-            5. Keep answers concise: maximum 3 short paragraphs. Use bullet points for lists.
-            6. Never repeat the full invoice data back to the user.
-            7. Respond in Spanish.
+            4. When comparing prices, use the market rates provided.
+            5. If the question cannot be answered from the provided context, say so clearly.
+            6. Keep answers concise: maximum 3 short paragraphs. Use bullet points for lists.
+            7. Never repeat the full invoice data back to the user.
+            8. Respond in Spanish.
 
             --- DATOS DE LA FACTURA ---
             %s
             --- FIN FACTURA ---
+
+            --- TARIFAS DE MERCADO ACTUALES ---
+            %s
+            --- FIN TARIFAS ---
 
             --- CONTEXTO REGULATORIO ---
             %s
@@ -60,9 +67,8 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
     }
 
     @Override
-    public ChatResult answer(InvoiceFields invoiceFields, List<RegulatorySnippet> context,
-                             String question, List<ConversationMessage> history) {
-        String systemContent = buildSystemContent(invoiceFields, context);
+    public ChatResult answer(ChatContext context, String question, List<ConversationMessage> history) {
+        String systemContent = buildSystemContent(context);
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(systemContent));
@@ -84,7 +90,7 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
 
         String answer = smartChatModel.chat(chatRequest).aiMessage().text();
 
-        List<ChatCitation> citations = context.stream()
+        List<ChatCitation> citations = context.regulatoryContext().stream()
                 .map(r -> new ChatCitation(r.title(), r.source(), r.docType()))
                 .distinct()
                 .toList();
@@ -92,22 +98,48 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
         return new ChatResult(null, answer, citations);
     }
 
-    private String buildSystemContent(InvoiceFields invoiceFields, List<RegulatorySnippet> context) {
-        String invoice = invoiceFields != null ? formatFields(invoiceFields) : "No se ha proporcionado factura.";
+    private String buildSystemContent(ChatContext context) {
+        String invoice = context.invoiceFields() != null
+                ? formatFields(context.invoiceFields()) : "No se ha proporcionado factura.";
+
+        String market = formatMarketRates(context.marketRates());
 
         String regulatory;
-        if (context.isEmpty()) {
+        if (context.regulatoryContext().isEmpty()) {
             regulatory = "Sin contexto regulatorio disponible.";
         } else {
             StringBuilder sb = new StringBuilder();
-            for (RegulatorySnippet chunk : context) {
+            for (RegulatorySnippet chunk : context.regulatoryContext()) {
                 sb.append("[Fuente: ").append(chunk.title()).append("]\n");
                 sb.append(chunk.content()).append("\n\n");
             }
             regulatory = sb.toString().stripTrailing();
         }
 
-        return SYSTEM_PROMPT_TEMPLATE.formatted(invoice, regulatory);
+        return SYSTEM_PROMPT_TEMPLATE.formatted(invoice, market, regulatory);
+    }
+
+    private String formatMarketRates(List<MarketRateSnapshot> rates) {
+        if (rates.isEmpty()) return "Sin datos de mercado disponibles.";
+        StringBuilder sb = new StringBuilder();
+        for (MarketRateSnapshot r : rates) {
+            sb.append(r.company()).append(" — ").append(r.tariffName())
+              .append(" (vigente desde ").append(r.validFrom()).append(")\n");
+            if (r.pricePerKwh() != null)
+                sb.append("  Precio plano: ").append(r.pricePerKwh()).append(" €/kWh\n");
+            if (r.pricePerKwhPunta() != null)
+                sb.append("  P1 (punta): ").append(r.pricePerKwhPunta()).append(" €/kWh\n");
+            if (r.pricePerKwhLlano() != null)
+                sb.append("  P2 (llano): ").append(r.pricePerKwhLlano()).append(" €/kWh\n");
+            if (r.pricePerKwhValle() != null)
+                sb.append("  P3 (valle): ").append(r.pricePerKwhValle()).append(" €/kWh\n");
+            if (r.contractedPowerPrice() != null)
+                sb.append("  Potencia P1: ").append(r.contractedPowerPrice()).append(" €/kW/día\n");
+            if (r.contractedPowerPriceP2() != null)
+                sb.append("  Potencia P2: ").append(r.contractedPowerPriceP2()).append(" €/kW/día\n");
+            sb.append("\n");
+        }
+        return sb.toString().stripTrailing();
     }
 
     private String formatFields(InvoiceFields fields) {

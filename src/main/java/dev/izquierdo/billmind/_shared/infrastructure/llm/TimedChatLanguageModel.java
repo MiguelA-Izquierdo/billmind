@@ -23,6 +23,8 @@ public class TimedChatLanguageModel implements ChatModel {
 
     private static final String BASE_PACKAGE = "dev.izquierdo.billmind";
 
+    private static final StackWalker STACK_WALKER = StackWalker.getInstance();
+
     public static final String MDC_OPERATION = "llm.operation";
     public static final String MDC_TYPE      = "llm.type";
 
@@ -62,19 +64,20 @@ public class TimedChatLanguageModel implements ChatModel {
 
     /**
      * MDC wins if set explicitly by the caller; otherwise the caller class+method is derived
-     * from the stack trace so callers never need to manage MDC themselves.
+     * from the stack so callers never need to manage MDC themselves. Uses {@link StackWalker},
+     * which lazily evaluates frames and short-circuits at the first match, avoiding the cost of
+     * materializing the entire stack trace ({@code Thread.getStackTrace()}) on every LLM call.
      */
     private static String resolveOperation() {
         String explicit = MDC.get(MDC_OPERATION);
         if (explicit != null) return explicit;
 
-        for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
-            String cls = frame.getClassName();
-            if (cls.startsWith(BASE_PACKAGE) && !cls.contains("TimedChatLanguageModel")) {
-                return simpleClassName(cls) + "." + frame.getMethodName();
-            }
-        }
-        return "unknown";
+        return STACK_WALKER.walk(frames -> frames
+                .filter(f -> f.getClassName().startsWith(BASE_PACKAGE)
+                        && !f.getClassName().contains("TimedChatLanguageModel"))
+                .map(f -> simpleClassName(f.getClassName()) + "." + f.getMethodName())
+                .findFirst()
+                .orElse("unknown"));
     }
 
     private static String simpleClassName(String fqcn) {

@@ -13,6 +13,7 @@ Reference for sessions where modules are designed or extended. Use with `@CLAUDE
 5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. See *LLM Provider Strategy* section below.
 6. **Domain Events** wired to Spring's `ApplicationEventPublisher`. The first active listener is introduced in Milestone 5, where `InvoiceProcessed` triggers the comparison pipeline.
 7. **Frontend-generated session UUID** — sent as `X-Session-Id` header. The backend correlates resources to it but does not authenticate (Phase 1 is anonymous). Auth lands in Milestone 7.
+10. **Admin route protection via external auth microservice** — destructive admin operations (e.g. `DELETE /api/v1/market-rates`) are guarded by `JwtAuthFilter` before `SessionFilter` runs. The filter delegates token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid and the request proceeds; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain. Admin routes are still declared as "public" in `PublicRoutesService` so `SessionFilter` skips them; `JwtAuthFilter` is the sole gatekeeper for those routes. Adding more admin routes requires only editing `AdminRoutesService.ADMIN_ROUTES`.
 8. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
 9. **English system prompts with "respond in Spanish" instruction** — small Ollama models follow English instructions more reliably; output language is controlled by an explicit instruction at the end of the prompt.
 
@@ -61,9 +62,40 @@ Gemini and Groq use Google's / Groq's OpenAI-compatible REST endpoints via `Open
 
 ---
 
-## Adding JWT authentication (Milestone 7)
+## Admin route protection (implemented — external auth delegation)
 
-- Spring Security filter in `_shared/infrastructure/security/`.
-- `JWT_SECRET` and `JWT_EXPIRATION` are read from `application.properties` via `@Value`.
-- A `SecurityFilterChain` bean configures protected endpoints.
+BillMind **never validates tokens itself**. All authentication is delegated to an external user microservice via `ExternalAuthPort`. This applies to admin routes today and will extend to all authenticated endpoints in Milestone 7.
+
+The filter chain for an incoming request:
+
+```
+JwtAuthFilter          ← only activates for routes in AdminRoutesService.ADMIN_ROUTES
+  └─ ExternalAuthAdapter.isAuthorized(bearerToken)
+       └─ GET <AUTH_EXTERNAL_URL>/introspect   (Authorization: Bearer <token>)
+            200 → true   →  chain continues
+            4xx / error  →  false → 401 or 403 returned immediately
+SessionFilter          ← skips admin routes (they stay in PublicRoutesService)
+  └─ requires X-Session-Id for all other /api/v1/ routes
+Controller
+```
+
+Key files:
+
+| File | Role |
+|---|---|
+| `_shared/domain/port/ExternalAuthPort` | Port — `isAuthorized(String bearerToken): boolean` |
+| `_shared/infrastructure/adapter/ExternalAuthAdapter` | Adapter — `GET /introspect`, fail-closed on any error |
+| `_shared/infrastructure/auth/JwtAuthFilter` | `OncePerRequestFilter` — extracts Bearer, calls port, rejects with 401/403 |
+| `_shared/infrastructure/auth/AdminRoutesService` | Declares which method+path pairs require JWT |
+| `_shared/infrastructure/config/SecurityConfig` | Registers `JwtAuthFilter` before `SessionFilter` |
+
+Config: `AUTH_EXTERNAL_URL` env var → `app.auth.external-url`.
+
+## Adding user authentication (Milestone 7)
+
+Authentication remains delegated to the external microservice — no local token validation is added to BillMind. The work for Milestone 7 is:
+
+- Extend `JwtAuthFilter` (or introduce a parallel filter) to cover user-facing endpoints, not just admin routes.
+- `ExternalAuthAdapter.isAuthorized` can be enriched to return the resolved subject/roles from the `/introspect` response if downstream logic needs them (e.g. scoping invoice queries to the authenticated user instead of the session UUID).
 - Migration: add nullable `user_id` to `sessions`; on login, link the current anonymous session to the new user. Anonymous historical invoices remain part of the dataset.
+- `JWT_SECRET` and `JWT_EXPIRATION` in `application.properties` are leftovers from an earlier approach and can be removed once Milestone 7 is scoped.

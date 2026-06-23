@@ -267,9 +267,10 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Deliverables:**
 
-- Spring Security + JWT (env vars already in `.env.example`).
+- **Authentication via external user microservice** (already established in Milestone 4 for admin routes). Milestone 7 extends that delegation model to user-facing endpoints — BillMind never validates tokens itself.
   - `users` table; nullable `user_id` migration on `sessions`.
   - Login that links the current anonymous session to the new user.
+  - Extend `JwtAuthFilter` / `AdminRoutesService` to cover authenticated user endpoints.
   - Rate limiting (per anonymous session and per user).
   - Semantic response cache.
   - PII redaction in logs.
@@ -278,7 +279,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Dependencies:** all previous.
 
-**Engineering highlights:** production security hardening (JWT, rate limiting, advanced prompt-injection defenses, PII redaction in logs), semantic response cache, anonymous-to-authenticated session migration, consolidated Flyway baseline.
+**Engineering highlights:** production security hardening (delegated auth, rate limiting, advanced prompt-injection defenses, PII redaction in logs), semantic response cache, anonymous-to-authenticated session migration, consolidated Flyway baseline.
 
 ### Milestone 8 — Minimal Frontend *(optional)*
 

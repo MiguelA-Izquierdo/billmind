@@ -2,8 +2,9 @@ package dev.izquierdo.billmind.invoice.infrastructure.controller;
 
 import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.application.query.QueryBus;
-import dev.izquierdo.billmind.comparison.application.usecase.CompareInvoiceUseCase;
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
+import dev.izquierdo.billmind._shared.domain.port.ExternalAuthPort;
+import dev.izquierdo.billmind._shared.infrastructure.auth.AdminRoutesService;
 import dev.izquierdo.billmind._shared.infrastructure.session.PublicRoutesService;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionService;
@@ -59,8 +60,13 @@ class InvoiceControllerTest {
     @MockitoBean
     private PublicRoutesService publicRoutesService;
 
+    // JwtAuthFilter is a Filter, so @WebMvcTest instantiates it; its collaborators are not part
+    // of the web slice and must be supplied as mocks.
     @MockitoBean
-    private CompareInvoiceUseCase compareInvoiceUseCase;
+    private ExternalAuthPort externalAuthPort;
+
+    @MockitoBean
+    private AdminRoutesService adminRoutesService;
 
     private static final UUID SESSION_ID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 

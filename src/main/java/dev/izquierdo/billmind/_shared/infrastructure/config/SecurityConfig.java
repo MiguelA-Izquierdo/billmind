@@ -1,5 +1,6 @@
 package dev.izquierdo.billmind._shared.infrastructure.config;
 
+import dev.izquierdo.billmind._shared.infrastructure.auth.JwtAuthFilter;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -21,12 +22,14 @@ import java.util.List;
 public class SecurityConfig {
 
     private final SessionFilter sessionFilter;
+    private final JwtAuthFilter jwtAuthFilter;
 
     @Value("${cors.allowed.origin}")
     private String allowedOrigin;
 
-    public SecurityConfig(SessionFilter sessionFilter) {
+    public SecurityConfig(SessionFilter sessionFilter, JwtAuthFilter jwtAuthFilter) {
         this.sessionFilter = sessionFilter;
+        this.jwtAuthFilter = jwtAuthFilter;
     }
 
     @Bean
@@ -36,7 +39,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .addFilterBefore(sessionFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(sessionFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthFilter, SessionFilter.class);
 
         return http.build();
     }
