@@ -103,6 +103,9 @@ services:
       - "8082:8082"
     environment:
       SERVER_PORT: 8082
+      # Actuator on a separate, internal-only port — intentionally NOT published
+      # under `ports:` so it stays unreachable from the host / public network.
+      MANAGEMENT_PORT: 8083
       DB_URL: jdbc:postgresql://postgres:5432/billmind
       DB_HOST: postgres
       DB_PORT: 5432
@@ -122,8 +125,15 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC_PARTITIONS: 3
       KAFKA_TOPIC_REPLICAS: 1
-      JWT_SECRET: dev-only-secret-change-in-production
-      JWT_EXPIRATION: 86400000
+    healthcheck:
+      # Liveness probe on the internal management port — reflects only livenessState,
+      # so it stays green regardless of Kafka being disabled or the DB being transiently down.
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Generous start period: Spring Boot startup + ONNX embedding model load.
+      start_period: 90s
     depends_on:
       postgres:
         condition: service_healthy

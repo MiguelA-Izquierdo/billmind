@@ -104,7 +104,7 @@ All LLM calls go through `TimedChatLanguageModel` (decorator overriding `chat(Ch
 - **Never** build queries with string concatenation (SQL Injection risk)
 - **Never** log sensitive data (credentials, invoice content, JWT tokens)
 - **Always** validate `MultipartFile`: MIME type, max size, file name
-- JWT configured via `JWT_SECRET` (minimum 32 chars) and `JWT_EXPIRATION` (default 86400000 ms)
+- Authentication delegated to an external microservice via `AUTH_EXTERNAL_URL` (Bearer token introspection)
 - CORS configured via `CORS_ALLOWED_ORIGIN` (never use `*` in production)
 
 ---

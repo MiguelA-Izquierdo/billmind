@@ -18,7 +18,7 @@ No login. The frontend generates a UUID per visitor and sends it as `X-Session-I
 
 ### Phase 2 — Authenticated (post-Milestone 7)
 
-Visitors can register to get persistent history, multiple invoices over time, and personalized recommendations. Existing sessions can be attached to a newly created user account.
+Visitors can register to get persistent history, multiple invoices over time, and personalized recommendations. **Identity is owned by an external user/identity microservice** — BillMind does not store credentials or manage accounts; it only links an existing anonymous session to the external `user_id` once the upstream service authenticates the visitor. This is the same delegation model already used for admin-route authentication today.
 
 ---
 
@@ -45,7 +45,7 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | SSE streaming + `conversationId` handshake | 5 | Real LLM UX with in-memory multi-turn |
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | Langfuse self-hosted | 6 | LLM observability |
-| Spring Security + JWT + rate limiting | 7 | Phase 2 |
+| Spring Security + delegated token validation (external identity service) + rate limiting | 7 | Phase 2 — no local user/credential storage |
 | Semantic response cache | 7 | Cost / latency |
 | Flyway migrations (consolidated initial migration) | 7 | Production-grade deployability before first release |
 
@@ -148,7 +148,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 ### Milestone 2 — Knowledge Base Ingestion + Hybrid Search + Market Price Consumer ✓ COMPLETE
 
-> **Electricity-first:** all milestones through Phase 1 target electricity invoices only (`InvoiceType.LUZ`). Uploading a gas, water, or telecom invoice returns HTTP 422 (`UnsupportedSupplyTypeException`). Support for other supply types is deferred to a later milestone.
+> **Electricity-first:** all milestones through Phase 1 target electricity invoices only (`SupplyDomain.ELECTRICITY`). Uploading a gas, water, or telecom invoice returns HTTP 422 (`UnsupportedSupplyTypeException`). Support for other supply types is deferred to a later milestone.
 
 **Objective:** populate the regulatory knowledge base, build the retrieval layer the assistant will use, and introduce event-driven market price ingestion via Kafka.
 
@@ -157,7 +157,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 - Apache Kafka (KRaft, no ZooKeeper) in `docker-compose.yml` under the `kafka` profile.
   - `spring-kafka` dependency in `pom.xml`.
   - Bounded context `market/` with:
-    - `ElectricityRate` aggregate: `id`, `supplyType` (`InvoiceType` enum), `company`, `tariffName`, `pricePerKwh` (nullable for TOU tariffs), `pricePerKwhValle`, `pricePerKwhLlano`, `pricePerKwhPunta` (nullable for flat-rate tariffs), `contractedPowerPrice`, `contractedPowerPriceP2` (both nullable), `validFrom`, `validTo`, `region`, `source`, `receivedAt`.
+    - `ElectricityRate` aggregate: `id`, `supplyType` (`SupplyDomain` enum), `company`, `tariffName`, `pricePerKwh` (nullable for TOU tariffs), `pricePerKwhValle`, `pricePerKwhLlano`, `pricePerKwhPunta` (nullable for flat-rate tariffs), `contractedPowerPrice`, `contractedPowerPriceP2` (both nullable), `validFrom`, `validTo`, `region`, `source`, `receivedAt`.
     - Port `ElectricityRateRepository`.
     - `electricity_rates` table (JPA entity).
   - `ElectricityPriceEvent` record (Kafka message schema for electricity, deserialized from JSON): `eventId`, `company`, `tariffName`, `pricePerKwh` (nullable for TOU), `pricePerKwhValle`, `pricePerKwhLlano`, `pricePerKwhPunta` (nullable for flat-rate), `contractedPowerPrice`, `contractedPowerPriceP2` (both nullable), `validFrom`, `validTo`, `region`, `source`, `publishedAt`. A `type` discriminator field is required; unknown types are sent directly to DLT. Future supply types add their own event records (`GasPriceEvent`, etc.).
@@ -263,14 +263,14 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 ### Milestone 7 — Production & Security (Phase 2)
 
-**Objective:** make the project deployable and add user accounts.
+**Objective:** make the project deployable and connect it to authenticated user identity. **User accounts are not built in BillMind** — identity, registration, login, credential storage and token issuance are fully delegated to an external user/identity microservice, exactly as admin-route authentication already works today (`JwtAuthFilter` + `AdminRoutesService`). Milestone 7 extends that same delegation model to user-facing endpoints.
 
 **Deliverables:**
 
-- **Authentication via external user microservice** (already established in Milestone 4 for admin routes). Milestone 7 extends that delegation model to user-facing endpoints — BillMind never validates tokens itself.
-  - `users` table; nullable `user_id` migration on `sessions`.
-  - Login that links the current anonymous session to the new user.
-  - Extend `JwtAuthFilter` / `AdminRoutesService` to cover authenticated user endpoints.
+- **Identity fully delegated to the external user microservice** (the model already in place for admin routes via `JwtAuthFilter` / `AdminRoutesService`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 7 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
+  - **No `users` table in BillMind.** `sessions` gains a nullable `user_id` column holding the opaque external user identifier — a foreign reference owned by the identity service, not a locally owned entity.
+  - Session linking: when an authenticated request arrives, BillMind associates the current anonymous session with the external `user_id` carried in the validated token. The registration and login flows themselves live entirely in the external service.
+  - Extend `JwtAuthFilter` / `AdminRoutesService` to cover authenticated user endpoints (same delegated-validation pattern as admin routes).
   - Rate limiting (per anonymous session and per user).
   - Semantic response cache.
   - PII redaction in logs.
@@ -279,7 +279,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Dependencies:** all previous.
 
-**Engineering highlights:** production security hardening (delegated auth, rate limiting, advanced prompt-injection defenses, PII redaction in logs), semantic response cache, anonymous-to-authenticated session migration, consolidated Flyway baseline.
+**Engineering highlights:** identity fully delegated to an external user microservice (no local credential/user storage), production security hardening (delegated token validation, rate limiting, advanced prompt-injection defenses, PII redaction in logs), semantic response cache, anonymous-to-external-user session linking, consolidated Flyway baseline.
 
 ### Milestone 8 — Minimal Frontend *(optional)*
 

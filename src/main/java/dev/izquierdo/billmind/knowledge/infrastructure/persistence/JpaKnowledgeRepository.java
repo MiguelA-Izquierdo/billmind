@@ -209,6 +209,10 @@ public class JpaKnowledgeRepository implements KnowledgeRepository {
     public long rebuildIndex() {
         String indexName = vectorTable + "_embedding_idx";
         try (Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn)) {
+                log.info("IVFFlat index skipped — table '{}' does not exist yet", vectorTable);
+                return 0;
+            }
             long rows = countRows(conn);
             if (rows < INDEX_MIN_ROWS) {
                 log.info("IVFFlat index skipped — {} vectors (need ≥{})", rows, INDEX_MIN_ROWS);
@@ -225,6 +229,17 @@ public class JpaKnowledgeRepository implements KnowledgeRepository {
             return rows;
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to rebuild IVFFlat index: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean tableExists(Connection conn) throws SQLException {
+        // to_regclass returns NULL (no exception) when the relation is absent.
+        try (PreparedStatement stmt = conn.prepareStatement("SELECT to_regclass(?)")) {
+            stmt.setString(1, vectorTable);
+            try (ResultSet rs = stmt.executeQuery()) {
+                rs.next();
+                return rs.getObject(1) != null;
+            }
         }
     }
 

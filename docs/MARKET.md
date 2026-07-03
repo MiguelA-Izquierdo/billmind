@@ -77,7 +77,7 @@ Events must be JSON with a `type` discriminator field:
   "data": [
     {
       "id": "1f1dcbbe-1f5d-4e06-bf27-5a44db91ef2a",
-      "supplyType": "LUZ",
+      "supplyType": "ELECTRICITY",
       "company": "Naturgy",
       "tariffName": "Tarifa Por Uso Luz",
       "pricePerKwh": 0.18500,

@@ -22,8 +22,10 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // Integration test for retrieval quality.
-// Seeds the knowledge base with 6 regulatory documents and evaluates recall@k and MRR
+// Seeds the knowledge base with 5 regulatory documents and evaluates recall@k and MRR
 // against a curated golden query set. Thresholds gate quality regressions in CI.
+// acceptedKeywords match against document titles (see KnowledgeSeedData); keep them in
+// sync with the seed corpus when documents are renamed or consolidated.
 //
 // Real stack: pgvector (TestContainers), AllMiniLM-L6-v2 (local ONNX), HybridKnowledgeSearchRepository.
 // Mocked: StartupReadinessChecker (health probes), InvoiceFieldExtractor (avoids LLM calls).
@@ -83,21 +85,21 @@ class HybridKnowledgeSearchRepositoryRetrievalIT {
 
     private static final List<QueryCase> GOLDEN_SET = List.of(
             new QueryCase("¿Qué es el CUPS en mi factura?",
-                    Set.of("glosario", "cómo leer")),
+                    Set.of("glosario", "general")),
             new QueryCase("qué significa el término de potencia en la factura de luz",
-                    Set.of("glosario", "cómo leer")),
+                    Set.of("glosario", "general")),
             new QueryCase("horas punta llano valle discriminación horaria electricidad",
-                    Set.of("2.0td")),
+                    Set.of("glosario", "ree")),
             new QueryCase("qué es la potencia P1 P2 contratada tarifa 2.0TD",
-                    Set.of("2.0td", "cómo leer")),
+                    Set.of("glosario", "peajes")),
             new QueryCase("¿me conviene el PVPC o tarifa fija del mercado libre?",
-                    Set.of("pvpc", "frecuentes")),
+                    Set.of("ree", "general")),
             new QueryCase("peajes acceso red CNMC metodología cargos sistema eléctrico",
-                    Set.of("peajes", "metodología")),
+                    Set.of("cnmc", "peajes")),
             new QueryCase("cómo leer entender factura electricidad conceptos desglose importe",
-                    Set.of("cómo leer", "frecuentes")),
+                    Set.of("general", "glosario")),
             new QueryCase("por qué me ha subido tanto la factura de luz este mes",
-                    Set.of("frecuentes", "cómo leer"))
+                    Set.of("general"))
     );
 
     private static final double MIN_RECALL_K3 = 0.625; // ≥ 5 / 8 queries hit at k=3

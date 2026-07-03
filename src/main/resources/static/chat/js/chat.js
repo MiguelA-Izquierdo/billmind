@@ -91,17 +91,15 @@ export async function sendMessage() {
 export async function checkBackendStatus() {
   const dot  = document.getElementById('kb-dot');
   const text = document.getElementById('kb-text');
+  // Actuator lives on a separate, internal-only management port and is not
+  // reachable from the browser by design. Derive status from the chat endpoint
+  // itself: a network failure means the service is down, a 404 means the
+  // assistant route is not ready yet, anything else means it is available.
   try {
-    const health = await fetch('/actuator/health', { headers: { 'X-Session-Id': SESSION_ID } });
-    const body   = await health.json();
-    const up     = body.status === 'UP';
-    const probe  = await fetch(CHAT_ENDPOINT, { method: 'OPTIONS', headers: { 'X-Session-Id': SESSION_ID } });
-    const ready  = probe.status !== 404;
+    const probe = await fetch(CHAT_ENDPOINT, { method: 'OPTIONS', headers: { 'X-Session-Id': SESSION_ID } });
+    const ready = probe.status !== 404;
 
-    if (!up) {
-      dot.className    = 'kb-dot offline';
-      text.textContent = 'Servicio no disponible';
-    } else if (!ready) {
+    if (!ready) {
       dot.className    = 'kb-dot pending';
       text.textContent = 'Asistente pendiente';
     } else {
@@ -109,8 +107,8 @@ export async function checkBackendStatus() {
       text.textContent = 'Asistente disponible';
     }
   } catch {
-    dot.className    = 'kb-dot pending';
-    text.textContent = 'Asistente pendiente';
+    dot.className    = 'kb-dot offline';
+    text.textContent = 'Servicio no disponible';
   }
 }
 

@@ -10,6 +10,11 @@
       "type": "string"
     },
     {
+      "key": "managementUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
       "key": "sessionId",
       "value": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "type": "string"
@@ -217,11 +222,11 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/actuator/health",
-              "host": ["{{baseUrl}}"],
+              "raw": "{{managementUrl}}/actuator/health",
+              "host": ["{{managementUrl}}"],
               "path": ["actuator", "health"]
             },
-            "description": "Spring Actuator health. Incluye estado de DB, Kafka, disco y probes de liveness/readiness."
+            "description": "Spring Actuator health en el puerto de gestión interno (8083), separado del puerto de aplicación. Un cliente sin autenticar solo ve {\"status\":\"UP\"}; el detalle de DB, Kafka, disco y probes de liveness/readiness es when-authorized."
           }
         }
       ]

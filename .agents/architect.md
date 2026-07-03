@@ -95,7 +95,7 @@ Before delivering any design, verify:
 |---|---|
 | `Invoice` | PDF invoice uploaded to the system |
 | `InvoiceClassification` | Result of classifying an invoice: type + issuing company |
-| `InvoiceType` | Enum: `LUZ`, `GAS`, `AGUA`, `TELCO`, `OTRO` |
+| `SupplyDomain` | Enum: `ELECTRICITY`, `GAS`, `WATER`, `TELECOM`, `OTHER` |
 | `InvoiceFields` | Structured fields extracted from the invoice (sealed hierarchy per type) |
 | `InvoiceParser` | Port: PDF bytes → plain text |
 | `InvoiceClassifier` | Port: plain text → `InvoiceClassification` |

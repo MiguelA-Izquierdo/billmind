@@ -98,4 +98,3 @@ Authentication remains delegated to the external microservice — no local token
 - Extend `JwtAuthFilter` (or introduce a parallel filter) to cover user-facing endpoints, not just admin routes.
 - `ExternalAuthAdapter.isAuthorized` can be enriched to return the resolved subject/roles from the `/introspect` response if downstream logic needs them (e.g. scoping invoice queries to the authenticated user instead of the session UUID).
 - Migration: add nullable `user_id` to `sessions`; on login, link the current anonymous session to the new user. Anonymous historical invoices remain part of the dataset.
-- `JWT_SECRET` and `JWT_EXPIRATION` in `application.properties` are leftovers from an earlier approach and can be removed once Milestone 7 is scoped.

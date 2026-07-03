@@ -35,10 +35,10 @@ WARN  [PII] LLM response rejected (len=12 vs input=1843), falling back to regex-
 WARN  [PII] LLM redaction failed (HttpTimeoutException), keeping regex-only result
 
 # Classifier — keyword shortcut taken (no LLM call)
-INFO  Keyword classification → type=LUZ, company=IBERDROLA
+INFO  Keyword classification → type=ELECTRICITY, company=IBERDROLA
 
 # Classifier — LLM required
-INFO  LLM classification → type=TELCO, company=MOVISTAR
+INFO  LLM classification → type=TELECOM, company=MOVISTAR
 ```
 
 ---
@@ -107,7 +107,12 @@ Package-private class (`_shared/infrastructure/llm/`) that holds approximate USD
 
 `spring-boot-starter-actuator` is already on the classpath. What remains is wiring custom `Counter` and `Timer` instruments for LLM calls and invoice processing.
 
-Target metrics to expose via `/actuator/metrics`:
+Actuator is exposed on a separate, internal-only management port (`8083` by default,
+override with `MANAGEMENT_PORT`), so the endpoints below are reached on that port — not
+the application port. Expanding `management.endpoints.web.exposure.include` to add
+`metrics`/`prometheus` will surface them there.
+
+Target metrics to expose via `/actuator/metrics` (on the management port):
 
 | Metric | Type | Tags |
 |---|---|---|

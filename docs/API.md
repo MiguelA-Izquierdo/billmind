@@ -141,7 +141,7 @@ Returns all invoices uploaded in the current session.
       "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "sessionId": "550e8400-e29b-41d4-a716-446655440000",
       "fileName": "factura_luz.pdf",
-      "supplyType": "LUZ",
+      "supplyType": "ELECTRICITY",
       "provider": "IBERDROLA",
       "uploadedAt": "2025-05-14T10:23:00Z"
     }
@@ -149,7 +149,7 @@ Returns all invoices uploaded in the current session.
 }
 ```
 
-`supplyType` values: `LUZ`, `GAS`, `AGUA`, `TELCO`, `OTRO`.
+`supplyType` values: `ELECTRICITY`, `GAS`, `WATER`, `TELECOM`, `OTHER`.
 
 **Example**
 
@@ -182,7 +182,7 @@ Returns a single invoice. Only responds if the `X-Session-Id` header matches the
     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "sessionId": "550e8400-e29b-41d4-a716-446655440000",
     "fileName": "factura_luz.pdf",
-    "supplyType": "LUZ",
+    "supplyType": "ELECTRICITY",
     "provider": "IBERDROLA",
     "uploadedAt": "2025-05-14T10:23:00Z"
   }
@@ -245,11 +245,17 @@ curl -X DELETE http://localhost:8082/api/v1/market-rates \
 
 ## Health
 
+Actuator is served on a separate, internal-only management port (`8083` by default,
+override with `MANAGEMENT_PORT`), **not** on the application port. It is intentionally
+not published by Docker so it stays unreachable from the host / public network — point
+Docker / Kubernetes liveness & readiness probes at it over the internal network.
+
 ```
-GET /actuator/health
+GET http://localhost:8083/actuator/health
 ```
 
-Returns Spring Boot Actuator health status. Useful for Docker / Kubernetes liveness probes.
+`show-details` is `when-authorized`: an unauthenticated caller only sees the status,
+while the DB / Kafka / disk breakdown and liveness/readiness probes require authorization.
 
 ```json
 { "status": "UP" }

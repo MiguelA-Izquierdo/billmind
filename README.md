@@ -42,7 +42,7 @@ PDF invoice
 ```
 PDF text
   │
-  ├─ blank? ──────────────────► rejected (OTRO / DESCONOCIDA)
+  ├─ blank? ──────────────────► rejected (OTHER / DESCONOCIDA)
   │
   ▼
 KeywordInvoiceClassifier ──── match? ──► LlmInvoiceClassifier.extractCompany()
@@ -114,7 +114,7 @@ src/main/java/dev/izquierdo/billmind/
 │
 ├── invoice/                    # Bounded Context: ingestion, extraction & persistence  [Active]
 │   ├── domain/
-│   │   ├── model/              # Invoice, InvoiceClassification, InvoiceType, InvoiceFields, ...
+│   │   ├── model/              # Invoice, InvoiceClassification, SupplyDomain, InvoiceFields, ...
 │   │   └── port/               # InvoiceParser, InvoiceClassifier, InvoiceFieldExtractor,
 │   │                           # InvoiceRepository, PiiRedactor
 │   ├── application/
@@ -163,12 +163,17 @@ Full reference (log levels, key log lines, validation thresholds, Micrometer roa
 ## Quick Start
 
 ```bash
-# Local AI (Ollama) + Kafka
-docker compose --profile local-ai --profile kafka up -d
+# Local AI (Ollama), no Kafka — the simplest start
+docker compose --profile local-ai up -d
 
-# Cloud LLM provider + Kafka (edit LLM_PROVIDER and add the API key in docker-compose.yml)
-docker compose --profile kafka up -d
+# Local AI (Ollama) + Kafka — requires KAFKA_ENABLED=true in .env
+KAFKA_ENABLED=true docker compose --profile local-ai --profile kafka up -d
+
+# Cloud LLM provider, no Kafka (edit LLM_PROVIDER and add the API key in docker-compose.yml)
+docker compose up -d
 ```
+
+Then open the chat UI at **http://localhost:8082/chat/**. First start with Ollama downloads the `llama3.2` model (~2 GB) before the app is usable.
 
 See [`docs/DOCKER.md`](docs/DOCKER.md) for the full setup guide, profile reference, and provider switching instructions.
 

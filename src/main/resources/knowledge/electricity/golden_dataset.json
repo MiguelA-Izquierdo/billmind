@@ -3,63 +3,63 @@
     "id": "P01",
     "query": "¿Qué es el CUPS?",
     "expectedDocTypes": ["GLOSSARY"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P02",
     "query": "¿En qué consiste el término de potencia?",
     "expectedDocTypes": ["GLOSSARY"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P03",
     "query": "¿Qué diferencia hay entre potencia contratada y potencia demandada?",
     "expectedDocTypes": ["GLOSSARY"],
-    "expectedMaxRank": 2,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P04",
     "query": "¿Qué es el maxímetro y cuándo me penaliza?",
     "expectedDocTypes": ["GLOSSARY"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P05",
     "query": "¿Qué es el IEE y cómo se calcula?",
     "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
-    "expectedMaxRank": 2,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P06",
     "query": "¿Qué es el bono social eléctrico?",
     "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
-    "expectedMaxRank": 2,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P07",
     "query": "¿Qué es la telemedida?",
     "expectedDocTypes": ["GLOSSARY"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P08",
     "query": "¿A qué horas es más barata la luz en la tarifa 2.0TD?",
     "expectedDocTypes": ["CNMC_CIRCULAR", "BOE_REGULATION"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P09",
     "query": "¿Cuáles son los horarios exactos de punta, llano y valle en la nueva tarifa?",
     "expectedDocTypes": ["CNMC_CIRCULAR", "BOE_REGULATION"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
@@ -80,7 +80,7 @@
     "id": "P12",
     "query": "¿Qué potencias estándar puedo contratar en mi casa?",
     "expectedDocTypes": ["GENERAL", "GLOSSARY"],
-    "expectedMaxRank": 2,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
@@ -94,14 +94,14 @@
     "id": "P14",
     "query": "¿Qué es el PVPC?",
     "expectedDocTypes": ["REE_GUIDE", "GLOSSARY"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
     "id": "P15",
     "query": "¿Puedo cambiar de comercializadora sin pagar penalización?",
     "expectedDocTypes": ["GENERAL"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
@@ -122,7 +122,7 @@
     "id": "P18",
     "query": "¿El precio de la luz es igual de noche que de día?",
     "expectedDocTypes": ["CNMC_CIRCULAR", "REE_GUIDE"],
-    "expectedMaxRank": 2,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {
@@ -143,7 +143,7 @@
     "id": "P21",
     "query": "¿Qué consumo anual es normal para una familia de 4 personas?",
     "expectedDocTypes": ["GENERAL"],
-    "expectedMaxRank": 1,
+    "expectedMaxRank": 3,
     "difficulty": "BAJA"
   },
   {

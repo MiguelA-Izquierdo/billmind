@@ -193,11 +193,10 @@ Uncomment and fill in your `.env` when connecting to a broker that requires SASL
 
 ---
 
-## JWT (Phase 2)
+## External authentication
 
-JWT auth is scaffolded for Phase 2 (Milestone 7). The variables are present but not enforced in Phase 1.
+Authentication is delegated to an external microservice — BillMind does not sign or validate tokens locally. `JwtAuthFilter` forwards the `Authorization: Bearer …` header to the service's introspection endpoint via `ExternalAuthPort`. In Phase 1 only admin routes are guarded; user-facing endpoints are opened up in Milestone 7.
 
 | Variable | Example | Description |
 |---|---|---|
-| `JWT_SECRET` | `≥32 chars` | Signing secret — minimum 32 characters |
-| `JWT_EXPIRATION` | `86400000` | Token TTL in milliseconds (default: 24 h) |
+| `AUTH_EXTERNAL_URL` | `http://localhost:8081` | Base URL of the auth microservice exposing `GET /introspect` |

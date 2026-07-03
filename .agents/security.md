@@ -14,7 +14,7 @@ Ensure BillMind is secure by design across all layers: REST API, file handling, 
 - **REST API** (port 8082): PDF upload endpoint, future search endpoints
 - **Files:** Processing PDFs uploaded by users (risk: malware, path traversal, zip bombs)
 - **Database:** PostgreSQL 16 with pgVector (risk: SQL Injection, invoice data exposure)
-- **Authentication:** JWT (configurable via `JWT_SECRET`, `JWT_EXPIRATION`)
+- **Authentication:** delegated to an external microservice via `ExternalAuthPort` (Bearer token introspection at `AUTH_EXTERNAL_URL`)
 - **LLM/Embeddings:** Local Ollama (risk: prompt injection in semantic searches)
 - **Docker:** PostgreSQL in container (risk: insecure configuration)
 - **Environment variables:** `.env` excluded from git (verify `.gitignore`)
@@ -59,11 +59,10 @@ If semantic search is implemented with invoice context in the Ollama prompt:
 - **Control:** Clearly separate system context from user input in prompts using the sandwich pattern
 - **Never** concatenate invoice content directly into the system prompt without sanitisation
 
-### 3. JWT Authentication
-Variables in `.env.example`:
-- `JWT_SECRET` — must be at least 32 characters, ideally 64+ random characters
-- `JWT_EXPIRATION` — 86400000 ms (24h). Consider reducing to 1h for access tokens
-- **Risks:** `none` algorithm, weak keys, non-expiring tokens, lack of revocation
+### 3. External Authentication
+- Auth is delegated to an external microservice via `ExternalAuthPort`; BillMind never signs or validates tokens locally.
+- `JwtAuthFilter` forwards the `Authorization: Bearer …` header to the introspection endpoint at `AUTH_EXTERNAL_URL`.
+- **Risks:** trusting introspection responses without TLS, missing timeouts/failure handling on the auth call, leaking the forwarded token in logs.
 
 ### 4. CORS Misconfiguration
 `CORS_ALLOWED_ORIGIN` variable:
@@ -106,7 +105,7 @@ The `GlobalExceptionHandler` logs full stack traces. In production:
 
 ### Configuration and infrastructure:
 - [ ] Is `.env` in `.gitignore`? ✓ (verified)
-- [ ] Does `JWT_SECRET` have at least 32 characters in `.env.example`?
+- [ ] Is the call to `AUTH_EXTERNAL_URL` made over TLS with a bounded timeout?
 - [ ] Is `show-sql=false` in production?
 - [ ] Does Docker Compose avoid exposing PostgreSQL on public interfaces?
 - [ ] Are dependencies up to date? (check CVEs in pom.xml)
