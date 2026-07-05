@@ -245,21 +245,22 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
 
 **Engineering highlights:** in-memory multi-turn conversation history, dual-context RAG (invoice text in system prompt + regulatory retrieval), SSE streaming with conversationId handshake, citation rendering.
 
-### Milestone 6 — Evaluation Harness + Observability
+### Milestone 6 — Evaluation Harness + Observability 🟡 PARTIAL
 
 **Objective:** introduce rigorous quality measurement and production observability — the engineering standard that separates a working prototype from a deployable AI system.
 
 **Deliverables:**
 
-- `_shared/eval/` module with a ~50-example golden set.
-  - RAGAS-style metrics: faithfulness, context precision, answer relevancy.
-  - Regression test in `mvn verify` that fails if quality drops.
-  - Self-hosted Langfuse with traces, tokens, latencies, estimated cost.
-  - Basic dashboard.
+- ✓ **RAGAS-style eval harness** (`src/test/java/.../eval/`, test scope) with a 50-example Spanish golden set (`src/test/resources/eval/rag_eval_dataset.json`). See `docs/EVAL.md`.
+  - ✓ **Hybrid metrics:** deterministic layer (context precision as docType Average Precision, context recall hit@k, reference coverage via embedding cosine) that always gates CI without an LLM, plus an opt-in LLM-judge layer (faithfulness via claim verification, answer relevancy, fact coverage) enabled with `EVAL_LLM_ENABLED=true`.
+  - ✓ Regression gate in `mvn verify` (`AssistantRagEvalIT`) — deterministic thresholds calibrated for AllMiniLM-L6-v2; pure metric unit tests in `RagasMetricsTest`.
+  - ✓ Micrometer + Actuator (Prometheus) instrumentation on an isolated management port — see `docs/OBSERVABILITY.md`. *(Delivered ahead of this milestone.)*
+  - ✓ Retrieval-only recall/MRR gate (`RagGoldenSetIT`, 30-question set) — predates this harness.
+  - ❌ **Remaining:** `eval_runs` persistence table (historical metric tracking); self-hosted Langfuse with traces, tokens, latencies, estimated cost + basic dashboard.
 
 **Dependencies:** Milestones 3, 5 (new numbering: comparison + chat).
 
-**Engineering highlights:** RAGAS-style metrics (faithfulness, context precision, answer relevancy), quality regression gate in CI, structured LLM observability with token and latency tracking.
+**Engineering highlights:** hybrid RAGAS-style metrics (deterministic embedding gate always green in CI + opt-in LLM-as-judge faithfulness), quality regression gate in CI, structured LLM observability with token and latency tracking.
 
 ### Milestone 7 — Production & Security (Phase 2)
 

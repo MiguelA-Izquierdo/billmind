@@ -103,6 +103,9 @@ Package-private class (`_shared/infrastructure/llm/`) that holds approximate USD
 
 ---
 
+> For the RAGAS-style LLM/RAG **quality** gate (faithfulness, context precision, answer
+> relevancy over a golden set), see `@docs/EVAL.md`. This section covers runtime metrics only.
+
 ## Micrometer integration (Milestone 6)
 
 `spring-boot-starter-actuator` + `micrometer-registry-prometheus` are on the classpath, and

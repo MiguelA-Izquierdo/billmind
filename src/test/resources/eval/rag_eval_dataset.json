@@ -1,0 +1,402 @@
+[
+  {
+    "id": "E01",
+    "question": "¿Qué es el CUPS y para qué sirve?",
+    "referenceAnswer": "El CUPS (Código Universal de Punto de Suministro) es un código alfanumérico único que identifica cada punto de suministro eléctrico en España. Empieza por 'ES' seguido de 20 dígitos y no cambia aunque se cambie de comercializadora o de titular. Es necesario para gestiones con la distribuidora y para cambiar de comercializadora.",
+    "expectedDocTypes": ["GLOSSARY"],
+    "mustIncludeFacts": ["CUPS", "punto de suministro", "ES"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E02",
+    "question": "¿Qué es el término de potencia en la factura eléctrica?",
+    "referenceAnswer": "El término de potencia es el componente fijo de la factura que depende de la potencia contratada y de los días del periodo, expresado en €/kW·año o €/kW·día. Se paga independientemente del consumo, como un abono por tener disponible esa potencia en la red.",
+    "expectedDocTypes": ["GLOSSARY"],
+    "mustIncludeFacts": ["término de potencia", "fijo", "potencia contratada"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E03",
+    "question": "¿Cuál es la diferencia entre potencia contratada y potencia demandada?",
+    "referenceAnswer": "La potencia contratada es la potencia máxima en kW que el consumidor tiene derecho a demandar según su contrato y determina el término de potencia. La potencia demandada es la que realmente se está consumiendo en un instante. Si la demandada supera la contratada de forma sostenida, puede activarse el maxímetro o saltar el ICP.",
+    "expectedDocTypes": ["GLOSSARY"],
+    "mustIncludeFacts": ["potencia contratada", "potencia demandada", "kW"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E04",
+    "question": "¿Qué es el maxímetro y cuándo penaliza?",
+    "referenceAnswer": "El maxímetro es un sistema que controla la potencia máxima demandada en un periodo. Cuando la potencia demandada supera en más de un 10% la potencia contratada, genera un cargo adicional por exceso de potencia. La penalización equivale a tres veces el precio del término de potencia por el exceso registrado.",
+    "expectedDocTypes": ["GLOSSARY"],
+    "mustIncludeFacts": ["maxímetro", "10%", "exceso"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E05",
+    "question": "¿Qué es el IEE y qué tipo se aplica?",
+    "referenceAnswer": "El Impuesto Especial sobre la Electricidad (IEE) es un impuesto indirecto que grava el consumo de electricidad. El tipo es del 5,11269% sobre la base imponible (término de potencia, energía y demás cargos, sin incluir el propio IEE ni el IVA). Se calcula antes que el IVA.",
+    "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
+    "mustIncludeFacts": ["IEE", "5,11269", "base imponible"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E06",
+    "question": "¿Qué es el bono social eléctrico?",
+    "referenceAnswer": "El bono social es un descuento sobre el precio PVPC para consumidores vulnerables: 25% para el consumidor vulnerable y 40% para el vulnerable severo. Lo gestiona la comercializadora de referencia y se aplica sobre el término de energía, no sobre los impuestos. Solo es compatible con el PVPC.",
+    "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
+    "mustIncludeFacts": ["bono social", "25%", "40%"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E07",
+    "question": "¿Qué significa la telemedida?",
+    "referenceAnswer": "La telemedida es el sistema de envío automático de los datos de consumo desde el contador inteligente a la distribuidora, sin necesidad de una visita presencial. Permite la facturación por lecturas reales horarias y que el consumidor consulte su curva de consumo.",
+    "expectedDocTypes": ["GLOSSARY"],
+    "mustIncludeFacts": ["telemedida", "contador inteligente", "distribuidora"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E08",
+    "question": "¿Qué es el PVPC?",
+    "referenceAnswer": "El PVPC (Precio Voluntario al Pequeño Consumidor) es la tarifa regulada de electricidad para consumidores con potencia contratada de hasta 10 kW. El precio de la energía varía hora a hora en función del mercado mayorista y lo ofrecen las comercializadoras de referencia. Es compatible con el bono social.",
+    "expectedDocTypes": ["GLOSSARY", "REE_GUIDE"],
+    "mustIncludeFacts": ["PVPC", "10 kW", "regulada"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E09",
+    "question": "¿Cuál es la diferencia entre comercializadora y distribuidora?",
+    "referenceAnswer": "La comercializadora es la empresa que te vende la electricidad y te emite la factura (Endesa, Iberdrola, Holaluz, etc.). La distribuidora gestiona la red que lleva la electricidad hasta tu casa (I-DE, E-Distribución, UFD, etc.) y no vende electricidad. Son entidades legalmente separadas aunque a veces pertenezcan al mismo grupo.",
+    "expectedDocTypes": ["GLOSSARY", "GENERAL"],
+    "mustIncludeFacts": ["comercializadora", "distribuidora", "red"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E10",
+    "question": "¿Qué es ESIOS?",
+    "referenceAnswer": "ESIOS es el portal de transparencia de datos del sistema eléctrico español, gestionado por Red Eléctrica de España (REE). Publica el precio horario del PVPC, los precios del mercado diario de OMIE, los perfiles de consumo y la producción por tecnología. Su dirección es esios.ree.es.",
+    "expectedDocTypes": ["GLOSSARY", "REE_GUIDE"],
+    "mustIncludeFacts": ["ESIOS", "REE", "precio"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E11",
+    "question": "¿Qué es el ATR o acceso de terceros a la red?",
+    "referenceAnswer": "El ATR (Acceso de Terceros a la Red) es el sistema que permite a cualquier comercializadora usar la red de las distribuidoras para llevar electricidad a sus clientes pagando los peajes de acceso. Garantiza que no haga falta ser propietario de la red para comercializar electricidad, lo que favorece la competencia.",
+    "expectedDocTypes": ["GLOSSARY", "BOE_REGULATION"],
+    "mustIncludeFacts": ["ATR", "peajes", "competencia"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E12",
+    "question": "¿Qué es una lectura estimada frente a una real?",
+    "referenceAnswer": "Una lectura real es la tomada directamente del contador por el lector o por telemedida. Una lectura estimada es la que calcula la distribuidora a partir del histórico cuando no puede tomar lectura real. Si difiere mucho del consumo real, al tomar una lectura real posterior se emite una factura de regularización.",
+    "expectedDocTypes": ["GLOSSARY", "GENERAL"],
+    "mustIncludeFacts": ["lectura estimada", "lectura real", "regularización"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E13",
+    "question": "¿Qué es el margen de comercialización?",
+    "referenceAnswer": "El margen de comercialización es lo que cobra la comercializadora por su servicio de gestión y suministro, por encima de los costes de energía, peajes e impuestos. En el PVPC está regulado y es fijo (en torno a 4 €/kW·año en el término de potencia); en el mercado libre es libre y varía según la comercializadora.",
+    "expectedDocTypes": ["GLOSSARY"],
+    "mustIncludeFacts": ["margen de comercialización", "PVPC", "mercado libre"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E14",
+    "question": "¿A qué horas es más barata la luz en la tarifa 2.0TD?",
+    "referenceAnswer": "En la 2.0TD las horas más baratas son el periodo valle (P3): de lunes a viernes de 00:00 a 08:00, y las 24 horas de sábados, domingos y festivos nacionales. El periodo punta (P1), el más caro, es de lunes a viernes de 10:00 a 14:00 y de 18:00 a 22:00.",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "BOE_REGULATION", "GLOSSARY"],
+    "mustIncludeFacts": ["valle", "P3", "00:00 a 08:00"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E15",
+    "question": "¿Cuáles son los tres periodos horarios de la 2.0TD y sus horas?",
+    "referenceAnswer": "La 2.0TD tiene tres periodos en días laborables: P1 punta (10:00-14:00 y 18:00-22:00), P2 llano (08:00-10:00, 14:00-18:00 y 22:00-00:00) y P3 valle (00:00-08:00). Los sábados, domingos y festivos nacionales son valle (P3) las 24 horas.",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "BOE_REGULATION"],
+    "mustIncludeFacts": ["P1", "P2", "P3"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E16",
+    "question": "¿Qué es la discriminación horaria?",
+    "referenceAnswer": "La discriminación horaria es un sistema de precios en el que el coste de la energía varía según la hora y el día. Con la 2.0TD, vigente desde junio de 2021, todos los consumidores domésticos tienen tres periodos: punta (P1), llano (P2) y valle (P3). Consumir en valle es mucho más barato que en punta.",
+    "expectedDocTypes": ["GLOSSARY", "REE_GUIDE"],
+    "mustIncludeFacts": ["discriminación horaria", "2.0TD", "valle"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E17",
+    "question": "¿Qué es un contador inteligente?",
+    "referenceAnswer": "Un contador inteligente es un equipo de medida digital que registra el consumo hora a hora y lo transmite automáticamente a la distribuidora mediante telemedida. Permite la facturación por horas reales y que el consumidor acceda a sus datos de consumo. En España su instalación masiva se completó hacia 2021.",
+    "expectedDocTypes": ["GLOSSARY", "REE_GUIDE"],
+    "mustIncludeFacts": ["contador inteligente", "telemedida", "hora a hora"],
+    "difficulty": "BAJA"
+  },
+  {
+    "id": "E18",
+    "question": "¿Qué son los cargos del sistema y quién los fija?",
+    "referenceAnswer": "Los cargos del sistema son componentes de la factura que financian obligaciones que no son infraestructura de red: primas a renovables, costes extrapeninsulares y anualidades del déficit tarifario. Los fija el Ministerio para la Transición Ecológica (MITECO) mediante Orden Ministerial y son iguales para todos los consumidores con la misma tarifa.",
+    "expectedDocTypes": ["GLOSSARY", "CNMC_CIRCULAR"],
+    "mustIncludeFacts": ["cargos del sistema", "MITECO", "déficit"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E19",
+    "question": "¿Qué diferencia hay entre peajes de acceso y cargos del sistema?",
+    "referenceAnswer": "Los peajes de acceso retribuyen el uso de las redes físicas de transporte y distribución y los fija la CNMC. Los cargos del sistema financian obligaciones que no son infraestructura de red (renovables, déficit, extrapeninsulares) y los fija el MITECO. Ambos aparecen integrados en el precio final de la factura.",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "GLOSSARY"],
+    "mustIncludeFacts": ["peajes", "cargos", "CNMC"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E20",
+    "question": "¿Qué establece la Circular 3/2020 de la CNMC?",
+    "referenceAnswer": "La Circular 3/2020, de 15 de enero, de la CNMC establece la metodología para el cálculo de los peajes de transporte y distribución de electricidad. Define la estructura en término de potencia y término de energía y los periodos horarios de las tarifas (tres para la 2.0TD y seis para la 3.0TD). Es el marco metodológico principal de peajes.",
+    "expectedDocTypes": ["CNMC_CIRCULAR"],
+    "mustIncludeFacts": ["Circular 3/2020", "peajes", "metodología"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E21",
+    "question": "¿Cuántos periodos tiene la tarifa 3.0TD y a quién aplica?",
+    "referenceAnswer": "La tarifa 3.0TD tiene seis periodos tarifarios (P1 a P6), diferenciados por hora y por estación del año. Aplica a consumidores con potencia contratada superior a 15 kW y hasta 450 kW conectados en baja tensión, típicamente pymes y pequeños negocios. Entró en vigor el 1 de junio de 2021.",
+    "expectedDocTypes": ["CNMC_CIRCULAR"],
+    "mustIncludeFacts": ["3.0TD", "seis periodos", "15 kW"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E22",
+    "question": "¿Cómo se estructuran los peajes de acceso?",
+    "referenceAnswer": "Los peajes de acceso se estructuran en dos términos: el término de potencia, un cargo fijo en €/kW·año que depende de la potencia contratada, y el término de energía, un cargo variable en €/kWh que depende de la energía consumida y del periodo horario. Los regula la CNMC y son iguales para todos los consumidores con la misma tarifa.",
+    "expectedDocTypes": ["CNMC_CIRCULAR"],
+    "mustIncludeFacts": ["término de potencia", "término de energía", "peajes"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E23",
+    "question": "¿Con qué periodicidad se revisan los peajes de acceso?",
+    "referenceAnswer": "Los peajes de acceso fijados por la CNMC se revisan anualmente, con publicación en el BOE antes del 1 de enero para entrar en vigor ese día. Los cargos del sistema del MITECO se revisan también anualmente por Orden Ministerial, y los componentes del PVPC se revisan con mayor frecuencia (el precio horario se calcula a diario).",
+    "expectedDocTypes": ["CNMC_CIRCULAR"],
+    "mustIncludeFacts": ["anual", "1 de enero", "BOE"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E24",
+    "question": "¿Qué pasos debo seguir para reclamar un error de facturación?",
+    "referenceAnswer": "Primero se reclama ante la comercializadora, que tiene un plazo de un mes para responder. Si no se resuelve y el error es de lectura o de peajes, se acude a la distribuidora. En última instancia, se puede reclamar ante la CNMC o el organismo regulador autonómico competente. Conviene guardar copia de todas las reclamaciones.",
+    "expectedDocTypes": ["CNMC_CIRCULAR", "GENERAL"],
+    "mustIncludeFacts": ["comercializadora", "1 mes", "CNMC"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E25",
+    "question": "¿Qué es la Ley 24/2013 del Sector Eléctrico?",
+    "referenceAnswer": "La Ley 24/2013, de 26 de diciembre, del Sector Eléctrico es la norma de cabecera del sector en España. Establece el marco para la generación, transporte, distribución y comercialización, y distingue las actividades reguladas (transporte y distribución) de las liberalizadas (generación y comercialización). Sus principios son la garantía de suministro, la sostenibilidad y la competencia.",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "mustIncludeFacts": ["Ley 24/2013", "sector eléctrico", "reguladas"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E26",
+    "question": "¿Qué regula el Real Decreto 216/2014?",
+    "referenceAnswer": "El Real Decreto 216/2014, de 28 de marzo, establece la metodología de cálculo del PVPC y las condiciones de los contratos de último recurso. Determina quién puede acogerse al PVPC (hasta 10 kW), cómo se calcula su precio y las obligaciones de las comercializadoras de referencia (CUR).",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "mustIncludeFacts": ["216/2014", "PVPC", "último recurso"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E27",
+    "question": "¿Qué introdujo la Orden TED/1161/2020?",
+    "referenceAnswer": "La Orden TED/1161/2020, de 4 de diciembre, estableció la nueva estructura de peajes vigente desde el 1 de junio de 2021. Introdujo las tarifas 2.0TD, 3.0TD y 6.XTD en sustitución de las antiguas, definió los tres periodos de la 2.0TD y los seis de la 3.0TD, y fijó el procedimiento de transición desde las tarifas anteriores.",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "mustIncludeFacts": ["TED/1161/2020", "2.0TD", "1 de junio de 2021"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E28",
+    "question": "¿Cuáles son las comercializadoras de referencia (CUR)?",
+    "referenceAnswer": "Las comercializadoras de referencia (CUR) están obligadas a ofrecer el PVPC a quien lo solicite. Son Endesa Energía XXI, Iberdrola Comercialización de Último Recurso, Naturgy Iberia, EDP Comercializadora de Último Recurso y Repsol Electricidad y Gas. Su margen de comercialización está regulado.",
+    "expectedDocTypes": ["BOE_REGULATION", "GLOSSARY"],
+    "mustIncludeFacts": ["CUR", "Endesa", "Iberdrola"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E29",
+    "question": "¿En qué consistió el tope ibérico al gas?",
+    "referenceAnswer": "El tope ibérico o mecanismo de ajuste de costes de producción de gas, aprobado por la UE para España y Portugal en 2022, fijó un precio máximo al gas usado en la generación eléctrica (desde 40 €/MWh subiendo hasta 70 €/MWh). El sobrecoste lo pagaban los consumidores como ajuste, pero el pool se calculaba con gas más barato, reduciendo el precio del mercado entre junio de 2022 y diciembre de 2023.",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "mustIncludeFacts": ["tope ibérico", "gas", "40"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E30",
+    "question": "¿Cómo ha evolucionado el IVA de la electricidad desde 2021?",
+    "referenceAnswer": "El IVA general en España es del 21%, pero la electricidad recibió tipos reducidos como medida de emergencia: bajó al 10% en agosto de 2021 (por el Real Decreto-ley 17/2021) y en 2023 llegó a aplicarse el 5% e incluso el 0% en algún periodo. El tipo aplicable depende de la normativa vigente en cada mes.",
+    "expectedDocTypes": ["BOE_REGULATION", "GLOSSARY"],
+    "mustIncludeFacts": ["IVA", "21%", "10%"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E31",
+    "question": "¿Qué medidas introdujo el Real Decreto-ley 17/2021?",
+    "referenceAnswer": "El Real Decreto-ley 17/2021, de 26 de julio, introdujo medidas urgentes ante la crisis energética: reducción temporal del IVA eléctrico del 21% al 10%, suspensión temporal del IVPEE ('impuesto al sol'), reducción de los cargos del sistema y la minoración de la retribución extraordinaria de nucleares e hidráulicas sin emisiones de CO2.",
+    "expectedDocTypes": ["BOE_REGULATION"],
+    "mustIncludeFacts": ["17/2021", "IVA", "cargos del sistema"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E32",
+    "question": "¿Cómo se calcula el precio horario del PVPC?",
+    "referenceAnswer": "El precio del PVPC para cada hora del día siguiente se publica por la tarde del día anterior en ESIOS. Se calcula sumando el precio del mercado diario (pool de OMIE), los servicios de ajuste, el peaje de energía del periodo y los cargos. La factura multiplica el precio de cada hora por el consumo de esa hora, lo que exige contador inteligente con telemedida.",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "mustIncludeFacts": ["PVPC", "ESIOS", "mercado diario"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E33",
+    "question": "¿Cómo funciona el mercado diario o pool de electricidad?",
+    "referenceAnswer": "El mercado diario lo gestiona OMIE como una subasta: los productores ofertan a qué precio venden su energía hora a hora y los compradores indican cuánta necesitan. OMIE cruza oferta y demanda y fija un precio marginalista, en el que la última unidad necesaria para cubrir la demanda determina el precio de toda la energía de esa hora.",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "mustIncludeFacts": ["OMIE", "marginalista", "subasta"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E34",
+    "question": "¿Qué factores afectan al precio del mercado mayorista?",
+    "referenceAnswer": "El precio del pool depende sobre todo del precio del gas natural (las centrales de ciclo combinado suelen fijar el precio marginal), de la producción renovable (con mucho viento o sol el precio baja), de la demanda, del precio del CO2 y de las interconexiones y la hidráulica. Cuando sube el gas, sube el precio de la luz.",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "mustIncludeFacts": ["gas natural", "renovable", "CO2"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E35",
+    "question": "¿Qué es el perfil de consumo y por qué importa?",
+    "referenceAnswer": "El perfil de consumo es la distribución temporal del consumo eléctrico, es decir cuánta energía se consume en cada hora o periodo. Es imprescindible para calcular el coste en tarifas con discriminación horaria, porque un mismo consumo mensual total puede tener costes muy distintos según cuándo se concentre.",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "mustIncludeFacts": ["perfil de consumo", "discriminación horaria", "hora"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E36",
+    "question": "¿Qué es un perfil sintético de consumo?",
+    "referenceAnswer": "Un perfil sintético es una curva normalizada que representa el comportamiento promedio de los consumidores según su tarifa. La distribuidora lo aplica para repartir el consumo total entre las horas cuando el contador no tiene telemedida o no envía lecturas horarias. REE los publica en ESIOS y se usan para liquidar el PVPC sin datos reales.",
+    "expectedDocTypes": ["REE_GUIDE"],
+    "mustIncludeFacts": ["perfil sintético", "telemedida", "ESIOS"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E37",
+    "question": "¿Qué diferencias hay entre el PVPC y el mercado libre?",
+    "referenceAnswer": "En el PVPC el precio de la energía varía hora a hora y está regulado por la CNMC/MITECO, sin permanencia y compatible con el bono social. En el mercado libre el precio lo pacta libremente el consumidor con la comercializadora (fijo, indexado o con periodos propios), puede tener permanencia y no es compatible con el bono social. Los peajes e impuestos son iguales en ambos.",
+    "expectedDocTypes": ["REE_GUIDE", "GENERAL"],
+    "mustIncludeFacts": ["PVPC", "mercado libre", "peajes"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E38",
+    "question": "¿Cómo se calcula el término de energía de la factura?",
+    "referenceAnswer": "El término de energía es la parte variable que depende de los kWh consumidos, expresada en €/kWh y con distinto precio por periodo. Se calcula sumando el consumo de cada periodo por su precio: consumo P1 × precio P1 + consumo P2 × precio P2 + consumo P3 × precio P3.",
+    "expectedDocTypes": ["GLOSSARY", "GENERAL"],
+    "mustIncludeFacts": ["término de energía", "kWh", "P1"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E39",
+    "question": "¿Cómo se calcula el término de potencia?",
+    "referenceAnswer": "El término de potencia se calcula multiplicando la potencia contratada en kW por el precio unitario en €/kW·año y por los días facturados divididos entre 365. Es un importe fijo que se paga independientemente del consumo de energía.",
+    "expectedDocTypes": ["GLOSSARY", "GENERAL"],
+    "mustIncludeFacts": ["término de potencia", "potencia contratada", "días"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E40",
+    "question": "¿Por qué puede haber subido mi factura este mes?",
+    "referenceAnswer": "Las causas más habituales son: aumento real del consumo (más días en casa, calefacción o refrigeración), una factura de regularización tras lecturas estimadas, más días en el periodo, subida del precio del mercado mayorista si estás en PVPC o indexado, subida de peajes o cargos en enero, o el fin de una reducción temporal de IVA o IEE.",
+    "expectedDocTypes": ["GENERAL"],
+    "mustIncludeFacts": ["consumo", "regularización", "mercado"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E41",
+    "question": "¿Qué es el pico de potencia y por qué salta el ICP?",
+    "referenceAnswer": "El pico de potencia es el momento de mayor demanda simultánea en el hogar. Si al usar varios aparatos a la vez la demanda total supera la potencia contratada, el ICP (Interruptor de Control de Potencia) salta y corta el suministro. Las soluciones son apagar aparatos, escalonar su uso o contratar más potencia.",
+    "expectedDocTypes": ["GENERAL"],
+    "mustIncludeFacts": ["pico de potencia", "ICP", "potencia contratada"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E42",
+    "question": "¿Qué potencia me conviene contratar en casa?",
+    "referenceAnswer": "Depende de los aparatos y de cuántos se usan a la vez. Como orientación: 2,3 kW para lo muy básico, 3,45 kW para cocina modesta, 4,6 kW para un hogar medio con vitrocerámica y lavadora, 5,75 kW para varios grandes electrodomésticos simultáneos y 6,9 kW o más con aire acondicionado o inducción potente. Contratar de más encarece el término de potencia; de menos, provoca cortes.",
+    "expectedDocTypes": ["GENERAL"],
+    "mustIncludeFacts": ["4,6 kW", "5,75 kW", "potencia"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E43",
+    "question": "¿Puedo cambiar de comercializadora sin coste?",
+    "referenceAnswer": "En la mayoría de casos sí. Si el contrato no tiene permanencia, puedes cambiar en cualquier momento sin penalización; si la tiene y cancelas antes de plazo, la comercializadora puede cobrar la penalización pactada. El proceso lo gestiona la nueva comercializadora, no hay corte de suministro, suele tardar entre 15 y 30 días y los peajes no cambian.",
+    "expectedDocTypes": ["GENERAL"],
+    "mustIncludeFacts": ["permanencia", "sin coste", "peajes"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E44",
+    "question": "¿Qué consumo anual es normal para un hogar español?",
+    "referenceAnswer": "Como referencia: una persona en un piso pequeño consume entre 1.200 y 2.000 kWh al año, dos personas entre 2.500 y 3.500 kWh, una familia de 3-4 personas entre 3.500 y 5.500 kWh, y con calefacción eléctrica puede superar los 6.000 kWh. Los valores varían mucho según el clima, el aislamiento y los hábitos.",
+    "expectedDocTypes": ["GENERAL"],
+    "mustIncludeFacts": ["kWh", "hogar", "año"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E45",
+    "question": "¿Cómo se calcula el coste de usar un electrodoméstico?",
+    "referenceAnswer": "El coste se calcula multiplicando la potencia del aparato en kW por las horas de uso y por el precio de la energía en €/kWh. Por ejemplo, una lavadora de 2 kW funcionando 1,5 horas en valle a 0,10 €/kWh cuesta 0,30 €; el mismo ciclo en punta a 0,25 €/kWh costaría 0,75 €.",
+    "expectedDocTypes": ["GENERAL"],
+    "mustIncludeFacts": ["potencia", "horas", "kWh"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E46",
+    "question": "¿Cómo puedo aprovechar la discriminación horaria para ahorrar?",
+    "referenceAnswer": "Conviene desplazar los consumos altos (lavadora, lavavajillas, secadora, carga del coche eléctrico) al periodo valle, en horas nocturnas y fines de semana, cuando el precio es el más bajo. Hay que minimizar los grandes consumos en punta (mediodía y tarde-noche de días laborables), ya que el precio en P1 puede ser 3 o 4 veces mayor que en P3.",
+    "expectedDocTypes": ["REE_GUIDE", "GENERAL"],
+    "mustIncludeFacts": ["valle", "punta", "ahorro"],
+    "difficulty": "MEDIA"
+  },
+  {
+    "id": "E47",
+    "question": "¿Qué impuestos y cargos lleva una factura eléctrica doméstica?",
+    "referenceAnswer": "Una factura doméstica incluye el término de potencia y el de energía, el alquiler del contador, el IEE (5,11269% sobre la base imponible) y el IVA (tipo vigente en el periodo, aplicado sobre el total incluyendo el IEE). El IEE se calcula antes que el IVA, y el alquiler del contador tributa al IVA general del 21%.",
+    "expectedDocTypes": ["GENERAL", "GLOSSARY", "BOE_REGULATION"],
+    "mustIncludeFacts": ["IEE", "IVA", "alquiler"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E48",
+    "question": "¿Cómo afecta el precio del gas natural a mi factura de la luz?",
+    "referenceAnswer": "Las centrales de gas de ciclo combinado suelen ser las 'marginales' que fijan el precio del pool en muchas horas. Por eso, cuando sube el precio del gas natural en los mercados internacionales, sube el precio de la electricidad, y cuando baja el gas o hay mucha renovable, la electricidad se abarata. El efecto es directo para quien está en PVPC o indexado.",
+    "expectedDocTypes": ["REE_GUIDE", "GENERAL"],
+    "mustIncludeFacts": ["gas natural", "marginal", "pool"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E49",
+    "question": "¿Qué es el régimen retributivo específico de las renovables?",
+    "referenceAnswer": "El régimen retributivo específico, antes llamado 'primas a las renovables', es el sistema de incentivos económicos a la generación con fuentes renovables, cogeneración de alta eficiencia y residuos. Se financia mediante los cargos del sistema que pagan todos los consumidores y fue reformado por el Real Decreto 413/2014 tras la crisis del déficit tarifario.",
+    "expectedDocTypes": ["GLOSSARY", "CNMC_CIRCULAR"],
+    "mustIncludeFacts": ["régimen retributivo específico", "renovables", "cargos"],
+    "difficulty": "ALTA"
+  },
+  {
+    "id": "E50",
+    "question": "¿Quién tiene derecho al bono social y cómo se solicita?",
+    "referenceAnswer": "Tienen derecho al bono social los consumidores vulnerables con potencia hasta 10 kW y rentas bajas, pensionistas con pensión mínima, familias numerosas, víctimas de violencia de género o desempleados con prestación agotada. Se solicita a la comercializadora de referencia aportando la documentación, con resolución en un máximo de 15 días hábiles. El descuento es del 25% (vulnerable) o 40% (vulnerable severo).",
+    "expectedDocTypes": ["BOE_REGULATION", "GLOSSARY"],
+    "mustIncludeFacts": ["bono social", "vulnerable", "10 kW"],
+    "difficulty": "ALTA"
+  }
+]
