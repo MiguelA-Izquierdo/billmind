@@ -13,11 +13,15 @@ import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceExcepti
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import dev.izquierdo.billmind._shared.infrastructure.config.SecurityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.mock.web.MockMultipartFile;
@@ -39,8 +43,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InvoiceController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, InvoiceControllerTest.MetricsTestConfig.class})
 class InvoiceControllerTest {
+
+    // The web slice does not include metrics auto-configuration; the controller needs a
+    // real MeterRegistry to build its upload timer (a mock would return null).
+    @TestConfiguration
+    static class MetricsTestConfig {
+        @Bean
+        MeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;

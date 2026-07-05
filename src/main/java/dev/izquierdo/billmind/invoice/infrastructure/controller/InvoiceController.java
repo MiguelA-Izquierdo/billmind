@@ -13,6 +13,8 @@ import dev.izquierdo.billmind.invoice.application.query.GetSessionInvoicesQuery;
 import dev.izquierdo.billmind.invoice.domain.model.Invoice;
 import dev.izquierdo.billmind.invoice.infrastructure.controller.dto.InvoiceResponse;
 import dev.izquierdo.billmind.invoice.infrastructure.controller.dto.InvoiceUploadResponse;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -33,12 +35,14 @@ public class InvoiceController {
     private final CommandBus commandBus;
     private final QueryBus queryBus;
     private final SessionContext sessionContext;
+    private final Timer uploadTimer;
 
     public InvoiceController(CommandBus commandBus, QueryBus queryBus,
-                              SessionContext sessionContext) {
+                              SessionContext sessionContext, MeterRegistry meterRegistry) {
         this.commandBus     = commandBus;
         this.queryBus       = queryBus;
         this.sessionContext = sessionContext;
+        this.uploadTimer    = Timer.builder("invoice.upload.duration").register(meterRegistry);
     }
 
     @PostMapping
@@ -48,7 +52,7 @@ public class InvoiceController {
         UUID invoiceId = UUID.randomUUID();
         UUID sessionId = sessionContext.getSessionId();
         UploadInvoiceCommand command = new UploadInvoiceCommand(invoiceId, sessionId, file.getOriginalFilename(), file.getBytes());
-        commandBus.dispatch(command);
+        uploadTimer.record(() -> commandBus.dispatch(command));
 
         Invoice invoice = queryBus.dispatch(new GetInvoiceQuery(invoiceId, sessionId));
         ComparisonResponseDTO comparison = null;

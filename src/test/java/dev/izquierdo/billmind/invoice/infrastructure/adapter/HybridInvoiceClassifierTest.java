@@ -4,9 +4,11 @@ import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier.KeywordInvoiceClassifier;
 import dev.izquierdo.billmind.invoice.infrastructure.adapter.classifier.LlmInvoiceClassifier;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,8 +24,14 @@ class HybridInvoiceClassifierTest {
     @Mock private KeywordInvoiceClassifier keywordClassifier;
     @Mock private LlmInvoiceClassifier llmClassifier;
 
-    @InjectMocks
+    private MeterRegistry meterRegistry;
     private HybridInvoiceClassifier classifier;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        classifier = new HybridInvoiceClassifier(keywordClassifier, llmClassifier, meterRegistry);
+    }
 
     // ── Texto vacío ───────────────────────────────────────────────────────────
 
@@ -86,5 +94,28 @@ class HybridInvoiceClassifierTest {
 
         assertThat(result.getType()).isEqualTo(SupplyDomain.TELECOM);
         assertThat(result.getCompany()).isEqualTo("MOVISTAR");
+    }
+
+    // ── Métricas ──────────────────────────────────────────────────────────────
+
+    @Test
+    void shouldTimeKeywordStrategyWhenKeywordsMatch() {
+        when(keywordClassifier.classify(anyString())).thenReturn(Optional.of(SupplyDomain.ELECTRICITY));
+        when(llmClassifier.extractCompany(anyString())).thenReturn("IBERDROLA");
+
+        classifier.classify("CUPS kwh potencia contratada electricidad");
+
+        assertThat(meterRegistry.timer("invoice.classify.duration", "strategy", "keyword").count()).isEqualTo(1L);
+    }
+
+    @Test
+    void shouldTimeLlmStrategyWhenNoKeywordMatch() {
+        when(keywordClassifier.classify(anyString())).thenReturn(Optional.empty());
+        when(llmClassifier.classify(anyString()))
+            .thenReturn(new InvoiceClassification(SupplyDomain.TELECOM, "MOVISTAR"));
+
+        classifier.classify("texto ambiguo sin keywords claras");
+
+        assertThat(meterRegistry.timer("invoice.classify.duration", "strategy", "llm").count()).isEqualTo(1L);
     }
 }

@@ -105,19 +105,25 @@ Package-private class (`_shared/infrastructure/llm/`) that holds approximate USD
 
 ## Micrometer integration (Milestone 6)
 
-`spring-boot-starter-actuator` is already on the classpath. What remains is wiring custom `Counter` and `Timer` instruments for LLM calls and invoice processing.
+`spring-boot-starter-actuator` + `micrometer-registry-prometheus` are on the classpath, and
+`management.endpoints.web.exposure.include` exposes `health,info,metrics,prometheus`. The
+custom `Counter` and `Timer` instruments below are wired and live.
 
 Actuator is exposed on a separate, internal-only management port (`8083` by default,
 override with `MANAGEMENT_PORT`), so the endpoints below are reached on that port — not
-the application port. Expanding `management.endpoints.web.exposure.include` to add
-`metrics`/`prometheus` will surface them there.
+the application port (e.g. `http://localhost:8083/actuator/prometheus`).
 
-Target metrics to expose via `/actuator/metrics` (on the management port):
+Metrics exposed via `/actuator/metrics` and `/actuator/prometheus` (on the management port):
 
-| Metric | Type | Tags |
-|---|---|---|
-| `pii.llm.invocations` | Counter | — |
-| `pii.llm.failures` | Counter | `reason` |
-| `pii.llm.fallbacks` | Counter | `reason` (exception / invalid_response) |
-| `invoice.classify.duration` | Timer | `strategy` (keyword / llm) |
-| `invoice.upload.duration` | Timer | — |
+| Metric | Type | Tags | Emitted by |
+|---|---|---|---|
+| `pii.llm.invocations` | Counter | — | `HybridPiiRedactor` |
+| `pii.llm.failures` | Counter | `reason` (exception class) | `HybridPiiRedactor` |
+| `pii.llm.fallbacks` | Counter | `reason` (exception / invalid_response) | `HybridPiiRedactor` |
+| `invoice.classify.duration` | Timer | `strategy` (keyword / llm) | `HybridInvoiceClassifier` |
+| `invoice.upload.duration` | Timer | — | `InvoiceController` |
+
+An LLM exception increments both `pii.llm.failures` (tagged with the exception class) and
+`pii.llm.fallbacks{reason=exception}`; a rejected/invalid LLM response increments only
+`pii.llm.fallbacks{reason=invalid_response}`. Instrumentation lives exclusively in the
+infrastructure layer, consistent with the logging convention above.

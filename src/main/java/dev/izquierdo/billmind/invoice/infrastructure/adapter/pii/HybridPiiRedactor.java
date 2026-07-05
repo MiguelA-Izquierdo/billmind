@@ -3,6 +3,8 @@ package dev.izquierdo.billmind.invoice.infrastructure.adapter.pii;
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
 import dev.izquierdo.billmind.invoice.domain.port.PiiRedactor;
 import dev.langchain4j.model.chat.ChatModel;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -45,9 +47,13 @@ public class HybridPiiRedactor implements PiiRedactor {
         "Text:\n---\n%s\n---";
 
     private final ChatModel chatModel;
+    private final MeterRegistry meterRegistry;
+    private final Counter llmInvocations;
 
-    public HybridPiiRedactor(@Qualifier("fastChatModel") ChatModel chatModel) {
+    public HybridPiiRedactor(@Qualifier("fastChatModel") ChatModel chatModel, MeterRegistry meterRegistry) {
         this.chatModel = chatModel;
+        this.meterRegistry = meterRegistry;
+        this.llmInvocations = meterRegistry.counter("pii.llm.invocations");
     }
 
     @Override
@@ -82,17 +88,21 @@ public class HybridPiiRedactor implements PiiRedactor {
     }
 
     private String redactWithLlm(String text) {
+        llmInvocations.increment();
         MDC.put(TimedChatLanguageModel.MDC_OPERATION, "pii-redaction");
         try {
             String result = chatModel.chat(REDACTION_PROMPT.formatted(text)).strip();
             if (!isValidLlmResponse(result, text)) {
                 log.warn("[PII] LLM response rejected (len={} vs input={}), falling back to regex-only",
                         result.length(), text.length());
+                meterRegistry.counter("pii.llm.fallbacks", "reason", "invalid_response").increment();
                 return text;
             }
             return result;
         } catch (Exception e) {
             log.warn("[PII] LLM redaction failed ({}), keeping regex-only result", e.getClass().getSimpleName());
+            meterRegistry.counter("pii.llm.failures", "reason", e.getClass().getSimpleName()).increment();
+            meterRegistry.counter("pii.llm.fallbacks", "reason", "exception").increment();
             return text;
         } finally {
             MDC.remove(TimedChatLanguageModel.MDC_OPERATION);

@@ -1,9 +1,11 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.pii;
 
 import dev.langchain4j.model.chat.ChatModel;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -17,8 +19,14 @@ class HybridPiiRedactorTest {
     @Mock
     private ChatModel chatModel;
 
-    @InjectMocks
+    private MeterRegistry meterRegistry;
     private HybridPiiRedactor redactor;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        redactor = new HybridPiiRedactor(chatModel, meterRegistry);
+    }
 
     // ── Regex ─────────────────────────────────────────────────────────────────
 
@@ -98,5 +106,35 @@ class HybridPiiRedactorTest {
         String result = redactor.redact("Titular: Juan García, IBAN ES9121000418450200051332, Calle Mayor 3");
 
         assertThat(result).contains("[NOMBRE]", "[DIRECCIÓN]", "[IBAN]");
+    }
+
+    // ── Métricas ──────────────────────────────────────────────────────────────
+
+    @Test
+    void shouldCountInvocationWhenLlmScanTriggered() {
+        when(chatModel.chat(anyString())).thenReturn("Titular: [NOMBRE]");
+
+        redactor.redact("Titular: Juan García López");
+
+        assertThat(meterRegistry.counter("pii.llm.invocations").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldCountFallbackWithInvalidResponseReasonWhenLlmRejected() {
+        when(chatModel.chat(anyString())).thenReturn("   ");
+
+        redactor.redact("Titular: Juan García");
+
+        assertThat(meterRegistry.counter("pii.llm.fallbacks", "reason", "invalid_response").count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void shouldCountFailureAndFallbackWithExceptionReasonWhenLlmThrows() {
+        when(chatModel.chat(anyString())).thenThrow(new RuntimeException("LLM timeout"));
+
+        redactor.redact("Titular: Juan García");
+
+        assertThat(meterRegistry.counter("pii.llm.failures", "reason", "RuntimeException").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.counter("pii.llm.fallbacks", "reason", "exception").count()).isEqualTo(1.0);
     }
 }
