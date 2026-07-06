@@ -11,9 +11,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -42,6 +44,28 @@ class JpaElectricityRateRepositoryTest {
 
         assertDoesNotThrow(() -> repository.save(rate));
         verify(jpa).save(any(ElectricityRateEntity.class));
+    }
+
+    @Test
+    void shouldCollapseDuplicateRowsToOnePerCompanyAndTariff() {
+        // Same (company, tariffName) ingested three times — e.g. the same Kafka event replayed.
+        ElectricityRateEntity dup1  = ElectricityRateMapper.toEntity(buildRate(UUID.randomUUID()));
+        ElectricityRateEntity dup2  = ElectricityRateMapper.toEntity(buildRate(UUID.randomUUID()));
+        ElectricityRateEntity dup3  = ElectricityRateMapper.toEntity(buildRate(UUID.randomUUID()));
+        ElectricityRateEntity other = ElectricityRateMapper.toEntity(
+            ElectricityRate.builder(UUID.randomUUID())
+                .supplyType(SupplyDomain.ELECTRICITY)
+                .company("ENDESA")
+                .tariffName("Conecta Luz")
+                .pricePerKwh(new BigDecimal("0.109000"))
+                .validFrom(LocalDate.of(2025, 1, 1))
+                .source("REE")
+                .build());
+        when(jpa.findLatestPerTariff()).thenReturn(List.of(dup1, dup2, dup3, other));
+
+        List<ElectricityRate> result = repository.findLatestPerTariff();
+
+        assertEquals(2, result.size());
     }
 
     private ElectricityRate buildRate(UUID id) {

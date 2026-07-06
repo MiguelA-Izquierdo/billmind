@@ -132,9 +132,10 @@ src/main/java/dev/izquierdo/billmind/
 │       ├── controller/         # InvoiceController
 │       └── persistence/        # InvoiceEntity, JpaInvoiceRepository
 │
-├── assistant/                  # Bounded Context: conversational RAG        [Roadmap M3]
-├── comparison/                 # Bounded Context: price comparison agent     [Roadmap M5]
-└── market/                     # Bounded Context: market rate ingestion      [Active — M2]
+├── assistant/                  # Bounded Context: conversational RAG          [Complete — M5]
+├── comparison/                 # Bounded Context: savings / comparison engine [Complete — M3]
+├── knowledge/                  # Bounded Context: regulatory KB + retrieval   [Complete — M2]
+└── market/                     # Bounded Context: market rate ingestion        [Complete — M2]
 ```
 
 ---
@@ -179,6 +180,18 @@ See [`docs/DOCKER.md`](docs/DOCKER.md) for the full setup guide, profile referen
 
 ---
 
+## Kubernetes deployment
+
+The Kubernetes manifests and the CD pipeline that deploys BillMind to a cluster live in a **separate infrastructure repository**, not in this repo. This app repo builds and publishes the Docker image; the infra repo takes that image and deploys it (the standard two-pipeline app/infra split).
+
+**To deploy on Kubernetes, follow the instructions in that repository:**
+
+- **[MiguelA-Izquierdo/billmind-infra](https://github.com/MiguelA-Izquierdo/billmind-infra)** — k3s manifests (Kustomize), namespace, ConfigMap, Secret template, Deployment, Service and Ingress, plus the CD `Jenkinsfile`.
+
+Do not add cluster manifests to this repository; keep infrastructure-as-code in `billmind-infra`.
+
+---
+
 ## Docs
 
 - Docker setup → [`docs/DOCKER.md`](docs/DOCKER.md)
@@ -188,3 +201,4 @@ See [`docs/DOCKER.md`](docs/DOCKER.md) for the full setup guide, profile referen
 - Test guide → [`docs/TESTING.md`](docs/TESTING.md)
 - Observability → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)
 - Roadmap → [`docs/PLAN.md`](docs/PLAN.md)
+- Kubernetes deployment → [`MiguelA-Izquierdo/billmind-infra`](https://github.com/MiguelA-Izquierdo/billmind-infra) (separate infra repo)

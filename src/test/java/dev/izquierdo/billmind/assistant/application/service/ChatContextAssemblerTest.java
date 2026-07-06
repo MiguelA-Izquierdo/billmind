@@ -4,8 +4,10 @@ import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
+import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
+import dev.izquierdo.billmind.assistant.domain.port.ComparisonContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.InvoiceContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.MarketRatesContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.RegulationSearchPort;
@@ -35,6 +37,7 @@ class ChatContextAssemblerTest {
     @Mock private InvoiceContextPort    invoiceContextPort;
     @Mock private RegulationSearchPort  regulationSearchPort;
     @Mock private MarketRatesContextPort marketRatesContextPort;
+    @Mock private ComparisonContextPort comparisonContextPort;
 
     private ChatContextAssembler assembler;
 
@@ -52,7 +55,8 @@ class ChatContextAssemblerTest {
     @BeforeEach
     void setUp() {
         assembler = new ChatContextAssembler(
-                invoiceContextPort, regulationSearchPort, marketRatesContextPort, MAX_RESULTS);
+                invoiceContextPort, regulationSearchPort, marketRatesContextPort,
+                comparisonContextPort, MAX_RESULTS);
     }
 
     // --- invoice fields ---
@@ -163,5 +167,44 @@ class ChatContextAssemblerTest {
 
         assertThat(context.marketRates()).isEmpty();
         verify(marketRatesContextPort, never()).loadLatestRates(any());
+    }
+
+    // --- comparison ---
+
+    @Test
+    void shouldLoadComparisonSummaryForInvoiceWithFields() {
+        Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
+        ComparisonSummary summary = new ComparisonSummary(
+                new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null);
+        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
+        when(comparisonContextPort.summarize(ELECTRICITY_FIELDS)).thenReturn(Optional.of(summary));
+
+        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+
+        assertThat(context.comparison()).isEqualTo(summary);
+        verify(comparisonContextPort).summarize(ELECTRICITY_FIELDS);
+    }
+
+    @Test
+    void shouldSetNullComparisonWhenEngineReturnsEmpty() {
+        Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
+        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
+        when(comparisonContextPort.summarize(ELECTRICITY_FIELDS)).thenReturn(Optional.empty());
+
+        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+
+        assertThat(context.comparison()).isNull();
+    }
+
+    @Test
+    void shouldNotComputeComparisonWhenNoInvoiceId() {
+        when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
+
+        ChatContext context = assembler.assemble(null, QUESTION);
+
+        assertThat(context.comparison()).isNull();
+        verify(comparisonContextPort, never()).summarize(any());
     }
 }

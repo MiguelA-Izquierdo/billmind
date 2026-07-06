@@ -7,8 +7,10 @@ import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
 import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
+import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
+import dev.izquierdo.billmind.assistant.domain.port.ComparisonContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.InvoiceContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.MarketRatesContextPort;
 import dev.izquierdo.billmind.assistant.domain.port.RegulationSearchPort;
@@ -26,16 +28,19 @@ public class ChatContextAssembler {
     private final InvoiceContextPort invoiceContextPort;
     private final RegulationSearchPort regulationSearchPort;
     private final MarketRatesContextPort marketRatesContextPort;
+    private final ComparisonContextPort comparisonContextPort;
     private final int maxKnowledgeResults;
 
     public ChatContextAssembler(
             InvoiceContextPort invoiceContextPort,
             RegulationSearchPort regulationSearchPort,
             MarketRatesContextPort marketRatesContextPort,
+            ComparisonContextPort comparisonContextPort,
             @Value("${knowledge.search.default-max-results:5}") int maxKnowledgeResults) {
         this.invoiceContextPort     = Objects.requireNonNull(invoiceContextPort);
         this.regulationSearchPort   = Objects.requireNonNull(regulationSearchPort);
         this.marketRatesContextPort = Objects.requireNonNull(marketRatesContextPort);
+        this.comparisonContextPort  = Objects.requireNonNull(comparisonContextPort);
         this.maxKnowledgeResults    = maxKnowledgeResults;
     }
 
@@ -50,7 +55,11 @@ public class ChatContextAssembler {
                 ? marketRatesContextPort.loadLatestRates(supplyDomainOf(invoiceFields))
                 : List.of();
 
-        return new ChatContext(invoiceFields, regulatory, marketRates);
+        ComparisonSummary comparison = invoiceFields != null
+                ? comparisonContextPort.summarize(invoiceFields).orElse(null)
+                : null;
+
+        return new ChatContext(invoiceFields, regulatory, marketRates, comparison);
     }
 
     private static SupplyDomain supplyDomainOf(InvoiceFields fields) {

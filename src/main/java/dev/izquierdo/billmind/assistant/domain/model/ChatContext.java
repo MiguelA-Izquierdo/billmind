@@ -7,5 +7,6 @@ import java.util.List;
 public record ChatContext(
     InvoiceFields invoiceFields,
     List<RegulatorySnippet> regulatoryContext,
-    List<MarketRateSnapshot> marketRates
+    List<MarketRateSnapshot> marketRates,
+    ComparisonSummary comparison
 ) {}

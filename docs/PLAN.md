@@ -24,7 +24,7 @@ Visitors can register to get persistent history, multiple invoices over time, an
 
 ## 2. Stack — kept and added
 
-**Kept:** Spring Boot 3.5.0, Java 21, LangChain4j 1.0.0, Ollama (local), PostgreSQL 16 + pgVector (IVFFlat, 384 dim), TestContainers. Hexagonal + DDD. CQRS with command bus. Domain events. `GlobalExceptionHandler`.
+**Kept:** Spring Boot 3.5.0, Java 21, LangChain4j 1.0.0, Ollama (local), PostgreSQL 16 + pgVector (IVFFlat, 384 dim), TestContainers. Hexagonal + DDD. CQRS with command bus. `GlobalExceptionHandler`.
 
 **Added per milestone:**
 
@@ -44,7 +44,7 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | `assistant/` bounded context | 5 | Explains the savings, answers follow-up questions |
 | SSE streaming + `conversationId` handshake | 5 | Real LLM UX with in-memory multi-turn |
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
-| Langfuse self-hosted | 6 | LLM observability |
+| LLM tracing → external Langfuse (backend deployed as shared infra, referenced by env var) | 6 | LLM observability |
 | Spring Security + delegated token validation (external identity service) + rate limiting | 7 | Phase 2 — no local user/credential storage |
 | Semantic response cache | 7 | Cost / latency |
 | Flyway migrations (consolidated initial migration) | 7 | Production-grade deployability before first release |
@@ -78,9 +78,6 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 -- NOT persisted (Phase 1 decision):
 -- comparisons  → recalculated on-the-fly from invoice fields + live electricity_rates
 -- conversations → InMemoryAssistantRepository; Phase 1 is anonymous, no history UX needed
-
-eval_runs (id, golden_set_version, faithfulness, context_precision,
-           answer_relevancy, created_at)  -- Milestone 6
 ```
 
 `invoices` contains **no PII** — redaction happens at extraction time (Milestone 1).
@@ -173,7 +170,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - Port `KnowledgeSearchRepository`.
   - Adapter combining pgVector cosine similarity + Postgres `tsvector` BM25 (`unaccent` + `to_tsvector('spanish', ...)`) with Reciprocal Rank Fusion (RRF).
   - Admin endpoint `POST /api/v1/admin/knowledge/ingest` to trigger ingestion; `DELETE` to clear; `POST /reindex` to rebuild IVFFlat index.
-  - Seed data: 6 regulatory documents (CNMC, REE/2.0TD, PVPC, glossary, invoice reading guide, FAQ) auto-loaded at startup when `knowledge.seed.enabled=true`.
+  - Seed data: 5 regulatory documents (glossary, REE guide, CNMC circular, BOE regulation, general facturación/FAQ guide) auto-loaded at startup when `knowledge.seed.enabled=true`.
   - Pluggable embedding provider via `EMBEDDING_PROVIDER` env var (`allminilm` default, `openai`, `ollama`).
   - IVFFlat index managed automatically by `JpaKnowledgeRepository.rebuildIndex()` (`lists = sqrt(rows)`; skipped below 100 vectors).
   - Retrieval quality IT: `HybridKnowledgeSearchRepositoryRetrievalIT` with 8-query golden set asserting recall@3 ≥ 0.625, recall@5 ≥ 0.750, MRR@5 ≥ 0.500.
@@ -256,7 +253,7 @@ eval_runs (id, golden_set_version, faithfulness, context_precision,
   - ✓ Regression gate in `mvn verify` (`AssistantRagEvalIT`) — deterministic thresholds calibrated for AllMiniLM-L6-v2; pure metric unit tests in `RagasMetricsTest`.
   - ✓ Micrometer + Actuator (Prometheus) instrumentation on an isolated management port — see `docs/OBSERVABILITY.md`. *(Delivered ahead of this milestone.)*
   - ✓ Retrieval-only recall/MRR gate (`RagGoldenSetIT`, 30-question set) — predates this harness.
-  - ❌ **Remaining:** `eval_runs` persistence table (historical metric tracking); self-hosted Langfuse with traces, tokens, latencies, estimated cost + basic dashboard.
+  - ❌ **Remaining — LLM tracing (backend externalized, instrumentation pending):** the Langfuse **backend** is treated as shared infrastructure, not an app concern — it is deployed outside this repo (its own `langfuse` namespace / shared-infra repo, with its own Postgres/ClickHouse, protected by an internal-only ingress), exactly like Postgres, Kafka, Ollama and the external identity service already are. BillMind will only **reference** it by env var (`LANGFUSE_HOST`) with project keys injected via Secret. Still to implement: the in-app **instrumentation** that emits traces/tokens/latencies/estimated cost — preferably via OpenTelemetry (OTLP export, vendor-neutral) so the backend stays swappable, reusing the existing `TimedChatLanguageModel` + `ModelPricingRegistry` token/cost tracking. The `docker-compose.yml` Langfuse target, if added, is a local-dev convenience only (same role as the local Postgres/Kafka/Ollama services).
 
 **Dependencies:** Milestones 3, 5 (new numbering: comparison + chat).
 

@@ -14,6 +14,7 @@ public interface ElectricityRateJpaRepository extends JpaRepository<ElectricityR
                 SELECT MAX(e2.validFrom) FROM ElectricityRateEntity e2
                 WHERE e2.company = e.company AND e2.tariffName = e.tariffName
             )
+            ORDER BY e.company, e.tariffName, e.receivedAt DESC
             """)
     List<ElectricityRateEntity> findLatestPerTariff();
 }
