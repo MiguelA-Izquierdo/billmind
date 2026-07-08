@@ -1,7 +1,9 @@
 package dev.izquierdo.billmind.invoice.infrastructure.config.chat;
 
+import dev.izquierdo.billmind._shared.infrastructure.llm.LlmTelemetry;
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
 import dev.langchain4j.model.chat.ChatModel;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,19 +32,21 @@ public class ChatModelRolesConfig {
     private String provider;
 
     private final Environment env;
+    private final LlmTelemetry telemetry;
 
-    public ChatModelRolesConfig(Environment env) {
+    public ChatModelRolesConfig(Environment env, ObjectProvider<LlmTelemetry> telemetrySinks) {
         this.env = env;
+        this.telemetry = LlmTelemetry.composite(telemetrySinks.orderedStream().toList());
     }
 
     @Bean("fastChatModel")
     public ChatModel fastChatModel(ChatModel chatLanguageModel) {
-        return new TimedChatLanguageModel(chatLanguageModel, "fast", provider, resolveModel());
+        return new TimedChatLanguageModel(chatLanguageModel, "fast", provider, resolveModel(), telemetry);
     }
 
     @Bean("smartChatModel")
     public ChatModel smartChatModel(ChatModel chatLanguageModel) {
-        return new TimedChatLanguageModel(chatLanguageModel, "smart", provider, resolveModel());
+        return new TimedChatLanguageModel(chatLanguageModel, "smart", provider, resolveModel(), telemetry);
     }
 
     private String resolveModel() {

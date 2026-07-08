@@ -1,16 +1,9 @@
 package dev.izquierdo.billmind.assistant.infrastructure.adapter;
 
-import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
-import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
-import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
-import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
-import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
 import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
-import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult.ChatCitation;
 import dev.izquierdo.billmind.assistant.domain.model.ConversationMessage;
-import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 import dev.izquierdo.billmind.assistant.domain.model.MessageRole;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
 import dev.izquierdo.billmind.assistant.domain.port.AssistantLlmPort;
@@ -22,22 +15,23 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
+/**
+ * Eager-context assistant adapter: loads the invoice, market rates, comparison and regulatory
+ * snippets up front and inlines them all in the system prompt. Active by default and whenever
+ * {@code assistant.tools.enabled} is {@code false} — the safety net for models that do not
+ * support tool calling. When tools are enabled, {@link AgenticAssistantLlmAdapter} takes over.
+ */
 @Component
+@ConditionalOnProperty(name = "assistant.tools.enabled", havingValue = "false", matchIfMissing = true)
 public class LlmAssistantAdapter implements AssistantLlmPort {
 
     private static final int MAX_OUTPUT_TOKENS = 400;
-
-    private static final DecimalFormatSymbols SPANISH_SYMBOLS =
-            new DecimalFormatSymbols(Locale.forLanguageTag("es-ES"));
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
             You are BillMind, an expert assistant specialized in Spanish utility invoices \
@@ -116,11 +110,12 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
 
     private String buildSystemContent(ChatContext context) {
         String invoice = context.invoiceFields() != null
-                ? formatFields(context.invoiceFields()) : "No se ha proporcionado factura.";
+                ? AssistantContextFormatter.formatFields(context.invoiceFields())
+                : "No se ha proporcionado factura.";
 
-        String market = formatMarketRates(context.marketRates());
+        String market = AssistantContextFormatter.formatMarketRates(context.marketRates());
 
-        String comparison = formatComparison(context.comparison());
+        String comparison = AssistantContextFormatter.formatComparison(context.comparison());
 
         String regulatory;
         if (context.regulatoryContext().isEmpty()) {
@@ -135,104 +130,5 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
         }
 
         return SYSTEM_PROMPT_TEMPLATE.formatted(invoice, market, comparison, regulatory);
-    }
-
-    private String formatComparison(ComparisonSummary c) {
-        if (c == null) {
-            return "No hay comparativa disponible (la factura no tiene datos de precio o consumo suficientes).";
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("Precio efectivo actual del usuario: ").append(num(c.userEffectivePricePerKwh()))
-          .append(" €/kWh (").append(c.userIsTou() ? "tarifa por periodos" : "tarifa plana").append(").\n");
-        sb.append("Consumo anual estimado: ").append(num(c.annualKwhEstimate())).append(" kWh.\n");
-        appendOfferBlock(sb, "Mejor tarifa plana del mercado", c.flatBlock());
-        appendOfferBlock(sb, "Mejor tarifa por periodos del mercado", c.touBlock());
-        return sb.toString().stripTrailing();
-    }
-
-    private void appendOfferBlock(StringBuilder sb, String label, ComparisonSummary.OfferBlock block) {
-        if (block == null) return;
-        sb.append(label).append(": ").append(block.bestCompany()).append(" — ")
-          .append(block.bestTariffName()).append(" a ").append(num(block.bestPricePerKwh())).append(" €/kWh.\n");
-        if (block.annualSavingsEuros().signum() > 0) {
-            sb.append("  Ahorro anual estimado frente a la tarifa actual: ")
-              .append(eur(block.annualSavingsEuros())).append(" €.\n");
-        } else {
-            sb.append("  El usuario ya paga igual o menos que esta tarifa (sin ahorro).\n");
-        }
-        for (ComparisonSummary.Alternative a : block.alternatives()) {
-            sb.append("  Alternativa: ").append(a.company()).append(" — ").append(a.tariffName())
-              .append(": ").append(num(a.pricePerKwh())).append(" €/kWh\n");
-        }
-    }
-
-    private String formatMarketRates(List<MarketRateSnapshot> rates) {
-        if (rates.isEmpty()) return "Sin datos de mercado disponibles.";
-        StringBuilder sb = new StringBuilder();
-        for (MarketRateSnapshot r : rates) {
-            sb.append(r.company()).append(" — ").append(r.tariffName())
-              .append(" (vigente desde ").append(r.validFrom()).append(")\n");
-            if (r.pricePerKwh() != null)
-                sb.append("  Precio plano: ").append(num(r.pricePerKwh())).append(" €/kWh\n");
-            if (r.pricePerKwhPunta() != null)
-                sb.append("  P1 (punta): ").append(num(r.pricePerKwhPunta())).append(" €/kWh\n");
-            if (r.pricePerKwhLlano() != null)
-                sb.append("  P2 (llano): ").append(num(r.pricePerKwhLlano())).append(" €/kWh\n");
-            if (r.pricePerKwhValle() != null)
-                sb.append("  P3 (valle): ").append(num(r.pricePerKwhValle())).append(" €/kWh\n");
-            if (r.contractedPowerPrice() != null)
-                sb.append("  Potencia P1: ").append(num(r.contractedPowerPrice())).append(" €/kW/día\n");
-            if (r.contractedPowerPriceP2() != null)
-                sb.append("  Potencia P2: ").append(num(r.contractedPowerPriceP2())).append(" €/kW/día\n");
-            sb.append("\n");
-        }
-        return sb.toString().stripTrailing();
-    }
-
-    private String formatFields(InvoiceFields fields) {
-        return switch (fields) {
-            case ElectricityFields e -> """
-                    Tipo: Electricidad
-                    Periodo: %s — %s
-                    Importe total: %s €
-                    Consumo total: %s kWh
-                    Consumo P1/P2/P3: %s / %s / %s kWh
-                    Precio P1/P2/P3: %s / %s / %s €/kWh
-                    Potencia contratada: %s kW
-                    """.formatted(
-                    e.billingPeriodStart(), e.billingPeriodEnd(),
-                    eur(e.totalAmount()),
-                    num(e.consumptionKwh()),
-                    num(e.consumptionKwhP1()), num(e.consumptionKwhP2()), num(e.consumptionKwhP3()),
-                    num(e.pricePerKwhP1()), num(e.pricePerKwhP2()), num(e.pricePerKwhP3()),
-                    num(e.contractedPowerKw()));
-            case GasFields g -> """
-                    Tipo: Gas
-                    Periodo: %s — %s
-                    Importe total: %s €
-                    """.formatted(g.billingPeriodStart(), g.billingPeriodEnd(), eur(g.totalAmount()));
-            case WaterFields w -> """
-                    Tipo: Agua
-                    Periodo: %s — %s
-                    Importe total: %s €
-                    """.formatted(w.billingPeriodStart(), w.billingPeriodEnd(), eur(w.totalAmount()));
-            case TelecomFields t -> """
-                    Tipo: Telecomunicaciones
-                    Periodo: %s — %s
-                    Importe total: %s €
-                    """.formatted(t.billingPeriodStart(), t.billingPeriodEnd(), eur(t.totalAmount()));
-        };
-    }
-
-    /** Formats a decimal for the Spanish prompt: comma separator, no grouping, trailing zeros stripped. */
-    private static String num(BigDecimal value) {
-        if (value == null) return "—";
-        return new DecimalFormat("0.######", SPANISH_SYMBOLS).format(value);
-    }
-
-    /** Formats a monetary amount with exactly two decimals and a Spanish comma separator. */
-    private static String eur(BigDecimal value) {
-        if (value == null) return "—";
-        return new DecimalFormat("0.00", SPANISH_SYMBOLS).format(value);
     }
 }

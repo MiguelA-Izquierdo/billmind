@@ -30,24 +30,33 @@ public class ChatContextAssembler {
     private final MarketRatesContextPort marketRatesContextPort;
     private final ComparisonContextPort comparisonContextPort;
     private final int maxKnowledgeResults;
+    private final boolean toolsEnabled;
 
     public ChatContextAssembler(
             InvoiceContextPort invoiceContextPort,
             RegulationSearchPort regulationSearchPort,
             MarketRatesContextPort marketRatesContextPort,
             ComparisonContextPort comparisonContextPort,
-            @Value("${knowledge.search.default-max-results:5}") int maxKnowledgeResults) {
+            @Value("${knowledge.search.default-max-results:5}") int maxKnowledgeResults,
+            @Value("${assistant.tools.enabled:false}") boolean toolsEnabled) {
         this.invoiceContextPort     = Objects.requireNonNull(invoiceContextPort);
         this.regulationSearchPort   = Objects.requireNonNull(regulationSearchPort);
         this.marketRatesContextPort = Objects.requireNonNull(marketRatesContextPort);
         this.comparisonContextPort  = Objects.requireNonNull(comparisonContextPort);
         this.maxKnowledgeResults    = maxKnowledgeResults;
+        this.toolsEnabled           = toolsEnabled;
     }
 
     public ChatContext assemble(UUID invoiceId, String question) {
         InvoiceFields invoiceFields = invoiceId != null
                 ? invoiceContextPort.loadInvoice(invoiceId).map(Invoice::getFields).orElse(null)
                 : null;
+
+        // In agentic mode the LLM pulls regulation, market rates and comparison on demand via
+        // tools, so we skip the eager (and costly) loads and inline only the invoice.
+        if (toolsEnabled) {
+            return ChatContext.invoiceOnly(invoiceFields);
+        }
 
         List<RegulatorySnippet> regulatory = regulationSearchPort.search(question, maxKnowledgeResults);
 
@@ -59,7 +68,7 @@ public class ChatContextAssembler {
                 ? comparisonContextPort.summarize(invoiceFields).orElse(null)
                 : null;
 
-        return new ChatContext(invoiceFields, regulatory, marketRates, comparison);
+        return ChatContext.eager(invoiceFields, regulatory, marketRates, comparison);
     }
 
     private static SupplyDomain supplyDomainOf(InvoiceFields fields) {

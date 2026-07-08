@@ -26,6 +26,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,7 +57,13 @@ class ChatContextAssemblerTest {
     void setUp() {
         assembler = new ChatContextAssembler(
                 invoiceContextPort, regulationSearchPort, marketRatesContextPort,
-                comparisonContextPort, MAX_RESULTS);
+                comparisonContextPort, MAX_RESULTS, false);
+    }
+
+    private ChatContextAssembler toolsEnabledAssembler() {
+        return new ChatContextAssembler(
+                invoiceContextPort, regulationSearchPort, marketRatesContextPort,
+                comparisonContextPort, MAX_RESULTS, true);
     }
 
     // --- invoice fields ---
@@ -205,6 +212,33 @@ class ChatContextAssemblerTest {
         ChatContext context = assembler.assemble(null, QUESTION);
 
         assertThat(context.comparison()).isNull();
+        verify(comparisonContextPort, never()).summarize(any());
+    }
+
+    // --- agentic (tools) mode: only the invoice is loaded eagerly ---
+
+    @Test
+    void shouldLoadOnlyInvoiceFieldsWhenToolsEnabled() {
+        Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
+        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+
+        ChatContext context = toolsEnabledAssembler().assemble(INVOICE_ID, QUESTION);
+
+        assertThat(context.invoiceFields()).isEqualTo(ELECTRICITY_FIELDS);
+        assertThat(context.regulatoryContext()).isEmpty();
+        assertThat(context.marketRates()).isEmpty();
+        assertThat(context.comparison()).isNull();
+    }
+
+    @Test
+    void shouldNotCallEagerPortsWhenToolsEnabled() {
+        Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
+        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+
+        toolsEnabledAssembler().assemble(INVOICE_ID, QUESTION);
+
+        verify(regulationSearchPort, never()).search(any(), anyInt());
+        verify(marketRatesContextPort, never()).loadLatestRates(any());
         verify(comparisonContextPort, never()).summarize(any());
     }
 }

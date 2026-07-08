@@ -198,6 +198,7 @@ Do not add cluster manifests to this repository; keep infrastructure-as-code in 
 - Configuration reference → [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - API reference → [`docs/API.md`](docs/API.md)
 - Market module → [`docs/MARKET.md`](docs/MARKET.md)
+- Assistant module (agentic tool calling) → [`docs/ASSISTANT.md`](docs/ASSISTANT.md)
 - Test guide → [`docs/TESTING.md`](docs/TESTING.md)
 - Observability → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)
 - Roadmap → [`docs/PLAN.md`](docs/PLAN.md)

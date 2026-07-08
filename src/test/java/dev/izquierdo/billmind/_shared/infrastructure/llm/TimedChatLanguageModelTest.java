@@ -133,6 +133,60 @@ class TimedChatLanguageModelTest {
         assertThat(lastLog()).containsPattern("latency=\\d+ms");
     }
 
+    @Test
+    void shouldFeedTelemetrySinkOnSuccessWithTokensAndCost() {
+        ChatResponse response = ChatResponse.builder()
+                .aiMessage(AiMessage.from("ok"))
+                .tokenUsage(new TokenUsage(500, 100))
+                .build();
+        when(delegate.chat(any(ChatRequest.class))).thenReturn(response);
+        CapturingTelemetry sink = new CapturingTelemetry();
+
+        new TimedChatLanguageModel(delegate, "smart", "openai", "gpt-4o", sink).chat(EMPTY_REQUEST);
+
+        assertThat(sink.last).isNotNull();
+        assertThat(sink.last.role()).isEqualTo("smart");
+        assertThat(sink.last.provider()).isEqualTo("openai");
+        assertThat(sink.last.model()).isEqualTo("gpt-4o");
+        assertThat(sink.last.tokensIn()).isEqualTo(500);
+        assertThat(sink.last.tokensOut()).isEqualTo(100);
+        assertThat(sink.last.costUsd()).isNotNull().isPositive();
+        assertThat(sink.last.isError()).isFalse();
+    }
+
+    @Test
+    void shouldFeedTelemetrySinkWithErrorWhenDelegateFails() {
+        when(delegate.chat(any(ChatRequest.class))).thenThrow(new IllegalStateException("boom"));
+        CapturingTelemetry sink = new CapturingTelemetry();
+
+        TimedChatLanguageModel model = new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o", sink);
+        try { model.chat(EMPTY_REQUEST); } catch (Exception ignored) {}
+
+        assertThat(sink.last).isNotNull();
+        assertThat(sink.last.error()).isEqualTo("IllegalStateException");
+        assertThat(sink.last.tokensIn()).isNull();
+    }
+
+    @Test
+    void shouldNotPropagateTelemetryFailureOntoLlmPath() {
+        ChatResponse expected = ChatResponse.builder().aiMessage(AiMessage.from("answer")).build();
+        when(delegate.chat(any(ChatRequest.class))).thenReturn(expected);
+        LlmTelemetry brokenSink = data -> { throw new RuntimeException("exporter down"); };
+
+        TimedChatLanguageModel model = new TimedChatLanguageModel(delegate, "fast", "openai", "gpt-4o", brokenSink);
+
+        assertThat(model.chat(EMPTY_REQUEST)).isSameAs(expected);
+    }
+
+    private static final class CapturingTelemetry implements LlmTelemetry {
+        private LlmCallData last;
+
+        @Override
+        public void record(LlmCallData data) {
+            this.last = data;
+        }
+    }
+
     private String lastLog() {
         List<ILoggingEvent> events = logAppender.list;
         assertThat(events).isNotEmpty();

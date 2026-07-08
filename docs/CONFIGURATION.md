@@ -147,6 +147,16 @@ ollama pull mxbai-embed-large  # 1024d
 
 ---
 
+## Assistant
+
+| Variable | Default | Description |
+|---|---|---|
+| `ASSISTANT_TOOLS_ENABLED` | `false` | `true` → agentic adapter: the LLM pulls comparison / market rates / regulation on demand via tool calling. `false` → eager adapter: all context is loaded up front into the prompt. **Requires a tool-capable `smartChatModel`** when enabled (cloud models or Groq's `llama-3.3-70b-versatile`; small local Ollama models are unreliable). See [`ASSISTANT.md`](ASSISTANT.md). |
+| `ASSISTANT_CONVERSATION_MAX_SIZE` | `1000` | Hard cap on stored in-memory conversations; least-recently-accessed are evicted first. |
+| `ASSISTANT_CONVERSATION_TTL` | `PT2H` | Sliding TTL (ISO-8601 duration) refreshed on each read/write; idle conversations expire. |
+
+---
+
 ## Vector Store (pgVector)
 
 | Variable | Default | Description |
@@ -200,3 +210,19 @@ Authentication is delegated to an external microservice — BillMind does not si
 | Variable | Example | Description |
 |---|---|---|
 | `AUTH_EXTERNAL_URL` | `http://localhost:8081` | Base URL of the auth microservice exposing `GET /introspect` |
+
+---
+
+## LLM observability
+
+Per-call LLM telemetry is emitted by `TimedChatLanguageModel` (latency, tokens, USD cost) into two independently toggled sinks. Both may run at once; both are cheap when off. See [`OBSERVABILITY.md`](OBSERVABILITY.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_METRICS_ENABLED` | `true` | Publishes `llm.call.duration`, `llm.calls`, `llm.tokens`, `llm.cost.usd` as Micrometer meters on the Actuator `/metrics` + `/prometheus` endpoints (management port). |
+| `LLM_TRACING_ENABLED` | `false` | Exports one OTLP span per LLM call to an external Langfuse backend. Requires `LANGFUSE_HOST`; fails fast on startup if the host is blank while enabled. |
+| `LANGFUSE_HOST` | *(empty)* | Base URL of the external Langfuse instance, e.g. `http://langfuse.internal:3000`. Spans are POSTed to `{host}/api/public/otel/v1/traces`. |
+| `LANGFUSE_PUBLIC_KEY` | *(empty)* | Langfuse project public key — sent as the username of the OTLP HTTP Basic auth header. |
+| `LANGFUSE_SECRET_KEY` | *(empty)* | Langfuse project secret key — sent as the password of the OTLP HTTP Basic auth header. Inject as a secret. |
+
+The Langfuse **backend** is external shared infrastructure (its own namespace, Postgres/ClickHouse, internal-only ingress) — BillMind only references it by URL. When tracing is disabled, no OpenTelemetry SDK is built.

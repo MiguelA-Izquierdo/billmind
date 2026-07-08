@@ -242,7 +242,50 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 **Engineering highlights:** in-memory multi-turn conversation history, dual-context RAG (invoice text in system prompt + regulatory retrieval), SSE streaming with conversationId handshake, citation rendering.
 
-### Milestone 6 — Evaluation Harness + Observability 🟡 PARTIAL
+### Post-Milestone 5 — Assistant context strategy (iterations 1–2) ✓ COMPLETE
+
+**Objective:** evolve *how* the assistant gets its context. M5 shipped an eager strategy — every
+question loaded invoice + all market rates + comparison + a RAG search into the prompt. Two
+follow-up iterations fixed the resulting noise, cost and unreliable LLM ranking. Full rationale
+in [`docs/ASSISTANT.md`](ASSISTANT.md).
+
+**Iteration 1 — deterministic comparison in chat context ✓**
+- The savings comparison is precomputed by the `comparison/` engine and surfaced to the assistant
+  as a ready-made result (cheapest tariff, effective price, annual savings). The LLM **explains**
+  it instead of ranking raw market rates itself — a task LLMs do unreliably.
+- New port `ComparisonContextPort`; the eager prompt gained a `COMPARATIVA CALCULADA` section with
+  rules telling the model to base "am I paying too much?" answers on it, not on the raw list.
+
+**Iteration 2 — agentic tool calling ✓**
+- **Why:** eager loading sent tariffs and regulation even when irrelevant (extra tokens/latency/cost
+  every turn) and offered no directed querying (e.g. filter tariffs by company). Going agentic lets
+  the LLM decide *what* to retrieve per question.
+- **Design:** two mutually-exclusive `AssistantLlmPort` beans selected by `assistant.tools.enabled`
+  (`@ConditionalOnProperty`). OFF (default) → `LlmAssistantAdapter` (eager, unchanged safety net for
+  non-tool-capable models). ON → `AgenticAssistantLlmAdapter` (inlines only the invoice; the rest via
+  tools). `ChatContextAssembler` skips the eager loads in tools mode (`ChatContext.invoiceOnly`).
+- **Manual low-level tool loop** (not `AiServices`/`@Tool`): keeps `TimedChatLanguageModel`
+  instrumentation, hexagonal ports and precise citation tracking. Bounded to 5 rounds with a final
+  tool-less call to force a textual answer.
+- **Three tools** over the existing ports: `get_invoice_comparison` (no params), `search_market_rates`
+  (optional `company` filter, in-memory), `search_regulation` (required `query`). Shared Spanish
+  formatting extracted to `AssistantContextFormatter`.
+- **Precise citations:** only regulatory snippets actually retrieved by `search_regulation` this turn
+  are cited — comparison/market-only turns return zero citations.
+- **Flag OFF by default:** tool calling needs a tool-capable `smartChatModel` (cloud, or Groq
+  `llama-3.3-70b-versatile`); small local Ollama is unreliable. Verified live against Groq across the
+  three routing scenarios.
+
+**Deferred (future work):**
+- Within-turn tool-call **deduplication + short-circuit** — some models (observed with
+  `llama-3.3-70b-versatile`) request an identical tool call twice before answering, wasting an LLM
+  round and a redundant port call. Cache results by `(name, arguments)` and, when a round contains
+  only already-seen calls, jump straight to the final tool-less answer.
+
+**Dependencies:** Milestone 3 (comparison engine + `ComparisonContextPort`), Milestone 5 (assistant
+port, conversation store, SSE).
+
+### Milestone 6 — Evaluation Harness + Observability ✓ COMPLETE
 
 **Objective:** introduce rigorous quality measurement and production observability — the engineering standard that separates a working prototype from a deployable AI system.
 
@@ -253,7 +296,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
   - ✓ Regression gate in `mvn verify` (`AssistantRagEvalIT`) — deterministic thresholds calibrated for AllMiniLM-L6-v2; pure metric unit tests in `RagasMetricsTest`.
   - ✓ Micrometer + Actuator (Prometheus) instrumentation on an isolated management port — see `docs/OBSERVABILITY.md`. *(Delivered ahead of this milestone.)*
   - ✓ Retrieval-only recall/MRR gate (`RagGoldenSetIT`, 30-question set) — predates this harness.
-  - ❌ **Remaining — LLM tracing (backend externalized, instrumentation pending):** the Langfuse **backend** is treated as shared infrastructure, not an app concern — it is deployed outside this repo (its own `langfuse` namespace / shared-infra repo, with its own Postgres/ClickHouse, protected by an internal-only ingress), exactly like Postgres, Kafka, Ollama and the external identity service already are. BillMind will only **reference** it by env var (`LANGFUSE_HOST`) with project keys injected via Secret. Still to implement: the in-app **instrumentation** that emits traces/tokens/latencies/estimated cost — preferably via OpenTelemetry (OTLP export, vendor-neutral) so the backend stays swappable, reusing the existing `TimedChatLanguageModel` + `ModelPricingRegistry` token/cost tracking. The `docker-compose.yml` Langfuse target, if added, is a local-dev convenience only (same role as the local Postgres/Kafka/Ollama services).
+  - ✓ **LLM tracing (OpenTelemetry → Langfuse):** `TimedChatLanguageModel` now fans every call out to composable `LlmTelemetry` sinks. Two are wired, each behind its own flag: `MetricsLlmTelemetry` (`LLM_METRICS_ENABLED`, default on) publishes `llm.call.duration` / `llm.calls` / `llm.tokens` / `llm.cost.usd` to Actuator/Prometheus, and `TracingLlmTelemetry` (`LLM_TRACING_ENABLED`, default off) exports one OTLP span per call — with OpenTelemetry GenAI attributes (`gen_ai.*`) plus reused `ModelPricingRegistry` cost — to an external Langfuse backend at `{LANGFUSE_HOST}/api/public/otel/v1/traces`. The Langfuse **backend** stays shared infrastructure referenced only by env var (keys injected as secrets); the vendor-neutral OTLP export keeps it swappable. `LlmTracingConfig` builds the OTel SDK only when tracing is enabled and fails fast on a blank host. See `docs/OBSERVABILITY.md`.
 
 **Dependencies:** Milestones 3, 5 (new numbering: comparison + chat).
 

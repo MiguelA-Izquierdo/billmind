@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -32,29 +33,72 @@ public class TimedChatLanguageModel implements ChatModel {
     private final String role;
     private final String provider;
     private final String model;
+    private final LlmTelemetry telemetry;
 
     public TimedChatLanguageModel(ChatModel delegate, String role, String provider, String model) {
-        this.delegate = delegate;
-        this.role     = role;
-        this.provider = provider;
-        this.model    = model;
+        this(delegate, role, provider, model, LlmTelemetry.NOOP);
     }
-    
+
+    public TimedChatLanguageModel(ChatModel delegate, String role, String provider, String model,
+                                  LlmTelemetry telemetry) {
+        this.delegate   = delegate;
+        this.role       = role;
+        this.provider   = provider;
+        this.model      = model;
+        this.telemetry  = telemetry != null ? telemetry : LlmTelemetry.NOOP;
+    }
+
     @Override
     public ChatResponse chat(ChatRequest request) {
-        String operation = resolveOperation();
-        String type      = MDC.get(MDC_TYPE);
-        long   start     = System.nanoTime();
+        String  operation = resolveOperation();
+        String  type      = MDC.get(MDC_TYPE);
+        Instant startedAt = Instant.now();
+        long    start     = System.nanoTime();
         log.debug("[LLM][REQUEST] operation={}  role={}  provider={}  model={}  messages={}{}",
                 operation, role, provider, model, request.messages().size(), formatMessages(request));
         try {
             ChatResponse response = delegate.chat(request);
-            logCall(operation, type, elapsedMs(start), response.tokenUsage(), null);
+            long latencyMs = elapsedMs(start);
+            Double cost    = costUsd(response.tokenUsage());
+            logCall(operation, type, latencyMs, response.tokenUsage(), cost, null);
+            emit(operation, type, startedAt, latencyMs, response.tokenUsage(), cost, null);
             return response;
         } catch (Exception e) {
-            logCall(operation, type, elapsedMs(start), null, e.getClass().getSimpleName());
+            long latencyMs = elapsedMs(start);
+            String error   = e.getClass().getSimpleName();
+            logCall(operation, type, latencyMs, null, null, error);
+            emit(operation, type, startedAt, latencyMs, null, null, error);
             throw e;
         }
+    }
+
+    /**
+     * Hands the call off to the telemetry sink (metrics/tracing). Never lets a telemetry failure
+     * escape onto the LLM path — a broken exporter must not break inference.
+     */
+    private void emit(String operation, String type, Instant startedAt, long latencyMs,
+                      TokenUsage tokens, Double cost, String error) {
+        if (telemetry == LlmTelemetry.NOOP) return;
+        try {
+            telemetry.record(new LlmCallData(operation, type, role, provider, model,
+                    startedAt, latencyMs,
+                    tokens != null ? tokens.inputTokenCount()  : null,
+                    tokens != null ? tokens.outputTokenCount() : null,
+                    tokens != null ? tokens.totalTokenCount()  : null,
+                    cost, error));
+        } catch (Exception e) {
+            log.warn("[LLM][TELEMETRY] sink failed ({}); ignoring", e.getClass().getSimpleName());
+        }
+    }
+
+    /** USD cost for the call, or null when the model is unpriced or usage is absent. */
+    private Double costUsd(TokenUsage tokens) {
+        if (tokens == null) return null;
+        Optional<ModelPricingRegistry.Pricing> pricing = ModelPricingRegistry.lookup(model);
+        if (pricing.isEmpty()) return null;
+        int inTokens  = tokens.inputTokenCount()  != null ? tokens.inputTokenCount()  : 0;
+        int outTokens = tokens.outputTokenCount() != null ? tokens.outputTokenCount() : 0;
+        return pricing.get().cost(inTokens, outTokens);
     }
 
     @Override
@@ -85,7 +129,8 @@ public class TimedChatLanguageModel implements ChatModel {
         return dot >= 0 ? fqcn.substring(dot + 1) : fqcn;
     }
 
-    private void logCall(String operation, String type, long latencyMs, TokenUsage tokens, String error) {
+    private void logCall(String operation, String type, long latencyMs, TokenUsage tokens,
+                         Double cost, String error) {
         StringBuilder sb = new StringBuilder("[LLM]");
         sb.append("  operation=").append(operation);
         if (type != null) sb.append("  type=").append(type);
@@ -97,11 +142,7 @@ public class TimedChatLanguageModel implements ChatModel {
             sb.append("  tokensIn=").append(tokens.inputTokenCount());
             sb.append("  tokensOut=").append(tokens.outputTokenCount());
             sb.append("  tokensTotal=").append(tokens.totalTokenCount());
-            Optional<ModelPricingRegistry.Pricing> pricing = ModelPricingRegistry.lookup(model);
-            if (pricing.isPresent()) {
-                int inTokens  = tokens.inputTokenCount()  != null ? tokens.inputTokenCount()  : 0;
-                int outTokens = tokens.outputTokenCount() != null ? tokens.outputTokenCount() : 0;
-                double cost = pricing.get().cost(inTokens, outTokens);
+            if (cost != null) {
                 sb.append(String.format(Locale.US, "  costUsd=%.6f", cost));
             }
         }

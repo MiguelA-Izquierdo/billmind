@@ -125,8 +125,67 @@ Metrics exposed via `/actuator/metrics` and `/actuator/prometheus` (on the manag
 | `pii.llm.fallbacks` | Counter | `reason` (exception / invalid_response) | `HybridPiiRedactor` |
 | `invoice.classify.duration` | Timer | `strategy` (keyword / llm) | `HybridInvoiceClassifier` |
 | `invoice.upload.duration` | Timer | — | `InvoiceController` |
+| `llm.call.duration` | Timer | `role`, `provider`, `model`, `operation`, `outcome` | `MetricsLlmTelemetry` |
+| `llm.calls` | Counter | `role`, `provider`, `model`, `operation`, `outcome` | `MetricsLlmTelemetry` |
+| `llm.tokens` | Counter (by count) | `role`, `provider`, `model`, `direction` (input/output) | `MetricsLlmTelemetry` |
+| `llm.cost.usd` | Counter (by USD) | `role`, `provider`, `model` | `MetricsLlmTelemetry` |
+
+The `llm.*` meters are fed by the same per-call hook as the `[LLM]` log line — `TimedChatLanguageModel`
+builds one `LlmCallData` and fans it out to every active telemetry sink. They are on by default
+(`LLM_METRICS_ENABLED=true`); token counts and cost are deliberately kept off the tag set to bound
+cardinality. Turn the sink off with `LLM_METRICS_ENABLED=false`.
 
 An LLM exception increments both `pii.llm.failures` (tagged with the exception class) and
 `pii.llm.fallbacks{reason=exception}`; a rejected/invalid LLM response increments only
 `pii.llm.fallbacks{reason=invalid_response}`. Instrumentation lives exclusively in the
 infrastructure layer, consistent with the logging convention above.
+
+---
+
+## LLM tracing → Langfuse (OTLP)
+
+The same `TimedChatLanguageModel` hook can also export **one OpenTelemetry span per LLM call** to a
+Langfuse backend over OTLP/HTTP. This is the distributed-tracing complement to the aggregate
+`llm.*` metrics above: metrics answer "how many calls / tokens / dollars", traces answer "what did
+*this* call look like".
+
+### Telemetry sinks
+
+Both sinks consume the same `LlmCallData`; each has its own flag, so a deployment runs neither,
+either, or both. When both flags are off, `TimedChatLanguageModel` holds `LlmTelemetry.NOOP` and no
+SDK is built.
+
+| Sink | Class | Flag (default) | Destination |
+|---|---|---|---|
+| Metrics | `MetricsLlmTelemetry` | `LLM_METRICS_ENABLED` (`true`) | Micrometer → Actuator `/metrics`, `/prometheus` |
+| Tracing | `TracingLlmTelemetry` | `LLM_TRACING_ENABLED` (`false`) | OpenTelemetry SDK → OTLP → Langfuse |
+
+`ChatModelRolesConfig` composes whatever sink beans exist into one `LlmTelemetry` and injects it into
+both role models. `LlmTracingConfig` (`@ConditionalOnProperty`) builds the OTel SDK, OTLP exporter
+and `Tracer` only when tracing is enabled.
+
+### Backend is external
+
+The Langfuse **backend** is shared infrastructure deployed outside this repo (its own namespace,
+Postgres/ClickHouse, internal-only ingress) — exactly like Postgres, Kafka and Ollama. BillMind only
+references it by `LANGFUSE_HOST` and authenticates with project keys injected as secrets. Spans are
+sent to `{LANGFUSE_HOST}/api/public/otel/v1/traces` with an HTTP Basic header built from
+`LANGFUSE_PUBLIC_KEY:LANGFUSE_SECRET_KEY`. Enabling tracing with a blank host fails fast at startup.
+
+### Span shape (OpenTelemetry GenAI conventions)
+
+Since the sink runs after the call completes, the span is created with an explicit start timestamp
+and closed with the matching end timestamp, so its duration equals the real call latency.
+
+| Attribute | Source |
+|---|---|
+| span name | `gen_ai <operation>` (e.g. `gen_ai LlmInvoiceFieldExtractor.extract`) |
+| `gen_ai.system` | provider (`openai`, `anthropic`, `groq`, `gemini`, `ollama`) |
+| `gen_ai.request.model` | model id |
+| `gen_ai.usage.input_tokens` / `output_tokens` / `total_tokens` | `TokenUsage` (omitted when absent) |
+| `gen_ai.usage.cost` | USD from `ModelPricingRegistry` (omitted when unpriced) |
+| `llm.role` / `llm.operation` / `llm.type` | role bean, resolved caller, optional MDC type |
+| status `ERROR` + `error.type` | on a failed call |
+
+A broken exporter never breaks inference: `TimedChatLanguageModel` swallows and logs any telemetry
+failure rather than letting it escape onto the LLM path.
