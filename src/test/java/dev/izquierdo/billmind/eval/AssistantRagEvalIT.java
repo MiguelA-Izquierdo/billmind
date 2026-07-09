@@ -130,7 +130,7 @@ class AssistantRagEvalIT {
     }
 
     private CaseEval evaluate(RagEvalCase c, EvalEmbeddings emb, EvalLlmJudge judge) {
-        ChatContext ctx = assembler.assemble(null, c.question());
+        ChatContext ctx = assembler.assemble(null, null, c.question());
         List<RegulatorySnippet> snippets = ctx.regulatoryContext();
         List<String> docTypes = snippets.stream().map(RegulatorySnippet::docType).toList();
         List<String> contents = snippets.stream().map(RegulatorySnippet::content).toList();

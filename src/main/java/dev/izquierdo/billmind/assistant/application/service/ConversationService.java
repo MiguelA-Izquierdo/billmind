@@ -18,11 +18,17 @@ public class ConversationService {
         this.repository = Objects.requireNonNull(repository);
     }
 
+    /**
+     * Continues the referenced conversation only when it belongs to the calling session. A
+     * conversation owned by another session is treated as if it did not exist, so a guessed
+     * {@code conversationId} cannot pull a stranger's history into the prompt.
+     */
     public Conversation resolve(ChatCommand command) {
         if (command.conversationId() == null) {
             return Conversation.create(command.sessionId(), command.invoiceId());
         }
         return repository.findById(command.conversationId())
+                .filter(conversation -> command.sessionId().equals(conversation.getSessionId()))
                 .orElseGet(() -> Conversation.create(command.sessionId(), command.invoiceId()));
     }
 

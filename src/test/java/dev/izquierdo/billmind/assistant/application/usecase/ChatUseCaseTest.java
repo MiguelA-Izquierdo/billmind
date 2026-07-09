@@ -56,7 +56,7 @@ class ChatUseCaseTest {
     @Test
     void shouldReturnAnswerFromLlm() {
         when(conversationService.resolve(command)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
 
         ChatResult result = chatUseCase.execute(command);
@@ -67,7 +67,7 @@ class ChatUseCaseTest {
     @Test
     void shouldReturnConversationIdFromResolvedConversation() {
         when(conversationService.resolve(command)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
 
         ChatResult result = chatUseCase.execute(command);
@@ -79,7 +79,7 @@ class ChatUseCaseTest {
     void shouldPropagateCitationsFromLlmResult() {
         ChatCitation citation = new ChatCitation("Guía 2.0TD", "REE", "GUIDE");
         when(conversationService.resolve(command)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any()))
                 .thenReturn(new ChatResult(null, "respuesta", List.of(citation)));
 
@@ -91,18 +91,18 @@ class ChatUseCaseTest {
     @Test
     void shouldDelegateContextAssemblyWithInvoiceIdAndMessage() {
         when(conversationService.resolve(command)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
 
         chatUseCase.execute(command);
 
-        verify(contextAssembler).assemble(INVOICE_ID, MESSAGE);
+        verify(contextAssembler).assemble(INVOICE_ID, SESSION_ID, MESSAGE);
     }
 
     @Test
     void shouldPassAssembledContextAndRecentMessagesToLlm() {
         when(conversationService.resolve(command)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
 
         chatUseCase.execute(command);
@@ -113,7 +113,7 @@ class ChatUseCaseTest {
     @Test
     void shouldRecordExchangeWithUserMessageAndLlmAnswer() {
         when(conversationService.resolve(command)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
 
         chatUseCase.execute(command);
@@ -126,20 +126,20 @@ class ChatUseCaseTest {
         ChatCommand noInvoiceCommand = new ChatCommand(SESSION_ID, null, null, "¿Qué es el PVPC?");
         ChatContext emptyContext = new ChatContext(null, List.of(), List.of(), null);
         when(conversationService.resolve(noInvoiceCommand)).thenReturn(conversation);
-        when(contextAssembler.assemble(null, "¿Qué es el PVPC?")).thenReturn(emptyContext);
+        when(contextAssembler.assemble(null, SESSION_ID, "¿Qué es el PVPC?")).thenReturn(emptyContext);
         when(llmPort.answer(eq(emptyContext), eq("¿Qué es el PVPC?"), anyList())).thenReturn(llmResult);
 
         ChatResult result = chatUseCase.execute(noInvoiceCommand);
 
         assertThat(result.answer()).isEqualTo("Pagas 12 € de potencia.");
-        verify(contextAssembler).assemble(null, "¿Qué es el PVPC?");
+        verify(contextAssembler).assemble(null, SESSION_ID, "¿Qué es el PVPC?");
     }
 
     @Test
     void shouldWorkWithoutConversationId() {
         ChatCommand noConversationCommand = new ChatCommand(SESSION_ID, INVOICE_ID, null, MESSAGE);
         when(conversationService.resolve(noConversationCommand)).thenReturn(conversation);
-        when(contextAssembler.assemble(INVOICE_ID, MESSAGE)).thenReturn(context);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
         when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
 
         ChatResult result = chatUseCase.execute(noConversationCommand);

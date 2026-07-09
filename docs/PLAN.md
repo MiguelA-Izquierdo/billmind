@@ -304,14 +304,14 @@ port, conversation store, SSE).
 
 ### Milestone 7 — Production & Security (Phase 2)
 
-**Objective:** make the project deployable and connect it to authenticated user identity. **User accounts are not built in BillMind** — identity, registration, login, credential storage and token issuance are fully delegated to an external user/identity microservice, exactly as admin-route authentication already works today (`JwtAuthFilter` + `AdminRoutesService`). Milestone 7 extends that same delegation model to user-facing endpoints.
+**Objective:** make the project deployable and connect it to authenticated user identity. **User accounts are not built in BillMind** — identity, registration, login, credential storage and token issuance are fully delegated to an external user/identity microservice, exactly as admin-route authentication already works today (`JwtAuthFilter` + `RouteAccessPolicy`). Milestone 7 extends that same delegation model to user-facing endpoints.
 
 **Deliverables:**
 
-- **Identity fully delegated to the external user microservice** (the model already in place for admin routes via `JwtAuthFilter` / `AdminRoutesService`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 7 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
+- **Identity fully delegated to the external user microservice** (the model already in place for admin routes via `JwtAuthFilter` / `RouteAccessPolicy`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 7 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
   - **No `users` table in BillMind.** `sessions` gains a nullable `user_id` column holding the opaque external user identifier — a foreign reference owned by the identity service, not a locally owned entity.
   - Session linking: when an authenticated request arrives, BillMind associates the current anonymous session with the external `user_id` carried in the validated token. The registration and login flows themselves live entirely in the external service.
-  - Extend `JwtAuthFilter` / `AdminRoutesService` to cover authenticated user endpoints (same delegated-validation pattern as admin routes).
+  - Extend `JwtAuthFilter` / `RouteAccessPolicy` to cover authenticated user endpoints (same delegated-validation pattern as admin routes).
   - Rate limiting (per anonymous session and per user).
   - Semantic response cache.
   - PII redaction in logs.

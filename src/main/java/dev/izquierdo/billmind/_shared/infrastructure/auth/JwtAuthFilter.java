@@ -3,6 +3,8 @@ package dev.izquierdo.billmind._shared.infrastructure.auth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.domain.port.ExternalAuthPort;
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
+import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccess;
+import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccessPolicy;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,19 +20,19 @@ import java.io.IOException;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final ExternalAuthPort externalAuthPort;
-    private final AdminRoutesService adminRoutesService;
+    private final RouteAccessPolicy routeAccessPolicy;
     private final ObjectMapper objectMapper;
 
-    public JwtAuthFilter(ExternalAuthPort externalAuthPort, AdminRoutesService adminRoutesService,
+    public JwtAuthFilter(ExternalAuthPort externalAuthPort, RouteAccessPolicy routeAccessPolicy,
                          ObjectMapper objectMapper) {
         this.externalAuthPort = externalAuthPort;
-        this.adminRoutesService = adminRoutesService;
+        this.routeAccessPolicy = routeAccessPolicy;
         this.objectMapper = objectMapper;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !adminRoutesService.isAdminRoute(request);
+        return routeAccessPolicy.accessFor(request) != RouteAccess.ADMIN;
     }
 
     @Override

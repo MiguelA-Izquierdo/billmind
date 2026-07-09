@@ -2,6 +2,8 @@ package dev.izquierdo.billmind._shared.infrastructure.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
+import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccess;
+import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccessPolicy;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,19 +24,19 @@ public class SessionFilter extends OncePerRequestFilter {
     private final SessionService sessionService;
     private final SessionContext sessionContext;
     private final ObjectMapper objectMapper;
-    private final PublicRoutesService publicRoutesService;
+    private final RouteAccessPolicy routeAccessPolicy;
 
     public SessionFilter(SessionService sessionService, SessionContext sessionContext,
-                         ObjectMapper objectMapper, PublicRoutesService publicRoutesService) {
+                         ObjectMapper objectMapper, RouteAccessPolicy routeAccessPolicy) {
         this.sessionService = sessionService;
         this.sessionContext = sessionContext;
         this.objectMapper = objectMapper;
-        this.publicRoutesService = publicRoutesService;
+        this.routeAccessPolicy = routeAccessPolicy;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/v1/") || publicRoutesService.isPublicRoute(request);
+        return routeAccessPolicy.accessFor(request) != RouteAccess.ANONYMOUS;
     }
 
     @Override

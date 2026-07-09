@@ -6,6 +6,7 @@ import dev.izquierdo.billmind.invoice.domain.port.InvoiceRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -18,8 +19,18 @@ public class GetInvoiceUseCase {
     }
 
     public Invoice execute(UUID invoiceId, UUID sessionId) {
+        return findOwned(invoiceId, sessionId).orElseThrow(InvoiceNotFoundException::new);
+    }
+
+    /**
+     * The single definition of "this invoice belongs to this session". An invoice owned by another
+     * session is indistinguishable from a missing one, so callers cannot probe for existence.
+     */
+    public Optional<Invoice> findOwned(UUID invoiceId, UUID sessionId) {
+        if (invoiceId == null || sessionId == null) {
+            return Optional.empty();
+        }
         return invoiceRepository.findById(invoiceId)
-                .filter(invoice -> sessionId.equals(invoice.getSessionId()))
-                .orElseThrow(InvoiceNotFoundException::new);
+                .filter(invoice -> sessionId.equals(invoice.getSessionId()));
     }
 }

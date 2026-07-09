@@ -29,7 +29,7 @@ public class ChatUseCase {
 
     public ChatResult execute(ChatCommand command) {
         Conversation conversation = conversationService.resolve(command);
-        ChatContext context = contextAssembler.assemble(command.invoiceId(), command.message());
+        ChatContext context = contextAssembler.assemble(command.invoiceId(), command.sessionId(), command.message());
         ChatResult result = llmPort.answer(context, command.message(), conversation.getRecentMessages(6));
         conversationService.recordExchange(conversation, command.message(), result.answer());
         return new ChatResult(conversation.getId(), result.answer(), result.citations());

@@ -43,6 +43,7 @@ class ChatContextAssemblerTest {
     private ChatContextAssembler assembler;
 
     private static final UUID   INVOICE_ID = UUID.randomUUID();
+    private static final UUID   SESSION_ID = UUID.randomUUID();
     private static final String QUESTION   = "¿Cuánto pago de potencia?";
     private static final int    MAX_RESULTS = 5;
 
@@ -71,11 +72,11 @@ class ChatContextAssemblerTest {
     @Test
     void shouldLoadInvoiceFieldsWhenInvoiceIdProvided() {
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
         when(marketRatesContextPort.loadLatestRates(any())).thenReturn(List.of());
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.invoiceFields()).isEqualTo(ELECTRICITY_FIELDS);
     }
@@ -84,18 +85,39 @@ class ChatContextAssemblerTest {
     void shouldSetNullInvoiceFieldsWhenInvoiceIdIsNull() {
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
 
-        ChatContext context = assembler.assemble(null, QUESTION);
+        ChatContext context = assembler.assemble(null, SESSION_ID, QUESTION);
 
         assertThat(context.invoiceFields()).isNull();
-        verify(invoiceContextPort, never()).loadInvoice(any());
+        verify(invoiceContextPort, never()).loadInvoice(any(), any());
     }
 
     @Test
     void shouldSetNullInvoiceFieldsWhenInvoiceNotFound() {
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.empty());
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.empty());
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
+
+        assertThat(context.invoiceFields()).isNull();
+    }
+
+    @Test
+    void shouldLoadInvoiceScopedToTheAskingSession() {
+        when(invoiceContextPort.loadInvoice(any(), any())).thenReturn(Optional.empty());
+        when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
+
+        assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
+
+        verify(invoiceContextPort).loadInvoice(INVOICE_ID, SESSION_ID);
+    }
+
+    @Test
+    void shouldSetNullInvoiceFieldsWhenInvoiceBelongsToAnotherSession() {
+        UUID otherSession = UUID.randomUUID();
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, otherSession)).thenReturn(Optional.empty());
+        when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
+
+        ChatContext context = assembler.assemble(INVOICE_ID, otherSession, QUESTION);
 
         assertThat(context.invoiceFields()).isNull();
     }
@@ -105,10 +127,10 @@ class ChatContextAssemblerTest {
     @Test
     void shouldSearchRegulatoryContextWithQuestionAndMaxResults() {
         RegulatorySnippet snippet = new RegulatorySnippet("Guía 2.0TD", "REE", "GUIDE", "contenido");
-        when(invoiceContextPort.loadInvoice(any())).thenReturn(Optional.empty());
+        when(invoiceContextPort.loadInvoice(any(), any())).thenReturn(Optional.empty());
         when(regulationSearchPort.search(QUESTION, MAX_RESULTS)).thenReturn(List.of(snippet));
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.regulatoryContext()).containsExactly(snippet);
         verify(regulationSearchPort).search(QUESTION, MAX_RESULTS);
@@ -119,7 +141,7 @@ class ChatContextAssemblerTest {
         RegulatorySnippet snippet = new RegulatorySnippet("Glosario", "BillMind", "GLOSSARY", "texto");
         when(regulationSearchPort.search(QUESTION, MAX_RESULTS)).thenReturn(List.of(snippet));
 
-        ChatContext context = assembler.assemble(null, QUESTION);
+        ChatContext context = assembler.assemble(null, SESSION_ID, QUESTION);
 
         assertThat(context.regulatoryContext()).containsExactly(snippet);
     }
@@ -132,11 +154,11 @@ class ChatContextAssemblerTest {
         MarketRateSnapshot rate = new MarketRateSnapshot("Iberdrola", "2.0TD",
                 null, new BigDecimal("0.08"), new BigDecimal("0.11"), new BigDecimal("0.18"),
                 new BigDecimal("0.044"), null, START);
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
         when(marketRatesContextPort.loadLatestRates(SupplyDomain.ELECTRICITY)).thenReturn(List.of(rate));
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.marketRates()).containsExactly(rate);
         verify(marketRatesContextPort).loadLatestRates(SupplyDomain.ELECTRICITY);
@@ -146,11 +168,11 @@ class ChatContextAssemblerTest {
     void shouldLoadMarketRatesWithGasDomainForGasInvoice() {
         GasFields gasFields = new GasFields(START, END, new BigDecimal("60.00"), null, null, null);
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura-gas.pdf").fields(gasFields).build();
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
         when(marketRatesContextPort.loadLatestRates(SupplyDomain.GAS)).thenReturn(List.of());
 
-        assembler.assemble(INVOICE_ID, QUESTION);
+        assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         verify(marketRatesContextPort).loadLatestRates(SupplyDomain.GAS);
     }
@@ -159,7 +181,7 @@ class ChatContextAssemblerTest {
     void shouldNotLoadMarketRatesWhenNoInvoiceId() {
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
 
-        ChatContext context = assembler.assemble(null, QUESTION);
+        ChatContext context = assembler.assemble(null, SESSION_ID, QUESTION);
 
         assertThat(context.marketRates()).isEmpty();
         verify(marketRatesContextPort, never()).loadLatestRates(any());
@@ -167,10 +189,10 @@ class ChatContextAssemblerTest {
 
     @Test
     void shouldNotLoadMarketRatesWhenInvoiceNotFound() {
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.empty());
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.empty());
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.marketRates()).isEmpty();
         verify(marketRatesContextPort, never()).loadLatestRates(any());
@@ -183,11 +205,11 @@ class ChatContextAssemblerTest {
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
         ComparisonSummary summary = new ComparisonSummary(
                 new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null);
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
         when(comparisonContextPort.summarize(ELECTRICITY_FIELDS)).thenReturn(Optional.of(summary));
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.comparison()).isEqualTo(summary);
         verify(comparisonContextPort).summarize(ELECTRICITY_FIELDS);
@@ -196,11 +218,11 @@ class ChatContextAssemblerTest {
     @Test
     void shouldSetNullComparisonWhenEngineReturnsEmpty() {
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
         when(comparisonContextPort.summarize(ELECTRICITY_FIELDS)).thenReturn(Optional.empty());
 
-        ChatContext context = assembler.assemble(INVOICE_ID, QUESTION);
+        ChatContext context = assembler.assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.comparison()).isNull();
     }
@@ -209,7 +231,7 @@ class ChatContextAssemblerTest {
     void shouldNotComputeComparisonWhenNoInvoiceId() {
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
 
-        ChatContext context = assembler.assemble(null, QUESTION);
+        ChatContext context = assembler.assemble(null, SESSION_ID, QUESTION);
 
         assertThat(context.comparison()).isNull();
         verify(comparisonContextPort, never()).summarize(any());
@@ -220,9 +242,9 @@ class ChatContextAssemblerTest {
     @Test
     void shouldLoadOnlyInvoiceFieldsWhenToolsEnabled() {
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
 
-        ChatContext context = toolsEnabledAssembler().assemble(INVOICE_ID, QUESTION);
+        ChatContext context = toolsEnabledAssembler().assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         assertThat(context.invoiceFields()).isEqualTo(ELECTRICITY_FIELDS);
         assertThat(context.regulatoryContext()).isEmpty();
@@ -233,9 +255,9 @@ class ChatContextAssemblerTest {
     @Test
     void shouldNotCallEagerPortsWhenToolsEnabled() {
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
-        when(invoiceContextPort.loadInvoice(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
 
-        toolsEnabledAssembler().assemble(INVOICE_ID, QUESTION);
+        toolsEnabledAssembler().assemble(INVOICE_ID, SESSION_ID, QUESTION);
 
         verify(regulationSearchPort, never()).search(any(), anyInt());
         verify(marketRatesContextPort, never()).loadLatestRates(any());

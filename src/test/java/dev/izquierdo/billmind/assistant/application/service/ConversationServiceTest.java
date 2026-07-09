@@ -2,6 +2,7 @@ package dev.izquierdo.billmind.assistant.application.service;
 
 import dev.izquierdo.billmind.assistant.application.command.ChatCommand;
 import dev.izquierdo.billmind.assistant.domain.model.Conversation;
+import dev.izquierdo.billmind.assistant.domain.model.ConversationMessage;
 import dev.izquierdo.billmind.assistant.domain.model.MessageRole;
 import dev.izquierdo.billmind.assistant.domain.port.AssistantRepository;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,20 @@ class ConversationServiceTest {
         Conversation result = conversationService.resolve(command);
 
         assertThat(result.getId()).isNotEqualTo(CONVERSATION_ID);
+    }
+
+    @Test
+    void shouldNotReuseConversationBelongingToAnotherSession() {
+        Conversation strangers = Conversation.create(UUID.randomUUID(), UUID.randomUUID());
+        strangers.addMessage(ConversationMessage.create(MessageRole.USER, "mi factura secreta"));
+        ChatCommand command = new ChatCommand(SESSION_ID, INVOICE_ID, strangers.getId(), "hola");
+        when(repository.findById(strangers.getId())).thenReturn(Optional.of(strangers));
+
+        Conversation result = conversationService.resolve(command);
+
+        assertThat(result.getId()).isNotEqualTo(strangers.getId());
+        assertThat(result.getSessionId()).isEqualTo(SESSION_ID);
+        assertThat(result.getMessages()).isEmpty();
     }
 
     @Test

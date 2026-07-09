@@ -47,9 +47,14 @@ public class ChatContextAssembler {
         this.toolsEnabled           = toolsEnabled;
     }
 
-    public ChatContext assemble(UUID invoiceId, String question) {
+    /**
+     * The invoice is loaded through the session that asked for it, so a visitor cannot pull another
+     * visitor's invoice into the prompt by guessing its id. An invoice they do not own is treated
+     * as absent.
+     */
+    public ChatContext assemble(UUID invoiceId, UUID sessionId, String question) {
         InvoiceFields invoiceFields = invoiceId != null
-                ? invoiceContextPort.loadInvoice(invoiceId).map(Invoice::getFields).orElse(null)
+                ? invoiceContextPort.loadInvoice(invoiceId, sessionId).map(Invoice::getFields).orElse(null)
                 : null;
 
         // In agentic mode the LLM pulls regulation, market rates and comparison on demand via

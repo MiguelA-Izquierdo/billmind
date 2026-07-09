@@ -57,4 +57,31 @@ class GetInvoiceUseCaseTest {
         assertThatThrownBy(() -> getInvoiceUseCase.execute(invoiceId, UUID.randomUUID()))
                 .isInstanceOf(InvoiceNotFoundException.class);
     }
+
+    // --- findOwned: the single ownership rule, shared with the assistant ---
+
+    @Test
+    void shouldFindOwnedInvoiceWhenSessionMatches() {
+        UUID invoiceId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        Invoice invoice = Invoice.builder(invoiceId, "factura.pdf").sessionId(sessionId).build();
+        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+
+        assertThat(getInvoiceUseCase.findOwned(invoiceId, sessionId)).contains(invoice);
+    }
+
+    @Test
+    void shouldNotFindInvoiceOwnedByAnotherSession() {
+        UUID invoiceId = UUID.randomUUID();
+        Invoice invoice = Invoice.builder(invoiceId, "factura.pdf").sessionId(UUID.randomUUID()).build();
+        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+
+        assertThat(getInvoiceUseCase.findOwned(invoiceId, UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void shouldNotFindInvoiceWhenIdsAreNull() {
+        assertThat(getInvoiceUseCase.findOwned(null, UUID.randomUUID())).isEmpty();
+        assertThat(getInvoiceUseCase.findOwned(UUID.randomUUID(), null)).isEmpty();
+    }
 }

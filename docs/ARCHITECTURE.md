@@ -13,7 +13,8 @@ Reference for sessions where modules are designed or extended. Use with `@CLAUDE
 5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. See *LLM Provider Strategy* section below.
 6. **Domain Events** — the publishing infrastructure (`DomainEventPublisher` → Spring's `ApplicationEventPublisher`) is in place for future use; no active listener is wired yet. The comparison is computed synchronously via the query bus, not event-driven.
 7. **Frontend-generated session UUID** — sent as `X-Session-Id` header. The backend correlates resources to it but does not authenticate (Phase 1 is anonymous). Auth lands in Milestone 7.
-10. **Admin route protection via external auth microservice** — destructive admin operations (e.g. `DELETE /api/v1/market-rates`) are guarded by `JwtAuthFilter` before `SessionFilter` runs. The filter delegates token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid and the request proceeds; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain. Admin routes are still declared as "public" in `PublicRoutesService` so `SessionFilter` skips them; `JwtAuthFilter` is the sole gatekeeper for those routes. Adding more admin routes requires only editing `AdminRoutesService.ADMIN_ROUTES`.
+10. **Admin route protection via external auth microservice** — admin operations (the whole `/api/v1/admin/**` tree, plus `DELETE /api/v1/market-rates`) are guarded by `JwtAuthFilter` before `SessionFilter` runs. The filter delegates token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid and the request proceeds; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain.
+11. **`RouteAccessPolicy` — one classifier, two filters.** Authentication and session correlation are independent axes, so every route resolves to exactly one `RouteAccess`: `ADMIN` (bearer token, no session), `ANONYMOUS` (session, no token), or `OPEN` (neither). `JwtAuthFilter` acts on `ADMIN`, `SessionFilter` acts on `ANONYMOUS`. Because both filters read the same classifier, a route can never be registered with one and forgotten by the other. Anything unrecognized under `/api/v1/` defaults to `ANONYMOUS`, and anything under `/api/v1/admin/**` is `ADMIN` by convention — a new admin endpoint is guarded the moment it is mapped, without touching the policy.
 8. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
 9. **English system prompts with "respond in Spanish" instruction** — small Ollama models follow English instructions more reliably; output language is controlled by an explicit instruction at the end of the prompt.
 
@@ -69,15 +70,21 @@ BillMind **never validates tokens itself**. All authentication is delegated to a
 The filter chain for an incoming request:
 
 ```
-JwtAuthFilter          ← only activates for routes in AdminRoutesService.ADMIN_ROUTES
+JwtAuthFilter          ← activates only when RouteAccessPolicy says ADMIN
   └─ ExternalAuthAdapter.isAuthorized(bearerToken)
        └─ GET <AUTH_EXTERNAL_URL>/introspect   (Authorization: Bearer <token>)
             200 → true   →  chain continues
             4xx / error  →  false → 401 or 403 returned immediately
-SessionFilter          ← skips admin routes (they stay in PublicRoutesService)
-  └─ requires X-Session-Id for all other /api/v1/ routes
+SessionFilter          ← activates only when RouteAccessPolicy says ANONYMOUS
+  └─ requires a valid X-Session-Id UUID
 Controller
 ```
+
+| Route | `RouteAccess` | Bearer token | `X-Session-Id` |
+|---|---|---|---|
+| `/api/v1/admin/**`, `DELETE /api/v1/market-rates` | `ADMIN` | required | — |
+| `POST /api/v1/invoices`, `POST /api/v1/assistant/chat`, … | `ANONYMOUS` | — | required |
+| `GET /api/v1/market-rates`, `/actuator/**`, `/chat/**` | `OPEN` | — | — |
 
 Key files:
 
@@ -86,7 +93,7 @@ Key files:
 | `_shared/domain/port/ExternalAuthPort` | Port — `isAuthorized(String bearerToken): boolean` |
 | `_shared/infrastructure/adapter/ExternalAuthAdapter` | Adapter — `GET /introspect`, fail-closed on any error |
 | `_shared/infrastructure/auth/JwtAuthFilter` | `OncePerRequestFilter` — extracts Bearer, calls port, rejects with 401/403 |
-| `_shared/infrastructure/auth/AdminRoutesService` | Declares which method+path pairs require JWT |
+| `_shared/infrastructure/route/RouteAccessPolicy` | Classifies every route as `ADMIN` / `ANONYMOUS` / `OPEN` |
 | `_shared/infrastructure/config/SecurityConfig` | Registers `JwtAuthFilter` before `SessionFilter` |
 
 Config: `AUTH_EXTERNAL_URL` env var → `app.auth.external-url`.
