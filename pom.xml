@@ -185,6 +185,13 @@
             <artifactId>langchain4j-embeddings-all-minilm-l6-v2</artifactId>
         </dependency>
 
+        <!-- Caffeine — in-process bounded caches: agentic tool results and the conversation store.
+             Version managed by the Spring Boot parent. A Redis-backed impl is planned for scale-out. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

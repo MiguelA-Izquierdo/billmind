@@ -6,9 +6,11 @@ import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
 import dev.izquierdo.billmind.assistant.domain.model.ConversationMessage;
 import dev.izquierdo.billmind.assistant.domain.model.MessageRole;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
+import dev.izquierdo.billmind.assistant.infrastructure.adapter.cache.CaffeineToolResultCache;
 import dev.izquierdo.billmind.assistant.infrastructure.adapter.tool.AssistantTools;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.exception.InvalidRequestException;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -19,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -47,7 +50,9 @@ class AgenticAssistantLlmAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AgenticAssistantLlmAdapter(smartChatModel, tools);
+        // Real Caffeine cache (fresh per test) — exercises the interface and keeps isolation.
+        adapter = new AgenticAssistantLlmAdapter(
+                smartChatModel, tools, new CaffeineToolResultCache(500, Duration.ofHours(2)));
     }
 
     private static ChatResponse response(AiMessage message) {
@@ -113,13 +118,14 @@ class AgenticAssistantLlmAdapterTest {
 
     @Test
     void shouldForceFinalAnswerWithoutToolsWhenRoundsExhausted() {
+        // Distinct queries each round so the short-circuit never triggers and all 5 rounds run.
         when(smartChatModel.chat(any(ChatRequest.class))).thenReturn(
-                response(toolCall("search_regulation", "{\"query\":\"x\"}")),  // round 1
-                response(toolCall("search_regulation", "{\"query\":\"x\"}")),  // round 2
-                response(toolCall("search_regulation", "{\"query\":\"x\"}")),  // round 3
-                response(toolCall("search_regulation", "{\"query\":\"x\"}")),  // round 4
-                response(toolCall("search_regulation", "{\"query\":\"x\"}")),  // round 5
-                response(AiMessage.from("Respuesta forzada sin tools.")));     // final call
+                response(toolCall("search_regulation", "{\"query\":\"x1\"}")),  // round 1
+                response(toolCall("search_regulation", "{\"query\":\"x2\"}")),  // round 2
+                response(toolCall("search_regulation", "{\"query\":\"x3\"}")),  // round 3
+                response(toolCall("search_regulation", "{\"query\":\"x4\"}")),  // round 4
+                response(toolCall("search_regulation", "{\"query\":\"x5\"}")),  // round 5
+                response(AiMessage.from("Respuesta forzada sin tools.")));      // final call
         when(tools.dispatch(any(), any(), anyList())).thenReturn("resultado");
 
         ChatResult result = adapter.answer(CONTEXT, QUESTION, List.of());
@@ -127,6 +133,53 @@ class AgenticAssistantLlmAdapterTest {
         assertThat(result.answer()).isEqualTo("Respuesta forzada sin tools.");
         verify(tools, times(5)).dispatch(any(), any(), anyList());
         verify(smartChatModel, times(6)).chat(any(ChatRequest.class));
+    }
+
+    @Test
+    void shouldShortCircuitWhenModelRepeatsAlreadyServedToolCall() {
+        // The model asks for the same call twice; the second round short-circuits to a tool-less answer.
+        when(smartChatModel.chat(any(ChatRequest.class))).thenReturn(
+                response(toolCall("search_regulation", "{\"query\":\"x\"}")),   // round 1: executed
+                response(toolCall("search_regulation", "{\"query\":\"x\"}")),   // round 2: repeat -> short-circuit
+                response(AiMessage.from("Respuesta final sin repetir la tool.")));
+        when(tools.dispatch(any(), any(), anyList())).thenReturn("resultado");
+
+        ChatResult result = adapter.answer(CONTEXT, QUESTION, List.of());
+
+        assertThat(result.answer()).isEqualTo("Respuesta final sin repetir la tool.");
+        verify(tools, times(1)).dispatch(any(), any(), anyList());
+        verify(smartChatModel, times(3)).chat(any(ChatRequest.class));
+    }
+
+    @Test
+    void shouldRecoverWithToollessAnswerWhenModelReturnsInvalidToolCall() {
+        // Reproduces the Groq 400 tool_use_failed: the round-2 tool call blows up on the provider.
+        when(smartChatModel.chat(any(ChatRequest.class)))
+                .thenReturn(response(toolCall("search_regulation", "{\"query\":\"x\"}")))
+                .thenThrow(new InvalidRequestException("400 tool_use_failed"))
+                .thenReturn(response(AiMessage.from("Respuesta segura sin herramientas.")));
+        when(tools.dispatch(any(), any(), anyList())).thenReturn("resultado");
+
+        ChatResult result = adapter.answer(CONTEXT, QUESTION, List.of());
+
+        assertThat(result.answer()).isEqualTo("Respuesta segura sin herramientas.");
+        verify(tools, times(1)).dispatch(any(), any(), anyList());
+        verify(smartChatModel, times(3)).chat(any(ChatRequest.class));
+    }
+
+    @Test
+    void shouldReturnFallbackMessageWhenModelFailsRepeatedly() {
+        // Invalid tool call, then the tool-less retry also fails -> degraded Spanish fallback, no crash.
+        when(smartChatModel.chat(any(ChatRequest.class)))
+                .thenThrow(new InvalidRequestException("400 tool_use_failed"))
+                .thenThrow(new RuntimeException("groq 500"));
+
+        ChatResult result = adapter.answer(CONTEXT, QUESTION, List.of());
+
+        assertThat(result.answer()).contains("No he podido completar");
+        assertThat(result.citations()).isEmpty();
+        verify(tools, never()).dispatch(any(), any(), anyList());
+        verify(smartChatModel, times(2)).chat(any(ChatRequest.class));
     }
 
     @Test

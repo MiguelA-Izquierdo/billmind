@@ -26,7 +26,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Catalogue and dispatcher for the assistant's agentic tools. Exposes the three retrieval
@@ -42,10 +44,14 @@ public class AssistantTools {
 
     static final String GET_INVOICE_COMPARISON = "get_invoice_comparison";
     static final String SEARCH_MARKET_RATES    = "search_market_rates";
-    static final String SEARCH_REGULATION      = "search_regulation";
+    /** Public so the agentic adapter can tell which tool is safe to cache (argument-deterministic). */
+    public static final String SEARCH_REGULATION = "search_regulation";
 
     private static final String NO_INVOICE = "No se ha proporcionado factura, así que no hay datos "
             + "de la factura del usuario para esta consulta.";
+
+    private static final String NO_RATES = "BillMind no tiene ninguna tarifa de mercado registrada "
+            + "para este tipo de suministro.";
 
     private final ComparisonContextPort comparisonContextPort;
     private final MarketRatesContextPort marketRatesContextPort;
@@ -126,18 +132,41 @@ public class AssistantTools {
     private String marketRates(InvoiceFields fields, ToolExecutionRequest request) {
         if (fields == null) return NO_INVOICE;
         List<MarketRateSnapshot> rates = marketRatesContextPort.loadLatestRates(supplyDomainOf(fields));
+        if (rates.isEmpty()) return NO_RATES;
         String company = readStringArgument(request, "company");
-        if (company != null && !company.isBlank()) {
-            String needle = company.toLowerCase(Locale.ROOT).strip();
-            rates = rates.stream()
-                    .filter(r -> r.company() != null
-                            && r.company().toLowerCase(Locale.ROOT).contains(needle))
-                    .toList();
-            if (rates.isEmpty()) {
-                return "No se han encontrado tarifas de mercado para la compañía '" + company + "'.";
-            }
+        if (company == null || company.isBlank()) {
+            return AssistantContextFormatter.formatMarketRates(rates);
         }
-        return AssistantContextFormatter.formatMarketRates(rates);
+        String needle = company.toLowerCase(Locale.ROOT).strip();
+        List<MarketRateSnapshot> matches = rates.stream()
+                .filter(r -> r.company() != null
+                        && r.company().toLowerCase(Locale.ROOT).contains(needle))
+                .toList();
+        return matches.isEmpty()
+                ? notInCatalogue(company, rates)
+                : AssistantContextFormatter.formatMarketRates(matches);
+    }
+
+    /**
+     * Absence from BillMind's catalogue is a limitation of our data, never a fact about the market.
+     * The denial is spelled out — and paired with the companies we do have — because models read a
+     * bare "no rates found" as "the company does not exist" (observed with llama-3.3-70b-versatile,
+     * which told a user that Octopus does not operate in Spain).
+     */
+    private static String notInCatalogue(String company, List<MarketRateSnapshot> rates) {
+        return "BillMind no tiene tarifas registradas de '" + company + "' en su catálogo. Esto NO "
+                + "significa que la compañía no exista ni que no opere en España: simplemente no "
+                + "está entre los datos de mercado disponibles. Compañías con tarifas en el "
+                + "catálogo: " + companiesIn(rates) + ".";
+    }
+
+    private static String companiesIn(List<MarketRateSnapshot> rates) {
+        return rates.stream()
+                .map(MarketRateSnapshot::company)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .collect(Collectors.joining(", "));
     }
 
     private String regulation(ToolExecutionRequest request, List<RegulatorySnippet> citationSink) {

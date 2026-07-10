@@ -276,11 +276,22 @@ in [`docs/ASSISTANT.md`](ASSISTANT.md).
   `llama-3.3-70b-versatile`); small local Ollama is unreliable. Verified live against Groq across the
   three routing scenarios.
 
+**Tool-loop hardening (done):** three safeguards in `AgenticAssistantLlmAdapter` against unreliable
+tool calling (Groq `llama-3.3-70b-versatile` intermittently emits a malformed tool call rejected
+with `400 tool_use_failed`):
+- **Short-circuit** — a within-turn `servedThisTurn` set; a round that only repeats already-seen
+  `(name, arguments)` calls jumps straight to the final tool-less answer (fewer rounds, smaller
+  surface for a malformed call).
+- **Resilience** — an `InvalidRequestException` on a tool round degrades to a tool-less retry and
+  finally to a Spanish fallback message; the SSE stream never propagates the provider 400.
+- **Cache** — `search_regulation` (the sole argument-deterministic, invoice-independent tool) is
+  memoized via the `ToolResultCache` port (Caffeine in-process today, Redis-backed later). The
+  conversation store was migrated to Caffeine in the same pass (sliding TTL + size cap).
+
 **Deferred (future work):**
-- Within-turn tool-call **deduplication + short-circuit** — some models (observed with
-  `llama-3.3-70b-versatile`) request an identical tool call twice before answering, wasting an LLM
-  round and a redundant port call. Cache results by `(name, arguments)` and, when a round contains
-  only already-seen calls, jump straight to the final tool-less answer.
+- **Redis-backed `ToolResultCache`** to share the regulatory cache across instances.
+- **Model-level reliability:** evaluate a more robust tool-calling `smartChatModel` to cut the
+  `tool_use_failed` rate at the source.
 
 **Dependencies:** Milestone 3 (comparison engine + `ComparisonContextPort`), Milestone 5 (assistant
 port, conversation store, SSE).

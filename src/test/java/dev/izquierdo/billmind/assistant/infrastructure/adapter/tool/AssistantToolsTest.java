@@ -128,14 +128,29 @@ class AssistantToolsTest {
     }
 
     @Test
-    void shouldReportNoMatchWhenCompanyFilterHasNoResults() {
+    void shouldDenyNonExistenceAndListAvailableCompaniesWhenCompanyIsNotInCatalogue() {
         when(marketRatesContextPort.loadLatestRates(SupplyDomain.ELECTRICITY))
-                .thenReturn(List.of(rate("Naturgy", "Plan A")));
+                .thenReturn(List.of(rate("Naturgy", "Plan A"), rate("Endesa", "Plan B"),
+                        rate("Endesa", "Plan C")));
+
+        String result = tools.dispatch(
+                request("search_market_rates", "{\"company\":\"Octopus\"}"), FIELDS, new ArrayList<>());
+
+        // The model must not read a missing company as "does not operate in Spain".
+        assertThat(result)
+                .contains("no tiene tarifas registradas de 'Octopus'")
+                .contains("NO significa que la compañía no exista")
+                .contains("Endesa, Naturgy"); // deduplicated and alphabetical
+    }
+
+    @Test
+    void shouldReportEmptyCatalogueWhenNoRatesExistForTheSupplyDomain() {
+        when(marketRatesContextPort.loadLatestRates(SupplyDomain.ELECTRICITY)).thenReturn(List.of());
 
         String result = tools.dispatch(
                 request("search_market_rates", "{\"company\":\"Endesa\"}"), FIELDS, new ArrayList<>());
 
-        assertThat(result).contains("No se han encontrado tarifas").contains("Endesa");
+        assertThat(result).contains("no tiene ninguna tarifa de mercado registrada");
     }
 
     // --- search_regulation ---

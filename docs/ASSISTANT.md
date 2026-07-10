@@ -164,6 +164,14 @@ Distinct from the eager template: it contains the invoice data inline, the rules
 use each tool. It has **no** eager market/comparison/regulatory sections — the model sees the tool
 specs through the tool-calling protocol itself, not through prompt text.
 
+The rules describe *situations*, never tool names. Naming the tools in the prompt turned them into
+vocabulary the model shared with the user: `llama-3.3-70b-versatile` answered "te recomiendo que
+utilices la herramienta `get_invoice_comparison`" and then asked permission to call it, burning a
+whole turn. Three rules enforce the boundary: tools are an internal mechanism and are never
+mentioned; the model acts instead of asking permission and never closes an answer offering to look
+something up; and missing data is stated as a limit of BillMind's catalogue, never as a fact about
+the world.
+
 ---
 
 ## Configuration
@@ -171,6 +179,8 @@ specs through the tool-calling protocol itself, not through prompt text.
 | Property | Env var | Default | Meaning |
 |---|---|---|---|
 | `assistant.tools.enabled` | `ASSISTANT_TOOLS_ENABLED` | `false` | `true` → agentic adapter; `false` → eager adapter |
+| `assistant.tools.cache.ttl` | `ASSISTANT_TOOLS_CACHE_TTL` | `PT2H` | Write-based TTL for the `search_regulation` result cache |
+| `assistant.tools.cache.max-size` | `ASSISTANT_TOOLS_CACHE_MAX_SIZE` | `500` | Max cached regulatory searches before size eviction |
 | `knowledge.search.default-max-results` | `KNOWLEDGE_SEARCH_MAX_RESULTS` | `5` | Snippets per `search_regulation` / eager RAG |
 | `assistant.conversation.max-size` | `ASSISTANT_CONVERSATION_MAX_SIZE` | `1000` | In-memory conversation cap (LRU eviction) |
 | `assistant.conversation.ttl` | `ASSISTANT_CONVERSATION_TTL` | `PT2H` | Sliding TTL for idle conversations |
@@ -195,10 +205,24 @@ arguments and the answer text during testing.
 
 ## Known behaviour & future work
 
-- **Redundant tool calls.** Some models (observed with `llama-3.3-70b-versatile`) occasionally
-  request the *same* tool with the *same* arguments twice before answering, costing an extra LLM
-  round and a redundant port call. A within-turn dedup — cache results by `(name, arguments)` and
-  short-circuit to the final tool-less call when a round contains only already-seen calls — is a
-  candidate mitigation. Not yet implemented.
+- **Redundant tool calls & invalid tool calls (mitigated).** Some models (observed with
+  `llama-3.3-70b-versatile`) occasionally request the *same* tool with the *same* arguments twice
+  before answering, and sometimes emit a malformed tool call that the provider rejects with
+  `400 tool_use_failed`. `AgenticAssistantLlmAdapter` now defends on three fronts:
+  - **Short-circuit** — a within-turn `servedThisTurn` set; when a round contains only already-seen
+    calls, the loop stops offering tools and forces the final tool-less answer (one fewer LLM round,
+    smaller surface for a malformed call).
+  - **Resilience** — an `InvalidRequestException` on a tool round degrades to a tool-less retry;
+    any further failure returns a Spanish fallback message. The SSE stream never propagates the 400.
+  - **Cache** — `search_regulation` (the only argument-deterministic, invoice-independent tool) is
+    memoized via `ToolResultCache` (Caffeine today, Redis-backed later), so repeats within and
+    across turns skip the hybrid retrieval. Cached citations are re-added so answers keep sources.
+- **Non-existence inferred from missing data (mitigated).** Asked about Octopus — a real supplier
+  absent from `electricity_rates` — the model reported that "Octopus no es una empresa de servicios
+  públicos disponible en el mercado español". The old `search_market_rates` empty result ("No se han
+  encontrado tarifas de mercado para la compañía 'X'") reads as non-existence. It now denies the
+  inference explicitly and lists the companies the catalogue *does* hold, so the model can neither
+  conclude the company is fake nor claim ignorance of what it has. Grounding the correction in the
+  tool result rather than the prompt matters: a rule can be ignored, a literal cannot.
 - **Tool-capable model dependency.** With the flag on, `smartChatModel` must support tool calling;
   otherwise keep it off. Documented here and in `PLAN.md`.
