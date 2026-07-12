@@ -1,8 +1,10 @@
 package dev.izquierdo.billmind.assistant.application.usecase;
 
+import dev.izquierdo.billmind._shared.domain.event.DomainEventPublisher;
 import dev.izquierdo.billmind.assistant.application.command.ChatCommand;
 import dev.izquierdo.billmind.assistant.application.service.ChatContextAssembler;
 import dev.izquierdo.billmind.assistant.application.service.ConversationService;
+import dev.izquierdo.billmind.assistant.domain.event.AssistantQuestionAnswered;
 import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult.ChatCitation;
@@ -11,6 +13,7 @@ import dev.izquierdo.billmind.assistant.domain.port.AssistantLlmPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +34,7 @@ class ChatUseCaseTest {
     @Mock private ConversationService  conversationService;
     @Mock private ChatContextAssembler contextAssembler;
     @Mock private AssistantLlmPort     llmPort;
+    @Mock private DomainEventPublisher eventPublisher;
 
     @InjectMocks
     private ChatUseCase chatUseCase;
@@ -146,5 +150,40 @@ class ChatUseCaseTest {
 
         assertThat(result.conversationId()).isNotNull();
         verify(conversationService).resolve(noConversationCommand);
+    }
+
+    @Test
+    void shouldPublishQuestionAnsweredWithCitationCount() {
+        ChatCitation citation = new ChatCitation("Guía 2.0TD", "REE", "GUIDE");
+        when(conversationService.resolve(command)).thenReturn(conversation);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
+        when(llmPort.answer(any(), any(), any()))
+                .thenReturn(new ChatResult(null, "respuesta", List.of(citation)));
+
+        chatUseCase.execute(command);
+
+        ArgumentCaptor<AssistantQuestionAnswered> captor =
+                ArgumentCaptor.forClass(AssistantQuestionAnswered.class);
+        verify(eventPublisher).publish(captor.capture());
+        AssistantQuestionAnswered.Payload payload = captor.getValue().getData();
+        assertThat(payload.conversationId()).isEqualTo(conversation.getId());
+        assertThat(payload.sessionId()).isEqualTo(SESSION_ID);
+        assertThat(payload.invoiceId()).isEqualTo(INVOICE_ID);
+        assertThat(payload.questionLength()).isEqualTo(MESSAGE.length());
+        assertThat(payload.citationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldPublishQuestionAnsweredWithZeroCitationsWhenNoneRetrieved() {
+        when(conversationService.resolve(command)).thenReturn(conversation);
+        when(contextAssembler.assemble(INVOICE_ID, SESSION_ID, MESSAGE)).thenReturn(context);
+        when(llmPort.answer(any(), any(), any())).thenReturn(llmResult);
+
+        chatUseCase.execute(command);
+
+        ArgumentCaptor<AssistantQuestionAnswered> captor =
+                ArgumentCaptor.forClass(AssistantQuestionAnswered.class);
+        verify(eventPublisher).publish(captor.capture());
+        assertThat(captor.getValue().getData().citationCount()).isZero();
     }
 }
