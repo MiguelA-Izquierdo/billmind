@@ -18,7 +18,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <langchain4j.version>1.0.0</langchain4j.version>
-        <testcontainers.version>1.21.0</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -215,25 +215,14 @@
                     <excludes>
                         <exclude>**/*IT.java</exclude>
                     </excludes>
-                    <environmentVariables>
-                        <DOCKER_HOST>tcp://localhost:2375</DOCKER_HOST>
-                    </environmentVariables>
-                    <systemPropertyVariables>
-                        <api.version>1.41</api.version>
-                    </systemPropertyVariables>
                 </configuration>
             </plugin>
+            <!-- Testcontainers resolves the Docker daemon per machine (docker context, DOCKER_HOST
+                 env var or ~/.testcontainers.properties). Never pin it here: a host-specific endpoint
+                 in the build makes the integration tests unrunnable anywhere but that host. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <configuration>
-                    <environmentVariables>
-                        <DOCKER_HOST>tcp://localhost:2375</DOCKER_HOST>
-                    </environmentVariables>
-                    <systemPropertyVariables>
-                        <api.version>1.41</api.version>
-                    </systemPropertyVariables>
-                </configuration>
                 <executions>
                     <execution>
                         <goals>

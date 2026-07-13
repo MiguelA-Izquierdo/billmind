@@ -1,0 +1,250 @@
+/* ── Empty state: the upload CTA owns the center of the screen ───────────── */
+
+.empty-state {
+  margin: auto;
+  width: 100%;
+  max-width: 560px;
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.empty-state[hidden] { display: none; }
+
+.hero-dropzone {
+  position: relative;
+  overflow: hidden;
+  border: 2px dashed var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 38px 32px 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, transform .18s;
+}
+.hero-dropzone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(108,111,245,.13), transparent 68%);
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.hero-dropzone:hover,
+.hero-dropzone:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  outline: none;
+}
+.hero-dropzone:hover::before,
+.hero-dropzone:focus-visible::before { opacity: .55; }
+
+.hero-icon {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 18px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  background: rgba(108,111,245,.14);
+  border: 1px solid rgba(108,111,245,.32);
+  transition: transform .18s, background .18s;
+}
+.hero-icon svg { width: 26px; height: 26px; }
+.hero-icon::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 22px;
+  border: 1px solid rgba(108,111,245,.35);
+  animation: hero-ring 2.6s ease-out infinite;
+}
+.hero-dropzone:hover .hero-icon { transform: translateY(-2px); background: rgba(108,111,245,.22); }
+
+@keyframes hero-ring {
+  0%       { transform: scale(.92); opacity: .7; }
+  70%,100% { transform: scale(1.18); opacity: 0; }
+}
+
+.hero-title {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  margin-bottom: 8px;
+}
+
+.hero-sub {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 380px;
+  margin: 0 auto 20px;
+}
+
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(108,111,245,.32);
+  transition: background .15s, transform .1s, box-shadow .15s;
+}
+.hero-btn svg { width: 15px; height: 15px; }
+.hero-btn:hover:not(:disabled) {
+  background: var(--accent2);
+  box-shadow: 0 8px 26px rgba(108,111,245,.45);
+}
+.hero-btn:active:not(:disabled) { transform: scale(.97); }
+.hero-btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+.hero-meta {
+  margin-top: 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hero-error {
+  margin: 14px auto 0;
+  max-width: 380px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--red);
+  background: rgba(248,113,113,.10);
+  border: 1px solid rgba(248,113,113,.32);
+}
+.hero-error[hidden] { display: none; }
+
+.hero-dropzone.shake { animation: hero-shake .32s ease-in-out; }
+@keyframes hero-shake {
+  0%,100%  { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+/* Dragover state — mirrors the full-window veil */
+.hero-dropzone.dragover {
+  border-color: var(--accent);
+  background: rgba(108,111,245,.10);
+  transform: translateY(-2px);
+}
+
+/* ── The 3 steps ─────────────────────────────────────────────────────────── */
+
+.hero-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  list-style: none;
+}
+
+.hero-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 12px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.hero-step-num {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(108,111,245,.14);
+  border: 1px solid rgba(108,111,245,.28);
+}
+
+.hero-step-txt {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.hero-step-txt strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Full-window drag veil ───────────────────────────────────────────────── */
+
+.drag-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15,17,23,.86);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none; /* let dragleave/drop resolve against the page below */
+}
+.drag-veil.active { display: flex; }
+
+.drag-veil-card {
+  border: 2px dashed var(--accent);
+  border-radius: 22px;
+  background: rgba(108,111,245,.07);
+  padding: 46px 60px;
+  text-align: center;
+  color: var(--text);
+  animation: veil-in .16s ease-out;
+}
+.drag-veil-card svg {
+  width: 40px;
+  height: 40px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.drag-veil-card strong { display: block; font-size: 17px; font-weight: 600; }
+.drag-veil-card span   { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+@keyframes veil-in {
+  from { transform: scale(.97); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Short viewports ─────────────────────────────────────────────────────── */
+
+@media (max-height: 780px) {
+  .empty-state { gap: 14px; }
+  .hero-dropzone { padding: 24px 28px 22px; }
+  .hero-icon { width: 52px; height: 52px; margin-bottom: 12px; border-radius: 15px; }
+  .hero-icon svg { width: 22px; height: 22px; }
+  .hero-title { font-size: 19px; }
+  .hero-sub { margin-bottom: 16px; }
+  .hero-step { padding: 9px 10px; }
+}
+
+@media (max-width: 640px) {
+  .hero-steps { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-icon::after { animation: none; }
+  .hero-dropzone:hover { transform: none; }
+  .drag-veil-card { animation: none; }
+}

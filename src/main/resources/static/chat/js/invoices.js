@@ -1,8 +1,55 @@
 import { SESSION_ID } from './session.js';
-import { fmtDate, fmtEuros } from './utils.js';
-import { showBanner } from './messages.js';
+import { state } from './state.js';
+import { fmtDate, fmtEuros, fmtSupply } from './utils.js';
+import { showBanner, hideBanner, clearMessages } from './messages.js';
+import { loadComparison } from './comparison.js';
+import { checkBackendStatus } from './chat.js';
+import {
+  showEmptyState, hideEmptyState, showSidebarEmpty,
+  syncChat, clearHeroError, closeDrawer,
+} from './ui.js';
 
 const INVOICES_ENDPOINT = '/api/v1/invoices';
+
+/**
+ * The one way an invoice becomes the active one.
+ *
+ * `withComparison` is false right after an upload, where the comparison already
+ * came back in the upload response and re-fetching it would be a second render.
+ * This used to be inferred from `event.isTrusted`, which broke under any
+ * synthetic event and made the path impossible to test.
+ */
+export function selectInvoice(invoiceId, { withComparison } = { withComparison: true }) {
+  const sel = document.getElementById('invoice-select');
+  sel.value = invoiceId ?? '';
+
+  state.selectedInvoiceId = invoiceId || null;
+  state.conversationId    = null;
+
+  // The backend conversation is gone; leaving its answers on screen would read
+  // as one thread while the assistant has no memory of them.
+  clearMessages();
+  hideBanner();
+  clearHeroError();
+  closeDrawer(); // on mobile the drawer covers the answer you just asked for
+
+  updateInvoiceCard(state.selectedInvoiceId);
+  syncChat();
+
+  if (!state.selectedInvoiceId) {
+    showEmptyState('unselected');
+    return;
+  }
+
+  hideEmptyState();
+  document.getElementById('chat-input').focus();
+  checkBackendStatus();
+
+  if (withComparison) {
+    const label = sel.options[sel.selectedIndex]?.textContent ?? '';
+    loadComparison(state.selectedInvoiceId, label);
+  }
+}
 
 export async function loadInvoices() {
   const sel = document.getElementById('invoice-select');
@@ -14,31 +61,34 @@ export async function loadInvoices() {
     const body = await res.json();
     const invoices = body.data?.content ?? body.data ?? [];
 
-    const uploadZone = document.getElementById('upload-zone');
-    const uploadMini = document.getElementById('upload-mini');
-
-    sel.innerHTML = '';
     if (!invoices.length) {
-      sel.innerHTML = '<option value="">Sin facturas — sube una primero</option>';
-      uploadZone.style.display = 'block';
-      uploadMini.style.display = 'none';
+      sel.innerHTML = '';
+      showSidebarEmpty(true);
+      showEmptyState('empty');
       return;
     }
 
-    uploadZone.style.display = 'none';
-    uploadMini.style.display = 'block';
-    sel.innerHTML = '<option value="">Selecciona una factura…</option>';
-    invoices.forEach(inv => {
-      const opt = document.createElement('option');
-      opt.value = inv.id;
-      opt.textContent = `${inv.supplyType ?? '?'} · ${inv.provider ?? 'Desconocida'} · ${fmtDate(inv.billingPeriodStart)}`;
-      sel.appendChild(opt);
-    });
-    sel.disabled = false;
+    fillSelector(sel, invoices);
+    showSidebarEmpty(false);
+
+    // Mid-upload the caller selects the new invoice itself — don't flash the hero.
+    if (!state.selectedInvoiceId && !state.isUploading) showEmptyState('unselected');
   } catch (err) {
+    sel.hidden = false;
     sel.innerHTML = '<option value="">Error al cargar facturas</option>';
     showBanner('No se pudieron cargar las facturas: ' + err.message, 'error');
   }
+}
+
+function fillSelector(sel, invoices) {
+  sel.innerHTML = '<option value="">Selecciona una factura…</option>';
+  invoices.forEach(inv => {
+    const opt = document.createElement('option');
+    opt.value = inv.id;
+    opt.textContent = `${fmtSupply(inv.supplyType)} · ${inv.provider ?? 'Desconocida'} · ${fmtDate(inv.billingPeriodStart)}`;
+    sel.appendChild(opt);
+  });
+  sel.disabled = false;
 }
 
 export async function updateInvoiceCard(invoiceId) {
@@ -52,7 +102,7 @@ export async function updateInvoiceCard(invoiceId) {
     if (!res.ok) throw new Error();
     const { data: inv } = await res.json();
 
-    document.getElementById('ic-type').textContent    = inv.supplyType ?? '—';
+    document.getElementById('ic-type').textContent    = inv.supplyType ? fmtSupply(inv.supplyType) : '—';
     document.getElementById('ic-company').textContent = inv.provider   ?? '—';
     const from = fmtDate(inv.billingPeriodStart);
     const to   = fmtDate(inv.billingPeriodEnd);

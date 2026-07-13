@@ -7,6 +7,7 @@ import {
   appendThinking, removeThinking,
   showBanner, hideBanner,
 } from './messages.js';
+import { syncChat, announce } from './ui.js';
 
 const CHAT_ENDPOINT = '/api/v1/assistant/chat';
 
@@ -22,7 +23,8 @@ export async function sendMessage() {
 
   const thinkingId = appendThinking();
   state.isStreaming = true;
-  setChatDisabled(true);
+  syncChat();
+  announce('El asistente está preparando la respuesta.');
 
   try {
     const res = await fetch(CHAT_ENDPOINT, {
@@ -77,13 +79,14 @@ export async function sendMessage() {
       }
     }
     finishStreaming(msgId);
+    announce('Respuesta completada.');
 
   } catch (err) {
     removeThinking(thinkingId);
     showBanner('Error de red: ' + err.message, 'error');
   } finally {
     state.isStreaming = false;
-    setChatDisabled(false);
+    syncChat();
     document.getElementById('chat-input').focus();
   }
 }
@@ -110,10 +113,4 @@ export async function checkBackendStatus() {
     dot.className    = 'kb-dot offline';
     text.textContent = 'Servicio no disponible';
   }
-}
-
-function setChatDisabled(disabled) {
-  const hasInvoice = !!state.selectedInvoiceId;
-  document.getElementById('send-btn').disabled   = disabled || !hasInvoice;
-  document.getElementById('chat-input').disabled = disabled || !hasInvoice;
 }

@@ -1,7 +1,7 @@
 /* ── Card positioning ──────────────────────────────────────────── */
 .msg.cmp-msg {
   margin: 0 auto;
-  max-width: 480px;
+  max-width: 520px;
   width: 100%;
 }
 
@@ -18,7 +18,7 @@
 .cmp-main {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: stretch;   /* lets the savings figure centre against the metric grid */
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
@@ -26,6 +26,9 @@
 
 .cmp-summary {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* the figure now sits shorter than the metric grid */
   text-align: center;
   min-width: 120px;
   max-width: 150px;
@@ -55,25 +58,6 @@
 .cmp-year {
   font-size: 10px;
   color: var(--muted);
-  margin-bottom: 7px;
-}
-
-.cmp-with       { font-size: 11px; line-height: 1.4; }
-.cmp-with strong { color: var(--accent); }
-
-.tou-badge {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .4px;
-  background: rgba(108,111,245,.15);
-  color: var(--accent);
-  border: 1px solid rgba(108,111,245,.3);
-  border-radius: 4px;
-  padding: 1px 5px;
-  margin-left: 4px;
-  vertical-align: middle;
 }
 
 /* Grid occupies the right side of cmp-main */
@@ -100,14 +84,117 @@
 .cmp-val.best  { color: var(--green); }
 .cmp-key { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
 
-.cmp-alts-title {
+/* ── Scenario tabs (flat vs time-of-use) ───────────────────────────
+   Two real, tappable cards. They must not be filled with solid accent — that is
+   the CTA's job at the foot of this same card — but they must still read as
+   controls, so they get a surface, a border, a hover lift and an explicit cue. */
+.cmp-tabs-hint {
   font-size: 10px;
-  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .5px;
-  margin-bottom: 4px;
   font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
 }
+
+.cmp-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cmp-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color .15s, background .15s, transform .12s, box-shadow .15s;
+}
+.cmp-tab:hover:not(.active) {
+  border-color: var(--accent);
+  background: rgba(108,111,245,.10);
+  transform: translateY(-2px);
+}
+.cmp-tab.active {
+  border-color: var(--accent);
+  background: rgba(108,111,245,.16);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 4px 16px rgba(108,111,245,.20);
+}
+
+.cmp-tab-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color .15s;
+}
+.cmp-tab.active .cmp-tab-label { color: var(--text); }
+
+/* The figure keeps its meaning in both states — the selected one is simply
+   brighter, never recoloured into white. */
+.cmp-tab-amount {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  font-variant-numeric: tabular-nums;
+  opacity: .6;
+  transition: opacity .15s;
+}
+.cmp-tab-amount.positive { color: var(--green); }
+.cmp-tab-amount.negative { color: var(--red); }
+.cmp-tab.active .cmp-tab-amount { opacity: 1; }
+
+/* Says out loud which one you are on and that the other is one tap away */
+.cmp-tab-cue {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--accent);
+  opacity: .75;
+}
+.cmp-tab.active .cmp-tab-cue { color: var(--muted); opacity: .6; }
+
+.cmp-panel[hidden] { display: none; }
+
+/* Winning tariff, full width — no more three-line wrap in a 130px column */
+.cmp-best {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.cmp-best strong { color: var(--accent); font-weight: 600; }
+
+/* ── Alternatives: reference material, folded away by default ──── */
+.cmp-alts { margin-top: 8px; }
+
+.cmp-alts summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 5px 0;
+  transition: color .15s;
+}
+.cmp-alts summary::-webkit-details-marker { display: none; }
+.cmp-alts summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform .15s;
+}
+.cmp-alts[open] summary::before { transform: rotate(90deg); }
+.cmp-alts summary:hover { color: var(--text); }
+
+.cmp-empty { color: var(--muted); font-size: 13px; }
 
 .cmp-alt-row {
   display: flex;
@@ -128,23 +215,6 @@
   margin-top: 8px;
   border-top: 1px solid var(--border);
   padding-top: 8px;
-}
-
-/* ── TOU secondary block ───────────────────────────────────────── */
-.cmp-tou-section {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border);
-}
-
-.cmp-tou-header {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  color: var(--accent);
-  margin-bottom: 8px;
-  opacity: .75;
 }
 
 .cmp-tou-disclaimer {

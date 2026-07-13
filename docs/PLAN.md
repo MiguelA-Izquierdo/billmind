@@ -45,6 +45,8 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | SSE streaming + `conversationId` handshake | 5 | Real LLM UX with in-memory multi-turn |
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | LLM tracing → external Langfuse (backend deployed as shared infra, referenced by env var) | 6 | LLM observability |
+| In-process domain event bus + `metrics/` bounded context reacting to the upload funnel and chat engagement | 6 | Cross-context reactions without coupling; instruments the event bus before the metrics domain lands |
+| `metrics/` domain + persistence + read API (funnel conversion, drop-off reasons, KB coverage gaps) | 9 | Turn the log-only handlers into a queryable product-analytics store |
 | Spring Security + delegated token validation (external identity service) + rate limiting | 7 | Phase 2 — no local user/credential storage |
 | Semantic response cache | 7 | Cost / latency |
 | Flyway migrations (consolidated initial migration) | 7 | Production-grade deployability before first release |
@@ -349,3 +351,21 @@ port, conversation store, SSE).
 **Dependencies:** Milestone 3 (comparison) minimum, ideally with Milestone 5 (chat).
 
 **Engineering highlights:** Next.js + Tailwind with SSE streaming and citation-linked PDF viewer; session UUID persisted client-side; full-stack Docker Compose deployment with Ollama, PostgreSQL + pgVector, and the Spring Boot API behind a single command.
+
+### Milestone 9 — `metrics/` Analytics Domain
+
+**Objective:** turn the `metrics/` bounded context from log-only event handlers into a queryable product-analytics store. The in-process domain event bus and the handlers already exist (they were introduced early, alongside Milestone 6's observability work, to instrument the bus without coupling contexts — see principle #11); this milestone gives them a domain and persistence.
+
+**Deliverables:**
+
+- `metrics/domain/` — aggregates for the upload funnel (ingested vs. rejected, by drop-off reason) and chat engagement (questions answered, `citationCount == 0` as a KB coverage-gap signal). Payloads stay ids/enums/counters only — PII-free by construction.
+  - `metrics/application/` — command handlers replacing the current log-only `DomainEventHandler`s; a query side for the read API.
+  - Persistence for the counters/time series (a `metrics_*` table or rollups).
+  - Read API exposing funnel conversion, drop-off breakdown, and coverage-gap rate.
+- Handlers become idempotent if/when the outbox trigger (principle #11) fires; today's synchronous after-commit dispatch is sufficient.
+
+**Dependencies:** the domain event bus (in place) and its producers — Milestones 1, 3, 5.
+
+**Engineering highlights:** event-driven analytics with zero cross-context coupling (consumers re-load aggregates by id, never receive text), PII-free-by-construction payloads, a metrics read model separate from the operational aggregates.
+
+> **Note on numbering:** Milestone 8 (frontend) is optional and independent; `metrics/` is sequenced as Milestone 9 so the optional frontend keeps its established number. Neither blocks the other.

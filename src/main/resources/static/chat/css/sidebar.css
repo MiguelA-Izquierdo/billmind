@@ -38,6 +38,30 @@
 }
 .invoice-selector:focus { border-color: var(--accent); }
 .invoice-selector:disabled { opacity: .5; cursor: not-allowed; }
+.invoice-selector[hidden] { display: none; }
+
+/* Nothing uploaded yet: point at the hero instead of offering a rival CTA */
+.sidebar-empty {
+  background: var(--surf2);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.sidebar-empty[hidden] { display: none; }
+.sidebar-empty p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.sidebar-empty-link {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.sidebar-empty-link:hover:not(:disabled) { color: var(--text); }
+.sidebar-empty-link:disabled { opacity: .5; cursor: not-allowed; }
 
 .invoice-card {
   margin-top: 12px;
@@ -53,35 +77,8 @@
 .ic-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
 .ic-value { font-size: 12px; font-weight: 500; }
 
-.upload-zone {
-  margin-top: 10px;
-  border: 1.5px dashed var(--border);
-  border-radius: 10px;
-  padding: 14px 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: all .2s;
-}
-.upload-zone:hover,
-.upload-zone.dragover { border-color: var(--accent); background: rgba(108,111,245,.06); }
-.upload-zone p { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-.upload-zone strong { display: block; font-size: 13px; color: var(--text); margin-bottom: 4px; }
-
-.upload-btn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: 7px 16px;
-  font-size: 12px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background .15s;
-}
-.upload-btn:hover { background: var(--accent2); }
-.upload-btn:disabled { opacity: .5; cursor: not-allowed; }
-
 .upload-mini { margin-top: 8px; text-align: right; }
+.upload-mini[hidden] { display: none; }
 .upload-mini button {
   background: none;
   border: 1px solid var(--border);
@@ -89,10 +86,12 @@
   border-radius: 6px;
   padding: 4px 10px;
   font-size: 11px;
+  font-family: inherit;
   cursor: pointer;
   transition: all .15s;
 }
-.upload-mini button:hover { border-color: var(--accent); color: var(--text); }
+.upload-mini button:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.upload-mini button:disabled { opacity: .5; cursor: not-allowed; }
 
 .sidebar-body { flex: 1; overflow-y: auto; padding: 16px; }
 .sidebar-section { margin-bottom: 20px; }
@@ -125,7 +124,8 @@
   color: var(--text);
   background: rgba(108,111,245,.08);
 }
-.suggestion-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* Kept legible while disabled: they still tell you what you'll be able to ask */
+.suggestion-btn:disabled { opacity: .7; cursor: not-allowed; }
 
 .kb-status {
   display: flex;

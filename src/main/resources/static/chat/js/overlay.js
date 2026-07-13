@@ -1,62 +1,103 @@
-const STAGES = {
-  upload: [
-    { pct: 10, label: 'Leyendo el PDF…',                           delay: 0 },
-    { pct: 30, label: 'Identificando tipo de factura…',            delay: 2500 },
-    { pct: 60, label: 'Extrayendo campos con IA…',                 delay: 5500 },
-    { pct: 80, label: 'Calculando tu ahorro potencial…',           delay: 9000 },
-    { pct: 90, label: 'Buscando las mejores tarifas del mercado…', delay: 12500 },
-  ],
-  comparison: [
-    { pct: 20, label: 'Cargando factura…',                         delay: 0 },
-    { pct: 65, label: 'Calculando tu ahorro potencial…',           delay: 800 },
-    { pct: 90, label: 'Buscando las mejores tarifas del mercado…', delay: 1800 },
-  ],
-};
+/**
+ * Upload/busy overlay.
+ *
+ * The progress bar only ever claims what we can actually measure: the byte
+ * transfer, reported by XHR. Once the bytes are on the server we have no signal
+ * about how far along the LLM is, so the bar switches to indeterminate and we
+ * show elapsed time instead of inventing a percentage.
+ */
 
-let _timers = [];
+const SLOW_AFTER_MS = 30_000;
 
-export function showOverlay(mode = 'upload') {
-  const stages = STAGES[mode] ?? STAGES.upload;
-  document.getElementById('upload-overlay').classList.add('active');
-  setProgress(0);
-  setMessage(stages[0].label);
+const el = id => document.getElementById(id);
 
-  stages.slice(1).forEach(stage => {
-    const t = setTimeout(() => {
-      setProgress(stage.pct);
-      setMessage(stage.label);
-    }, stage.delay);
-    _timers.push(t);
-  });
+let elapsedTimer = null;
+let slowTimer    = null;
+let startedAt    = 0;
+
+function reset() {
+  clearInterval(elapsedTimer);
+  clearTimeout(slowTimer);
+  elapsedTimer = null;
+  slowTimer    = null;
+
+  el('overlay-track').classList.remove('indeterminate');
+  el('overlay-progress').style.width = '0%';
+  el('overlay-file').hidden    = true;
+  el('overlay-elapsed').hidden = true;
+  el('overlay-cancel').hidden  = true;
+  el('overlay-cancel').onclick = null;
+}
+
+/** Phase 1: real, measured progress while the file is being sent. */
+export function showUploadOverlay(fileName, onCancel) {
+  reset();
+  el('upload-overlay').classList.add('active');
+  el('overlay-message').textContent = 'Subiendo tu factura…';
+  el('overlay-hint').textContent    = 'Enviando el archivo al servidor.';
+
+  const file = el('overlay-file');
+  file.textContent = fileName;
+  file.hidden      = false;
+
+  const cancel = el('overlay-cancel');
+  cancel.hidden  = false;
+  cancel.onclick = onCancel;
+}
+
+export function setUploadProgress(pct) {
+  el('overlay-progress').style.width = Math.min(100, Math.round(pct)) + '%';
+}
+
+/** Phase 2: bytes delivered. We no longer know anything — say so, and count up. */
+export function enterProcessing() {
+  el('overlay-message').textContent = 'Analizando tu factura con IA…';
+  el('overlay-hint').textContent    = 'Suele tardar entre 10 y 30 segundos.';
+  el('overlay-track').classList.add('indeterminate');
+  el('overlay-progress').style.width = '100%';
+
+  startedAt = Date.now();
+  const elapsed = el('overlay-elapsed');
+  elapsed.hidden = false;
+  elapsed.textContent = '0 s';
+
+  elapsedTimer = setInterval(() => {
+    elapsed.textContent = Math.floor((Date.now() - startedAt) / 1000) + ' s';
+  }, 1000);
+
+  slowTimer = setTimeout(() => {
+    el('overlay-hint').textContent =
+      'Está tardando más de lo normal. Puedes cancelar y volver a intentarlo.';
+    el('overlay-hint').classList.add('warn');
+  }, SLOW_AFTER_MS);
+}
+
+/** Indeterminate spinner for short server-side work with no cancel path. */
+export function showBusyOverlay(label) {
+  reset();
+  el('upload-overlay').classList.add('active');
+  el('overlay-message').textContent = label;
+  el('overlay-hint').textContent    = 'Un momento…';
+  el('overlay-track').classList.add('indeterminate');
+  el('overlay-progress').style.width = '100%';
 }
 
 export function hideOverlay(success = true) {
-  _timers.forEach(clearTimeout);
-  _timers = [];
+  clearInterval(elapsedTimer);
+  clearTimeout(slowTimer);
+  el('overlay-hint').classList.remove('warn');
 
-  if (success) {
-    setProgress(100);
-    setTimeout(() => {
-      document.getElementById('upload-overlay').classList.remove('active');
-      setTimeout(() => setProgress(0), 300);
-    }, 500);
-  } else {
-    document.getElementById('upload-overlay').classList.remove('active');
-    setTimeout(() => setProgress(0), 300);
-  }
-}
+  const close = () => {
+    el('upload-overlay').classList.remove('active');
+    setTimeout(reset, 300);
+  };
 
-function setProgress(pct) {
-  const el = document.getElementById('overlay-progress');
-  if (el) el.style.width = pct + '%';
-}
+  if (!success) return close();
 
-function setMessage(msg) {
-  const el = document.getElementById('overlay-message');
-  if (!el) return;
-  el.style.opacity = '0';
-  setTimeout(() => {
-    el.textContent = msg;
-    el.style.opacity = '1';
-  }, 200);
+  // Land the bar on a full, solid 100% before dismissing.
+  el('overlay-track').classList.remove('indeterminate');
+  el('overlay-progress').style.width = '100%';
+  el('overlay-message').textContent  = 'Listo';
+  el('overlay-cancel').hidden        = true;
+  setTimeout(close, 400);
 }

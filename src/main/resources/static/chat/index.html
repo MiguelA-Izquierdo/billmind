@@ -7,13 +7,23 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/overlay.css">
+  <link rel="stylesheet" href="css/hero.css">
   <link rel="stylesheet" href="css/chat.css">
   <link rel="stylesheet" href="css/comparison.css">
   <link rel="stylesheet" href="css/char-limit.css">
+  <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
 
 <header>
+  <button class="menu-btn" id="menu-btn" aria-label="Abrir panel de facturas"
+          aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
   <div class="logo">Bill<span>Mind</span></div>
   <div class="header-sep"></div>
   <span class="header-title">Asistente</span>
@@ -21,39 +31,63 @@
   <a class="hdr-link" href="/market-rates.html">↗ Tarifas</a>
 </header>
 
-<div class="upload-overlay" id="upload-overlay" aria-live="polite">
+<div class="upload-overlay" id="upload-overlay" role="dialog" aria-modal="true" aria-live="polite">
   <div class="overlay-card">
     <svg class="overlay-bolt" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/>
     </svg>
+
     <div class="overlay-message" id="overlay-message">Preparando…</div>
-    <div class="overlay-progress-track">
+    <div class="overlay-file" id="overlay-file" hidden></div>
+
+    <div class="overlay-progress-track" id="overlay-track">
       <div class="overlay-progress-fill" id="overlay-progress"></div>
     </div>
-    <div class="overlay-hint">La IA está analizando tu factura, tardará unos segundos…</div>
+
+    <div class="overlay-hint" id="overlay-hint">Subiendo…</div>
+    <div class="overlay-elapsed" id="overlay-elapsed" hidden></div>
+
+    <button class="overlay-cancel" id="overlay-cancel" hidden>Cancelar</button>
   </div>
 </div>
 
+<div class="drag-veil" id="drag-veil" aria-hidden="true">
+  <div class="drag-veil-card">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <strong>Suelta aquí tu factura</strong>
+    <span>PDF · hasta 5 MB</span>
+  </div>
+</div>
+
+<!-- Streaming tokens would flood a live region, so we announce milestones here instead -->
+<div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+
 <div class="layout">
 
-  <aside class="sidebar">
+  <div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
+
+  <aside class="sidebar" id="sidebar" aria-label="Facturas y sugerencias">
     <div class="sidebar-header">
-      <h3>Factura analizada</h3>
-      <select class="invoice-selector" id="invoice-select" disabled>
+      <h3>Tu factura</h3>
+
+      <div class="sidebar-empty" id="sidebar-empty">
+        <p>Aún no has analizado ninguna factura.</p>
+        <button class="sidebar-empty-link" data-upload-trigger>Sube la primera →</button>
+      </div>
+
+      <select class="invoice-selector" id="invoice-select" aria-label="Selecciona una factura" hidden>
         <option value="">Cargando facturas…</option>
       </select>
 
-      <div class="upload-zone" id="upload-zone" style="display:none">
-        <strong>Sube tu factura</strong>
-        <p>PDF hasta 5 MB</p>
-        <button class="upload-btn" id="upload-btn">Seleccionar PDF</button>
+      <div class="upload-mini" id="upload-mini" hidden>
+        <button data-upload-trigger>+ Subir otra factura</button>
       </div>
 
-      <div class="upload-mini" id="upload-mini" style="display:none">
-        <button id="upload-mini-btn">+ Subir otra factura</button>
-      </div>
-
-      <input type="file" id="file-input" accept=".pdf,application/pdf" style="display:none">
+      <input type="file" id="file-input" accept=".pdf,application/pdf" hidden>
 
       <div class="invoice-card" id="invoice-card">
         <div class="invoice-card-row">
@@ -95,27 +129,76 @@
   </aside>
 
   <div class="chat-area">
-    <div class="messages" id="messages">
-      <div class="welcome" id="welcome">
-        <div class="welcome-icon">⚡</div>
-        <h2>Asistente BillMind</h2>
-        <p>Selecciona una factura en el panel izquierdo y hazme cualquier pregunta sobre ella. Tengo acceso a normativa regulatoria (CNMC, REE, BOE) para darte respuestas precisas.</p>
-        <div class="welcome-notice">Selecciona una factura del panel izquierdo para empezar.</div>
+    <div class="messages" id="messages" role="log" aria-label="Conversación">
+
+      <div class="empty-state" id="empty-state">
+        <div class="hero-dropzone" id="hero-dropzone" data-upload-trigger
+             role="button" tabindex="0" aria-label="Subir una factura en PDF">
+          <div class="hero-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <h2 class="hero-title" id="hero-title">Sube tu factura de la luz</h2>
+          <p class="hero-sub" id="hero-sub">
+            Arrástrala aquí —o suéltala en cualquier parte de la pantalla— y en unos segundos
+            te digo si estás pagando de más.
+          </p>
+          <button class="hero-btn" data-upload-trigger>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Seleccionar PDF
+          </button>
+          <p class="hero-meta">PDF · hasta 5 MB · de momento solo electricidad</p>
+          <p class="hero-error" id="hero-error" role="alert" hidden></p>
+        </div>
+
+        <ol class="hero-steps">
+          <li class="hero-step">
+            <span class="hero-step-num">1</span>
+            <span class="hero-step-txt"><strong>Subes el PDF</strong>La IA extrae los datos</span>
+          </li>
+          <li class="hero-step">
+            <span class="hero-step-num">2</span>
+            <span class="hero-step-txt"><strong>Comparamos</strong>Con tarifas reales del mercado</span>
+          </li>
+          <li class="hero-step">
+            <span class="hero-step-num">3</span>
+            <span class="hero-step-txt"><strong>Preguntas</strong>Con la normativa CNMC/REE detrás</span>
+          </li>
+        </ol>
       </div>
+
     </div>
 
     <div class="input-area">
       <div id="error-banner"></div>
       <div class="input-wrapper">
-        <textarea id="chat-input" placeholder="Escribe tu pregunta sobre la factura…" rows="1" disabled></textarea>
-        <button id="send-btn" disabled>
+        <label class="sr-only" for="chat-input">Tu pregunta sobre la factura</label>
+        <textarea id="chat-input" placeholder="Sube una factura para poder preguntar…" rows="1" disabled></textarea>
+        <button id="send-btn" aria-label="Enviar pregunta" disabled>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="22" y1="2" x2="11" y2="13"></line>
             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
           </svg>
         </button>
       </div>
-      <p class="input-hint">El asistente usa tu factura completa + normativa regulatoria para responder · <kbd>Enter</kbd> envía · <kbd>Shift+Enter</kbd> nueva línea</p>
+      <!-- Single .input-hint node: char-limit.js wraps it with the char counter -->
+      <div class="input-hint">
+        <p id="hint-locked">
+          <span class="hint-lock">🔒</span>
+          <button class="hint-link" data-upload-trigger>Sube una factura</button> para empezar a preguntar
+        </p>
+        <p id="hint-ready" hidden>
+          <span class="hint-ready-lead">Ya puedes preguntar</span> — leo tu factura entera y la normativa CNMC/REE ·
+          <kbd>Enter</kbd> envía · <kbd>Shift+Enter</kbd> nueva línea
+        </p>
+      </div>
     </div>
   </div>
 

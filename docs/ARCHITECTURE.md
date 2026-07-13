@@ -11,12 +11,44 @@ Reference for sessions where modules are designed or extended. Use with `@CLAUDE
 3. **Automatic IVFFlat index management** — `PgVectorEmbeddingStore` is always configured with `useIndex=false`; the app manages the index lifecycle itself via `JpaKnowledgeRepository.rebuildIndex()`. At startup (after seed) and on `POST /admin/knowledge/reindex`: if vectors < 100 → no index (sequential scan); if vectors ≥ 100 → `DROP + CREATE INDEX` with `lists = sqrt(rows)`. This keeps `lists` correct as the dataset grows without any manual env var tuning. HNSW is the target for a future upgrade when available in `langchain4j-pgvector`.
 4. **Chunk size 150, overlap 30** — tuned to AllMiniLM-L6-v2's 256-token limit. Configurable via `KNOWLEDGE_CHUNK_SIZE` and `KNOWLEDGE_CHUNK_OVERLAP`.
 5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. See *LLM Provider Strategy* section below.
-6. **Domain Events** — the publishing infrastructure (`DomainEventPublisher` → Spring's `ApplicationEventPublisher`) is in place for future use; no active listener is wired yet. The comparison is computed synchronously via the query bus, not event-driven.
+6. **Domain Events** — cross-context reactions travel through `DomainEventPublisher`, a **synchronous in-process bus** (`SpringDomainEventPublisher`, a hand-rolled `Map<event class → handlers>` — **not** Spring's `ApplicationEventPublisher`). Producers publish **after** the persistence step (effectively after-commit) and the emitting use case is never wrapped in a wide `@Transactional`. The first consumer is the `metrics/` bounded context. See the *Domain Events* section below for the event catalogue, and `docs/PLAN.md` (principle #11) for the sync/after-commit rationale and the outbox upgrade path. The comparison, by contrast, is computed synchronously via the query bus, not event-driven.
 7. **Frontend-generated session UUID** — sent as `X-Session-Id` header. The backend correlates resources to it but does not authenticate (Phase 1 is anonymous). Auth lands in Milestone 7.
-10. **Admin route protection via external auth microservice** — admin operations (the whole `/api/v1/admin/**` tree, plus `DELETE /api/v1/market-rates`) are guarded by `JwtAuthFilter` before `SessionFilter` runs. The filter delegates token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid and the request proceeds; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain.
-11. **`RouteAccessPolicy` — one classifier, two filters.** Authentication and session correlation are independent axes, so every route resolves to exactly one `RouteAccess`: `ADMIN` (bearer token, no session), `ANONYMOUS` (session, no token), or `OPEN` (neither). `JwtAuthFilter` acts on `ADMIN`, `SessionFilter` acts on `ANONYMOUS`. Because both filters read the same classifier, a route can never be registered with one and forgotten by the other. Anything unrecognized under `/api/v1/` defaults to `ANONYMOUS`, and anything under `/api/v1/admin/**` is `ADMIN` by convention — a new admin endpoint is guarded the moment it is mapped, without touching the policy.
-8. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
-9. **English system prompts with "respond in Spanish" instruction** — small Ollama models follow English instructions more reliably; output language is controlled by an explicit instruction at the end of the prompt.
+8. **Admin route protection via external auth microservice** — admin operations (the whole `/api/v1/admin/**` tree, plus `DELETE /api/v1/market-rates`) are guarded by `JwtAuthFilter` before `SessionFilter` runs. The filter delegates token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid and the request proceeds; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain.
+9. **`RouteAccessPolicy` — one classifier, two filters.** Authentication and session correlation are independent axes, so every route resolves to exactly one `RouteAccess`: `ADMIN` (bearer token, no session), `ANONYMOUS` (session, no token), or `OPEN` (neither). `JwtAuthFilter` acts on `ADMIN`, `SessionFilter` acts on `ANONYMOUS`. Because both filters read the same classifier, a route can never be registered with one and forgotten by the other. Anything unrecognized under `/api/v1/` defaults to `ANONYMOUS`, and anything under `/api/v1/admin/**` is `ADMIN` by convention — a new admin endpoint is guarded the moment it is mapped, without touching the policy.
+10. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
+11. **English system prompts with "respond in Spanish" instruction** — small Ollama models follow English instructions more reliably; output language is controlled by an explicit instruction at the end of the prompt.
+
+---
+
+## Domain Events
+
+Cross-context reactions travel through `DomainEventPublisher`. The implementation (`SpringDomainEventPublisher`) is a **synchronous, in-process bus**: a hand-rolled `Map<event class → List<DomainEventHandler>>`, built by collecting every `DomainEventHandler` bean at startup and routing each event to the handlers registered for its **exact** class. It does **not** use Spring's `ApplicationEventPublisher`, `@EventListener`, or `@Async`.
+
+**Execution model:**
+
+- **Synchronous, same thread, blocking.** `publish()` invokes each handler inline; a slow or throwing handler affects the producer's flow.
+- **After-commit by construction.** Producers publish *after* the persistence step returns. Since `upload()` / the emitting use case is deliberately **not** wrapped in a wide `@Transactional` (the LLM calls would hold a DB connection open for seconds), the narrow Spring Data transaction has already committed by the time the event is published — effectively after-commit without `@TransactionalEventListener`.
+- **PII-safe payloads.** Every payload carries only ids / enums / counters — never invoice or message text — so consumers in other contexts (e.g. `metrics/`) stay PII-free. A handler that needs more re-loads the aggregate by id.
+- **Known gap:** a crash between commit and in-process dispatch loses the event — harmless for the current metrics/log consumers. The upgrade path (transactional outbox) and its trigger conditions are documented in `docs/PLAN.md` (principle #11).
+
+### Event catalogue
+
+| Event (`eventName`) | Producer | Emitted when | Payload (ids / enums / counters only) | Consumer(s) |
+|---|---|---|---|---|
+| `invoice.ingested` | `UploadInvoiceUseCase` | Invoice classified, PII-redacted, fields extracted and persisted OK | `invoiceId, sessionId, supplyType, provider, uploadedAt` | `InvoiceIngestedMetricsHandler` |
+| `invoice.rejected` | `UploadInvoiceUseCase` | Upload rejected (not a supply invoice / unsupported supply type) | `invoiceId, sessionId, type, reason` | `InvoiceRejectedMetricsHandler` |
+| `assistant.question-answered` | `ChatUseCase` | Assistant produced a complete answer | `conversationId, sessionId, invoiceId, questionLength, citationCount` | `AssistantQuestionAnsweredMetricsHandler` |
+
+`citationCount == 0` on `assistant.question-answered` doubles as a knowledge-base coverage-gap signal (the answer cited no regulatory document).
+
+> **Terminology:** these in-process **domain events** are distinct from the **Kafka market price events** (`ElectricityPriceEvent` on `market.electricity-price-updated`) that the `market/` context consumes. Both are called "events" but they are different mechanisms — the former is a synchronous in-monolith bus, the latter an inter-service message broker.
+
+### Adding a domain event
+
+1. Define the event in the producer context's `domain/event/` — a `final` class extending `BaseDomainEvent<Payload>`, with a `Payload` record carrying **only** non-PII ids/enums/counters.
+2. Publish it from the application layer (use case) **after** persistence, via the injected `DomainEventPublisher`. Never wrap the emitting use case in a wide `@Transactional`.
+3. Add a `DomainEventHandler<YourEvent>` `@Component` in the consuming context's `infrastructure/event/`. Wiring is automatic — `SpringDomainEventPublisher` picks up every handler bean at startup.
+4. Update the event catalogue table above.
 
 ---
 

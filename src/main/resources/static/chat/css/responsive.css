@@ -1,0 +1,90 @@
+/* ── Responsive layer ─────────────────────────────────────────────────────
+   Loaded last so it wins over the desktop rules it overrides.
+   Desktop keeps the fixed sidebar; below 860px it becomes an off-canvas drawer
+   and the chat takes the full width. */
+
+.menu-btn {
+  display: none;              /* desktop: the sidebar is always there */
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px;
+  cursor: pointer;
+  line-height: 0;
+}
+.menu-btn svg { width: 18px; height: 18px; }
+.menu-btn:hover { border-color: var(--accent); }
+
+.sidebar-scrim { display: none; }
+
+@media (max-width: 860px) {
+
+  body { height: 100dvh; }    /* dodge the mobile URL bar / virtual keyboard */
+
+  .menu-btn { display: block; }
+
+  header { padding: 10px 14px; gap: 10px; }
+  .header-sep,
+  .header-title,
+  .session-label { display: none; }
+  .logo { font-size: 18px; }
+  .hdr-link { margin-left: auto; }
+
+  /* Sidebar → drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 800;
+    width: 300px;
+    max-width: 86vw;
+    transform: translateX(-100%);
+    transition: transform .24s ease-out;
+    box-shadow: 0 0 40px rgba(0,0,0,.5);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 700;
+    background: rgba(15,17,23,.65);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .sidebar-scrim[hidden] { display: none; }
+
+  .chat-area { width: 100%; }
+  .messages  { padding: 16px 14px; gap: 14px; }
+  .input-area { padding: 12px 14px; }
+
+  /* Bubbles get the width back that the sidebar was taking */
+  .msg { max-width: 100%; }
+  .msg-content { max-width: calc(100% - 42px); }
+
+  /* Hero: thumb-sized targets, no cramped copy */
+  .empty-state { max-width: 100%; padding: 4px; }
+  .hero-dropzone { padding: 26px 20px 22px; border-radius: 14px; }
+  .hero-title { font-size: 19px; }
+  .hero-sub { font-size: 12.5px; margin-bottom: 18px; }
+  .hero-btn { padding: 13px 24px; font-size: 14px; }
+  .hero-meta { font-size: 10.5px; }
+
+  .overlay-card { padding: 34px 26px; }
+  .drag-veil-card { padding: 32px 28px; }
+}
+
+/* Very small phones: the 3 steps stop being a row (see also hero.css ≤640px) */
+@media (max-width: 480px) {
+  .hero-icon { width: 48px; height: 48px; margin-bottom: 12px; }
+  .hero-title { font-size: 17px; }
+  .hero-btn { width: 100%; justify-content: center; }
+  .input-hint { font-size: 10.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
+}

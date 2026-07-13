@@ -26,19 +26,26 @@ src/main/java/dev/izquierdo/billmind/
 │   │   └── query/                    # Query, QueryBus, QueryHandler
 │   ├── domain/
 │   │   ├── event/                    # DomainEvent, BaseDomainEvent, DomainEventPublisher
+│   │   │   └── handle/               # DomainEventHandler
 │   │   ├── exceptions/               # ValidationErrorsException
-│   │   └── model/                    # PaginatedResult<T>
+│   │   ├── model/                    # PaginatedResult<T>
+│   │   │   └── fields/               # Supply-type field records: ElectricityFields, GasFields, WaterFields, TelecomFields (+ MobileLine, StreamingService)
+│   │   └── port/                     # ExternalAuthPort (external identity delegation)
 │   └── infrastructure/
 │       ├── GlobalExceptionHandler    # Centralized @ControllerAdvice
+│       ├── adapter/                  # ExternalAuthAdapter (GET /introspect, fail-closed)
+│       ├── auth/                     # JwtAuthFilter, ManagementHealthAuthFilter
 │       ├── command/                  # SimpleCommandBus
-│       ├── config/                   # LangChain4jConfig (EmbeddingModel, PgVectorEmbeddingStore)
+│       ├── config/                   # LangChain4jConfig (PgVectorEmbeddingStore), SecurityConfig, ManagementSecurityConfig, LlmTracingConfig, WebMvcConfig
+│       │   └── embedding/            # Per-provider EmbeddingModel beans: AllMiniLm, OpenAi, Ollama
 │       ├── dto/                      # ErrorResponseDTO, SuccessResponseDTO
-│       ├── event/                    # SpringDomainEventPublisher
+│       ├── event/                    # SpringDomainEventPublisher (synchronous in-process bus)
 │       ├── health/                   # StartupReadinessChecker, OllamaHealthIndicator, KafkaHealthIndicator
 │       ├── kafka/                    # KafkaEvent, KafkaConsumerFactoryConfig
-│       ├── llm/                      # TimedChatLanguageModel (implements ChatModel), ModelPricingRegistry, LlmResponseJsonSanitizer
+│       ├── llm/                      # TimedChatLanguageModel (implements ChatModel), ModelPricingRegistry, LlmResponseJsonSanitizer, LlmTelemetry sinks (Metrics/Tracing)
 │       ├── persistence/              # SessionEntity, SessionJpaRepository
 │       ├── query/                    # SimpleQueryBus
+│       ├── route/                    # RouteAccessPolicy, RouteAccess (ADMIN / ANONYMOUS / OPEN classifier)
 │       └── session/                  # SessionContext, SessionFilter, SessionService
 │
 ├── invoice/                          # Bounded Context: invoice ingestion & structured extraction
@@ -67,7 +74,8 @@ src/main/java/dev/izquierdo/billmind/
 ├── assistant/                        # Bounded Context: conversational RAG (Milestone 5 — complete)
 ├── comparison/                       # Bounded Context: savings engine (Milestone 3 — complete)
 ├── knowledge/                        # Bounded Context: regulatory KB ingestion + hybrid search (Milestone 2 — complete)
-└── market/                           # Bounded Context: market rate ingestion (Milestone 2 — Market Consumer, complete)
+├── market/                           # Bounded Context: market rate ingestion (Milestone 2 — Market Consumer, complete)
+└── metrics/                          # Bounded Context: reacts to domain events (upload funnel + chat engagement) via DomainEventHandlers — handlers log-only until the metrics domain lands
 ```
 
 ### Rules (NEVER violate)

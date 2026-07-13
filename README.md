@@ -180,6 +180,22 @@ See [`docs/DOCKER.md`](docs/DOCKER.md) for the full setup guide, profile referen
 
 ---
 
+## Tests
+
+```bash
+./mvnw test      # unit tests only (surefire excludes *IT)
+./mvnw verify    # unit + integration tests (*IT) — this is what CI runs
+```
+
+Integration tests (`*IT`) spin up Postgres/pgVector and Kafka through **Testcontainers**, so they need a
+running Docker daemon. Testcontainers discovers it on its own — from the active `docker context`, the
+`DOCKER_HOST` environment variable, or `~/.testcontainers.properties`. The daemon endpoint is deliberately
+**not** pinned in `pom.xml`: a host-specific endpoint baked into the build makes the tests unrunnable on
+every other machine, CI agents included. If discovery fails, point Testcontainers at your daemon through
+the environment rather than the build — and there is no need to expose Docker over TCP to do it.
+
+---
+
 ## Kubernetes deployment
 
 The Kubernetes manifests and the CD pipeline that deploys BillMind to a cluster live in a **separate infrastructure repository**, not in this repo. This app repo builds and publishes the Docker image; the infra repo takes that image and deploys it (the standard two-pipeline app/infra split).

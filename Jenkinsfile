@@ -43,12 +43,13 @@ pipeline {
             steps {
                 sh """
                     chmod +x mvnw
-                    ./mvnw test
+                    ./mvnw -B --no-transfer-progress verify
                 """
             }
             post {
                 always {
-                    junit 'target/surefire-reports/*.xml'
+                    junit 'target/surefire-reports/TEST-*.xml'
+                    junit 'target/failsafe-reports/TEST-*.xml'
                 }
                 success {
                     script {

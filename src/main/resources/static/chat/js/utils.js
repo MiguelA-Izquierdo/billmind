@@ -1,3 +1,16 @@
+// SupplyDomain (backend enum) → what a human calls it
+const SUPPLY_LABELS = {
+  ELECTRICITY: 'Electricidad',
+  GAS:         'Gas',
+  WATER:       'Agua',
+  TELECOM:     'Telefonía',
+  OTHER:       'Otro',
+};
+
+export function fmtSupply(type) {
+  return SUPPLY_LABELS[type] ?? 'Suministro';
+}
+
 export function escHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')

@@ -73,11 +73,67 @@
   background: linear-gradient(90deg, var(--accent), var(--elec));
   border-radius: 2px;
   width: 0%;
-  transition: width .7s cubic-bezier(.25, .46, .45, .94);
+  transition: width .25s ease-out;
 }
+
+/* No signal from the server about how far along the LLM is — so the bar stops
+   claiming a percentage and just shows that work is happening. */
+.overlay-progress-track.indeterminate .overlay-progress-fill {
+  width: 100%;
+  transition: none;
+  background: linear-gradient(90deg,
+    transparent 0%, var(--accent) 35%, var(--elec) 65%, transparent 100%);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: overlay-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes overlay-sweep {
+  0%   { background-position: -40% 0; }
+  100% { background-position: 140% 0; }
+}
+
+.overlay-file {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-all;
+}
+.overlay-file[hidden] { display: none; }
 
 .overlay-hint {
   font-size: 11px;
   color: var(--muted);
   line-height: 1.5;
+  transition: color .2s;
+}
+.overlay-hint.warn { color: var(--elec); }
+
+.overlay-elapsed {
+  margin-top: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.overlay-elapsed[hidden] { display: none; }
+
+.overlay-cancel {
+  margin-top: 18px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 18px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+}
+.overlay-cancel:hover { border-color: var(--red); color: var(--red); }
+.overlay-cancel[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-bolt { animation: none; }
+  .overlay-progress-track.indeterminate .overlay-progress-fill { animation: none; opacity: .6; }
 }
