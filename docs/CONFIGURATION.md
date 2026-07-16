@@ -13,6 +13,7 @@ cp .env.example .env
 | Variable | Default | Description |
 |---|---|---|
 | `SERVER_PORT` | `8082` | HTTP port the API listens on |
+| `MANAGEMENT_PORT` | `8083` | Internal-only port for Actuator (health, metrics, prometheus). Kept separate from the application port and **not** published by Docker — point liveness/readiness probes here over the internal network. |
 
 ---
 
@@ -26,6 +27,7 @@ cp .env.example .env
 | `DB_NAME` | `billmind` | Database name |
 | `DB_USERNAME` | `billmind` | Database user |
 | `DB_PASSWORD` | `billmind` | Database password |
+| `DDL_AUTO` | `update` | Hibernate schema mode (`spring.jpa.hibernate.ddl-auto`). `update` is the dev/pre-release default; **never deploy `update` to production** — lock it to `validate` (or `none`) once Flyway lands in Milestone 7. |
 
 ---
 
@@ -123,6 +125,7 @@ Uses a locally running Ollama server to generate embeddings. The model must be p
 | Variable | Default | Description |
 |---|---|---|
 | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model name |
+| `OLLAMA_EMBEDDING_TIMEOUT_SECONDS` | `120` | Embedding request timeout in seconds (increase if the knowledge-base seed times out on large documents). |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Shared with `LLM_PROVIDER=ollama` |
 
 Pull the embedding model before starting:
@@ -140,10 +143,13 @@ ollama pull mxbai-embed-large  # 1024d
 
 | Variable | Default | Description |
 |---|---|---|
-| `KNOWLEDGE_SEARCH_MIN_VECTOR_SCORE` | `0.5` | Minimum cosine similarity (0–1) a vector candidate must have to enter the RRF fusion step. Filters out semantically weak matches before ranking. Lower values increase recall at the cost of precision. Tune per embedding model: AllMiniLM-L6-v2 typically scores lower than OpenAI or nomic-embed-text on Spanish content. |
+| `KNOWLEDGE_SEED_ENABLED` | `true` | Auto-load the 5 seed regulatory documents at startup and rebuild the IVFFlat index. Set to `false` to skip seeding (e.g. when the corpus is already populated). |
+| `KNOWLEDGE_CHUNK_SIZE` | `150` | Chunk size in words for the ingestion sliding window. Tuned to AllMiniLM-L6-v2's 256-token limit. |
+| `KNOWLEDGE_CHUNK_OVERLAP` | `30` | Word overlap between consecutive chunks, to avoid splitting context across chunk boundaries. |
+| `KNOWLEDGE_SEARCH_MIN_VECTOR_SCORE` | `0.72` | Minimum cosine similarity (0–1) a vector candidate must have to enter the RRF fusion step. Filters out semantically weak matches before ranking. Lower values increase recall at the cost of precision. Tune per embedding model: AllMiniLM-L6-v2 typically scores lower than OpenAI or nomic-embed-text on Spanish content. |
 | `KNOWLEDGE_SEARCH_MAX_RESULTS` | `5` | Maximum number of results returned per search query. |
 
-> **Tuning tip:** Start at `0.5` with OpenAI or nomic-embed-text. Drop to `0.3` if you observe low recall with AllMiniLM-L6-v2. Raise to `0.6–0.7` to enforce higher precision in production.
+> **Tuning tip:** The `0.72` default suits high-quality multilingual embedders (`bge-m3`, OpenAI). Drop to `0.50` for AllMiniLM-L6-v2, which scores lower on Spanish (the eval ITs use `0.3` for this reason), and to `~0.60` for `nomic-embed-text`. Raise it to enforce higher precision in production.
 
 ---
 
@@ -205,11 +211,42 @@ Uncomment and fill in your `.env` when connecting to a broker that requires SASL
 
 ## External authentication
 
-Authentication is delegated to an external microservice — BillMind does not sign or validate tokens locally. `JwtAuthFilter` forwards the `Authorization: Bearer …` header to the service's introspection endpoint via `ExternalAuthPort`. In Phase 1 only admin routes are guarded; user-facing endpoints are opened up in Milestone 7.
+Authentication is delegated to an external microservice — BillMind does not sign or validate tokens locally. `JwtAuthFilter` forwards the `Authorization: Bearer …` header to the service's introspection endpoint via `ExternalAuthPort`. In Phase 1 only admin routes are guarded; user-facing endpoints are opened up in Milestone 9.
 
 | Variable | Example | Description |
 |---|---|---|
 | `AUTH_EXTERNAL_URL` | `http://localhost:8081` | Base URL of the auth microservice exposing `GET /introspect` |
+
+---
+
+## Rate limiting
+
+A per-endpoint token-bucket limiter guards every `/api/v1/**` route. Full design (profiles, IP ceiling, fail policy, store migration) → [`RATELIMIT.md`](RATELIMIT.md).
+
+### Global
+
+| Variable | Default | Description |
+|---|---|---|
+| `RATELIMIT_STORE` | `caffeine` | Bucket backend. `caffeine` = in-process, per-instance (Phase 1). `redis` (Lettuce) shares buckets across instances behind the same `RateLimitStore` port (Milestone 9). |
+| `RATELIMIT_TRUST_FORWARDED_FOR` | `false` | Honour `X-Forwarded-For` for the client IP. Enable **only** behind a trusted proxy that overwrites it; otherwise the header is attacker-spoofable and the IP ceiling can be bypassed. |
+| `RATELIMIT_CAFFEINE_MAX_SIZE` | `50000` | Max distinct keys held in the Caffeine store. |
+| `RATELIMIT_CAFFEINE_EXPIRE_AFTER` | `PT1H` | How long an idle bucket survives (ISO-8601 duration). |
+
+### Per-profile buckets
+
+Each route resolves to a profile (`UPLOAD`, `CHAT`, `ADMIN`, `PUBLIC_READ`, `DEFAULT`; `NONE` is unlimited). Every profile has a `capacity`, a `refill-tokens` per `refill-period`, and a per-request `cost`, all overridable via env vars — starting points live in `application.properties` and should be tuned from metrics once live. `UPLOAD`, `CHAT` and `DEFAULT` additionally declare an **IP ceiling** (`overrides.ip.*`) because `X-Session-Id` is self-asserted and a session-only bucket is bypassed by rotating the header.
+
+| Variable (pattern) | Example default | Description |
+|---|---|---|
+| `RATELIMIT_UPLOAD_CAPACITY` / `_REFILL` / `_PERIOD` / `_COST` | `5` / `5` / `PT1H` / `5` | Session bucket for `POST /invoices` (paid LLM extraction). |
+| `RATELIMIT_UPLOAD_IP_CAPACITY` / `_IP_REFILL` / `_IP_PERIOD` | `10` / `10` / `PT1H` | IP ceiling for uploads. |
+| `RATELIMIT_CHAT_CAPACITY` / `_REFILL` / `_PERIOD` | `20` / `20` / `PT1M` | Session bucket for `POST /assistant/chat`. |
+| `RATELIMIT_CHAT_IP_CAPACITY` / `_IP_REFILL` / `_IP_PERIOD` | `60` / `60` / `PT1M` | IP ceiling for chat. |
+| `RATELIMIT_ADMIN_CAPACITY` / `_REFILL` / `_PERIOD` | `5` / `5` / `PT1M` | Same numbers on both the IP (pre-auth) and token (post-auth) layers. |
+| `RATELIMIT_PUBLIC_READ_CAPACITY` / `_REFILL` / `_PERIOD` | `60` / `60` / `PT1M` | Cheap reads (fail-open). |
+| `RATELIMIT_DEFAULT_CAPACITY` / `_REFILL` / `_PERIOD` (+ `_IP_*`) | `30` / `30` / `PT1M` | Fallback for any unmapped `/api/v1/` route, with the same IP ceiling as the paid routes. |
+
+> **Fail policy:** paid/security profiles (`UPLOAD`, `CHAT`, `ADMIN`) are fail-closed — a store outage returns `503`. `PUBLIC_READ` is fail-open. An actual breach returns `429`. See `RATELIMIT.md`.
 
 ---
 

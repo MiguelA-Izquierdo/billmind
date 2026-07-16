@@ -2,7 +2,7 @@
 
 > **Are you overpaying on your utility bills?** BillMind ingests your invoices, understands them semantically, and will soon tell you exactly how much you're being overcharged — and who offers a better deal.
 
-An AI-powered REST API for utility invoice intelligence: PDF ingestion, hybrid AI classification, LLM-powered structured extraction, and price comparison against real market data (Milestone 2).
+An AI-powered REST API for utility invoice intelligence: PDF ingestion, hybrid AI classification, LLM-powered structured extraction, and price comparison against real market data (market ingestion in Milestone 2, savings engine in Milestone 3).
 
 Built with **Spring Boot 3.5.0**, **Java 21**, and **LangChain4j 1.0.0**. Supports both **fully local AI** (Ollama, zero cloud dependencies) and **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env variable — your choice.
 
@@ -92,7 +92,7 @@ Infrastructure → Application → Domain
 | pgVector extension (IVFFlat index) | — |
 | Apache PDFBox | via LangChain4j |
 | JUnit 5 + Mockito | via Spring Boot |
-| TestContainers | 1.21.0 |
+| TestContainers | 1.21.4 |
 | JaCoCo | 0.8.12 |
 
 ---
@@ -105,8 +105,10 @@ src/main/java/dev/izquierdo/billmind/
 │   ├── application/            # CommandBus, QueryBus
 │   ├── domain/                 # DomainEvent, DomainEventPublisher, exceptions
 │   └── infrastructure/
-│       ├── auth/               # JwtAuthFilter, AdminRoutesService (external auth delegation)
+│       ├── auth/               # JwtAuthFilter (authenticates only), ExternalTokenAuthentication, ApiSecurityErrorHandler
 │       ├── adapter/            # ExternalAuthAdapter — calls external /introspect
+│       ├── route/              # RouteAccessPolicy + RouteAccessAuthorizationManager (the access decision)
+│       ├── ratelimit/          # Per-endpoint token-bucket limiter (bucket4j + Caffeine)
 │       ├── dto/                # ErrorResponseDTO, SuccessResponseDTO
 │       ├── llm/                # TimedChatLanguageModel, ModelPricingRegistry
 │       ├── session/            # SessionContext, SessionFilter, SessionService
@@ -135,7 +137,8 @@ src/main/java/dev/izquierdo/billmind/
 ├── assistant/                  # Bounded Context: conversational RAG          [Complete — M5]
 ├── comparison/                 # Bounded Context: savings / comparison engine [Complete — M3]
 ├── knowledge/                  # Bounded Context: regulatory KB + retrieval   [Complete — M2]
-└── market/                     # Bounded Context: market rate ingestion        [Complete — M2]
+├── market/                     # Bounded Context: market rate ingestion        [Complete — M2]
+└── metrics/                    # Bounded Context: domain-event handlers (log-only until M10)
 ```
 
 ---
@@ -144,20 +147,21 @@ src/main/java/dev/izquierdo/billmind/
 
 **Anonymous endpoints (Phase 1):** every request carries a client-generated UUID in `X-Session-Id`. The backend uses it to correlate resources (invoices, conversations) but does not authenticate the caller.
 
-**Admin endpoints:** BillMind never validates tokens itself. Authentication is fully delegated to an external user microservice. On each admin request `JwtAuthFilter` extracts the `Authorization: Bearer <token>` header and calls `GET <AUTH_EXTERNAL_URL>/introspect` on the external service. A `200` response authorises the request; any other response or connectivity error fails closed. Currently the only admin endpoint is `DELETE /api/v1/market-rates`. More admin routes are registered in `AdminRoutesService` without touching the filter.
+**Admin endpoints:** BillMind never validates tokens itself. Authentication is fully delegated to an external user microservice, and — deliberately — authenticating and authorizing are separate steps. `JwtAuthFilter` only establishes an identity: it extracts the `Authorization: Bearer <token>` header, calls `GET <AUTH_EXTERNAL_URL>/introspect`, and puts an `ExternalTokenAuthentication` (with `ROLE_ADMIN` only on a `200`) into the `SecurityContext` — it rejects nothing. The access **decision** is taken by Spring Security's `AuthorizationFilter`, fed by `RouteAccessPolicy`, and enforced a second time by `@PreAuthorize("hasRole('ADMIN')")` on each admin handler. A new admin route (anything under `/api/v1/admin/**`) is guarded the moment it is mapped, without touching the filter. Currently the only admin endpoint outside that tree is `DELETE /api/v1/market-rates`. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) → *Admin route protection* for what each layer catches.
 
-**Milestone 7:** user authentication will extend the same delegation model to user-facing endpoints rather than adding local JWT validation to BillMind.
+**Milestone 9:** user authentication will extend the same delegation model to user-facing endpoints rather than adding local JWT validation to BillMind.
 
 ---
 
 ## Observability
 
-Logs and in-process metrics are the current observability story for Phase 1 (single-instance deployment).
+Micrometer/Actuator metrics and structured logs are both live (Milestone 6 complete), served on a separate internal-only management port.
 
 - **Logs** — infrastructure layer only; no invoice content, no PII, no credentials ever logged. `[PII]` prefix on all redaction-related lines for easy filtering.
-- **LLM observability** — every LLM call is logged with operation, provider, model, latency and token counts (where the provider supports it). Micrometer replaces log-based metrics at Milestone 6.
+- **Metrics** — Micrometer meters exposed on `/actuator/metrics` and `/actuator/prometheus` (management port): PII/classifier/upload timers plus the `llm.*` family (`llm.call.duration`, `llm.calls`, `llm.tokens`, `llm.cost.usd`) and `ratelimit.*`.
+- **LLM observability** — every LLM call is timed by `TimedChatLanguageModel`, which fans each call out to composable `LlmTelemetry` sinks: `MetricsLlmTelemetry` (the `llm.*` meters, on by default) and `TracingLlmTelemetry` (one OTLP span per call to an external Langfuse backend, off by default).
 
-Full reference (log levels, key log lines, validation thresholds, Micrometer roadmap) → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
+Full reference (log levels, key log lines, validation thresholds, metric catalogue, LLM tracing) → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
 ---
 
@@ -213,8 +217,10 @@ Do not add cluster manifests to this repository; keep infrastructure-as-code in 
 - Docker setup → [`docs/DOCKER.md`](docs/DOCKER.md)
 - Configuration reference → [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - API reference → [`docs/API.md`](docs/API.md)
+- Architecture & design decisions → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Market module → [`docs/MARKET.md`](docs/MARKET.md)
 - Assistant module (agentic tool calling) → [`docs/ASSISTANT.md`](docs/ASSISTANT.md)
+- Rate limiting → [`docs/RATELIMIT.md`](docs/RATELIMIT.md)
 - Test guide → [`docs/TESTING.md`](docs/TESTING.md)
 - Observability → [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)
 - Roadmap → [`docs/PLAN.md`](docs/PLAN.md)

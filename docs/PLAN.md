@@ -16,7 +16,7 @@ A visitor opens the app, uploads a utility invoice PDF, and the system:
 
 No login. The frontend generates a UUID per visitor and sends it as `X-Session-Id`. The backend correlates resources (uploaded invoices, conversations) to that UUID without authenticating it.
 
-### Phase 2 — Authenticated (post-Milestone 7)
+### Phase 2 — Authenticated (Milestone 9)
 
 Visitors can register to get persistent history, multiple invoices over time, and personalized recommendations. **Identity is owned by an external user/identity microservice** — BillMind does not store credentials or manage accounts; it only links an existing anonymous session to the external `user_id` once the upstream service authenticates the visitor. This is the same delegation model already used for admin-route authentication today.
 
@@ -46,10 +46,10 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | LLM tracing → external Langfuse (backend deployed as shared infra, referenced by env var) | 6 | LLM observability |
 | In-process domain event bus + `metrics/` bounded context reacting to the upload funnel and chat engagement | 6 | Cross-context reactions without coupling; instruments the event bus before the metrics domain lands |
-| `metrics/` domain + persistence + read API (funnel conversion, drop-off reasons, KB coverage gaps) | 9 | Turn the log-only handlers into a queryable product-analytics store |
-| Spring Security + delegated token validation (external identity service) + rate limiting | 7 | Phase 2 — no local user/credential storage |
 | Semantic response cache | 7 | Cost / latency |
 | Flyway migrations (consolidated initial migration) | 7 | Production-grade deployability before first release |
+| Delegated user identity (external service) + authenticated endpoints + per-user & Redis-backed rate limiting | 9 | Phase 2 — no local user/credential storage; per-user analytics need `user_id` first |
+| `metrics/` domain + persistence + read API (funnel conversion, drop-off reasons, KB coverage gaps) | 10 | Turn the log-only handlers into a queryable product-analytics store |
 
 ---
 
@@ -104,6 +104,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
    10. **Hexagonal rules untouchable.** No Spring/LangChain4j imports in `domain/`. Ever.
    11. **In-process domain events, no outbox (yet).** Cross-context reactions travel through `DomainEventPublisher` (synchronous in-process bus, dispatched by exact event class). Producers publish **after** the persistence step so the narrow Spring Data transaction has already committed — this is effectively after-commit *because* the slow work (LLM calls) is deliberately kept outside any transaction; the emitting use case must therefore **never** be wrapped in a wide `@Transactional` (it would hold a DB connection open for the whole LLM round-trip). First consumer: the `metrics/` bounded context, reacting to the upload funnel (`InvoiceIngested` + `InvoiceRejected`, by drop-off reason) and chat engagement (`AssistantQuestionAnswered`, whose `citationCount == 0` doubles as a knowledge-base coverage-gap signal). All event payloads carry only ids/enums/counters — never invoice or message text — so metrics stays PII-free. Handlers are placeholders (log only) until the metrics domain lands. **Known gap:** a crash between commit and in-process dispatch loses the event — harmless for a metrics/log consumer today.
        - **Outbox trigger (deferred).** Introduce a transactional outbox (events table written in the *same narrow transaction* as the aggregate + a `@Scheduled` relay dispatching after commit, at-least-once → **idempotent handlers deduped by `eventId`**) as soon as either: (a) a reaction has irreversible business consequences that must not be lost or duplicated (notifications, downstream state changes, billing), or (b) a consumer moves to a **separate process / Kafka** (at which point `market`'s existing Kafka infra makes outbox → Kafka the natural target). No broker is required for the in-monolith form — an events table + relay suffices.
+   12. **Access control in layers, decided by the engine.** Filters authenticate; Spring Security's `AuthorizationFilter` decides (via `RouteAccessAuthorizationManager`, fed by `RouteAccessPolicy`); admin handlers carry `@PreAuthorize("hasRole('ADMIN')")`. The three layers exist because they fail differently: the engine catches a wiring mistake (a filter unregistered, the chain reordered), while the handler annotation catches a misclassification by the route policy itself — which the engine, trusting that same policy, would wave through. `anyRequest().permitAll()` is banned: it idles the engine and reduces the whole guard to one filter's path matching. Corollary: an identity used for anything (rate-limit key, audit, ownership) is read from the `SecurityContext`, never from a raw header — there it exists only if it was validated. See `docs/ARCHITECTURE.md` → *Admin route protection*.
 
 ---
 
@@ -317,25 +318,20 @@ port, conversation store, SSE).
 
 **Engineering highlights:** hybrid RAGAS-style metrics (deterministic embedding gate always green in CI + opt-in LLM-as-judge faithfulness), quality regression gate in CI, structured LLM observability with token and latency tracking.
 
-### Milestone 7 — Production & Security (Phase 2)
+### Milestone 7 — Production Hardening & Deployability
 
-**Objective:** make the project deployable and connect it to authenticated user identity. **User accounts are not built in BillMind** — identity, registration, login, credential storage and token issuance are fully delegated to an external user/identity microservice, exactly as admin-route authentication already works today (`JwtAuthFilter` + `RouteAccessPolicy`). Milestone 7 extends that same delegation model to user-facing endpoints.
+**Objective:** make the project deployable and close out the remaining non-identity production/security hardening. Authenticated user identity is deliberately **not** part of this milestone — it is sequenced later (Milestone 9), because per-user analytics in `metrics/` depend on the `user_id` link existing first. Milestone 7 is what makes BillMind shippable while it is still anonymous-only.
 
 **Deliverables:**
 
-- **Identity fully delegated to the external user microservice** (the model already in place for admin routes via `JwtAuthFilter` / `RouteAccessPolicy`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 7 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
-  - **No `users` table in BillMind.** `sessions` gains a nullable `user_id` column holding the opaque external user identifier — a foreign reference owned by the identity service, not a locally owned entity.
-  - Session linking: when an authenticated request arrives, BillMind associates the current anonymous session with the external `user_id` carried in the validated token. The registration and login flows themselves live entirely in the external service.
-  - Extend `JwtAuthFilter` / `RouteAccessPolicy` to cover authenticated user endpoints (same delegated-validation pattern as admin routes).
-  - Rate limiting (per anonymous session and per user).
+- **Flyway** introduced now: consolidate the current schema into a baseline initial migration, switch `ddl-auto` to `validate`, and from this point all schema changes go through versioned migrations. (The `user_id` column added by Milestone 9 lands as a versioned migration on top of this baseline, not as part of it.)
   - Semantic response cache.
   - PII redaction in logs.
   - Advanced prompt-injection defenses.
-  - **Flyway** introduced now: consolidate the current schema into a baseline initial migration, switch `ddl-auto` to `validate`, and from this point all schema changes go through versioned migrations.
 
 **Dependencies:** all previous.
 
-**Engineering highlights:** identity fully delegated to an external user microservice (no local credential/user storage), production security hardening (delegated token validation, rate limiting, advanced prompt-injection defenses, PII redaction in logs), semantic response cache, anonymous-to-external-user session linking, consolidated Flyway baseline.
+**Engineering highlights:** consolidated Flyway baseline with `ddl-auto=validate`, semantic response cache for cost/latency, PII redaction in logs, advanced prompt-injection defenses — the production-readiness layer that ships before user accounts.
 
 ### Milestone 8 — Minimal Frontend *(optional)*
 
@@ -352,9 +348,28 @@ port, conversation store, SSE).
 
 **Engineering highlights:** Next.js + Tailwind with SSE streaming and citation-linked PDF viewer; session UUID persisted client-side; full-stack Docker Compose deployment with Ollama, PostgreSQL + pgVector, and the Spring Boot API behind a single command.
 
-### Milestone 9 — `metrics/` Analytics Domain
+### Milestone 9 — User Identity (Phase 2)
 
-**Objective:** turn the `metrics/` bounded context from log-only event handlers into a queryable product-analytics store. The in-process domain event bus and the handlers already exist (they were introduced early, alongside Milestone 6's observability work, to instrument the bus without coupling contexts — see principle #11); this milestone gives them a domain and persistence.
+**Objective:** connect BillMind to authenticated user identity — the entry point into Phase 2. **User accounts are not built in BillMind** — identity, registration, login, credential storage and token issuance are fully delegated to an external user/identity microservice, exactly as admin-route authentication already works today (`JwtAuthFilter` + `RouteAccessPolicy`). This milestone extends that same delegation model to user-facing endpoints. It is sequenced **before** `metrics/` (Milestone 10) on purpose: per-user analytics need the `user_id` link to exist first, so the funnel and engagement aggregates can be attributed to a user.
+
+**Deliverables:**
+
+- **Identity fully delegated to the external user microservice** (the model already in place for admin routes via `JwtAuthFilter` / `RouteAccessPolicy`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 9 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
+  - **No `users` table in BillMind.** `sessions` gains a nullable `user_id` column holding the opaque external user identifier — a foreign reference owned by the identity service, not a locally owned entity. Added as a versioned Flyway migration on top of the Milestone 7 baseline.
+  - Session linking: when an authenticated request arrives, BillMind associates the current anonymous session with the external `user_id` carried in the validated token. The registration and login flows themselves live entirely in the external service.
+  - Extend `JwtAuthFilter` / `RouteAccessPolicy` to cover authenticated user endpoints (same delegated-validation pattern as admin routes): the filter widens beyond `ADMIN` routes, and a new `RouteAccess.AUTHENTICATED` is enforced by the existing `RouteAccessAuthorizationManager` — no new filter.
+  - Rate limiting — **the per-endpoint token-bucket limiter already exists** (`_shared/infrastructure/ratelimit/`, bucket4j + Caffeine, pre/post-auth checkpoints, per-profile fail-open/closed; see `docs/RATELIMIT.md`). This milestone adds:
+    - **Per-user keying** for the new authenticated endpoints — once accounts land, the key stops being the freely-rotatable anonymous `X-Session-Id`, which retires the whole rotation-bypass class for logged-in traffic.
+    - **Redis-backed `ProxyManager`** (`billmind.ratelimit.store=redis`) to make limits global across instances (one property + one bean; the store adapter, policies, keys and numbers are untouched).
+    - **Note — the anonymous economic-DoS gap is *not* fully closed here.** `UPLOAD`/`CHAT` already carry an **IP ceiling** on top of the session bucket (`overrides.ip.*`), sized above CGNAT so it caps a single laptop rotating `X-Session-Id` without touching real visitors (see `docs/RATELIMIT.md`, *The IP ceiling*). What that ceiling still cannot stop is a **distributed** attacker spreading load across many IPs. The real backstop for that case is the **global LLM cost circuit breaker**, sequenced in Milestone 10 (`metrics/`) where the cost signal lives — plus CAPTCHA on the anonymous upload.
+
+**Dependencies:** Milestone 7 (Flyway baseline — the `user_id` column ships as a versioned migration on top of it). Builds on the existing admin-route delegated-auth stack (`JwtAuthFilter`, `RouteAccessPolicy`, `RouteAccessAuthorizationManager`).
+
+**Engineering highlights:** identity fully delegated to an external user microservice (no local credential/user storage), anonymous-to-external-user session linking, `RouteAccess.AUTHENTICATED` enforced by the existing authorization engine (no new filter), per-user rate-limit keying that retires the session-rotation bypass, Redis-backed global rate limits.
+
+### Milestone 10 — `metrics/` Analytics Domain
+
+**Objective:** turn the `metrics/` bounded context from log-only event handlers into a queryable product-analytics store. The in-process domain event bus and the handlers already exist (they were introduced early, alongside Milestone 6's observability work, to instrument the bus without coupling contexts — see principle #11); this milestone gives them a domain and persistence. With user identity in place (Milestone 9), funnel and engagement aggregates can be attributed to a `user_id`, not just an anonymous session.
 
 **Deliverables:**
 
@@ -363,9 +378,10 @@ port, conversation store, SSE).
   - Persistence for the counters/time series (a `metrics_*` table or rollups).
   - Read API exposing funnel conversion, drop-off breakdown, and coverage-gap rate.
 - Handlers become idempotent if/when the outbox trigger (principle #11) fires; today's synchronous after-commit dispatch is sufficient.
+- **Possible solution sequenced here — global LLM cost circuit breaker.** This is the real backstop for the anonymous economic DoS that per-key rate limiting cannot close: `UPLOAD`/`CHAT` already pair a session bucket with an IP ceiling (see `docs/RATELIMIT.md`), which stops a single laptop rotating sessions but not a **distributed** attacker spread across many IPs. It belongs in this milestone because it builds directly on the cost signal `metrics/` already consumes (`TimedChatLanguageModel` / `ModelPricingRegistry` → `llm.cost.usd`): an aggregate, **key-independent** cap on LLM spend/throughput over a rolling window that trips to a Spanish `503` when exceeded. Unlike any per-key limit it holds under session rotation, CGNAT, and distributed attacks — the one guarantee a per-key scheme cannot give. Complementary anonymous mitigation (a CAPTCHA / proof-of-work on the upload) is tracked in `docs/RATELIMIT.md`.
 
-**Dependencies:** the domain event bus (in place) and its producers — Milestones 1, 3, 5.
+**Dependencies:** the domain event bus (in place) and its producers — Milestones 1, 3, 5; Milestone 9 (user identity) for per-user attribution of the funnel and engagement aggregates.
 
 **Engineering highlights:** event-driven analytics with zero cross-context coupling (consumers re-load aggregates by id, never receive text), PII-free-by-construction payloads, a metrics read model separate from the operational aggregates.
 
-> **Note on numbering:** Milestone 8 (frontend) is optional and independent; `metrics/` is sequenced as Milestone 9 so the optional frontend keeps its established number. Neither blocks the other.
+> **Note on numbering:** Milestone 8 (frontend) is optional and independent. Phase 2 opens with user identity (Milestone 9), sequenced ahead of `metrics/` (Milestone 10) because per-user analytics need the `user_id` link first. The optional frontend keeps its established number; none of 8/9/10 blocks the others (9 → 10 is the only real dependency).

@@ -19,6 +19,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <langchain4j.version>1.0.0</langchain4j.version>
         <testcontainers.version>1.21.4</testcontainers.version>
+        <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -190,6 +191,21 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- Rate limiting — token bucket + atomic store abstraction (ProxyManager). Apache-2.0.
+             The jdk17 variant covers Java 21. Caffeine backend today (in-process, single instance);
+             a Lettuce/Redis backend swaps in later behind the same RateLimitStore port, no logic
+             change. NB: groupId is com.bucket4j (8.x line) but the Java package is io.github.bucket4j. -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-caffeine</artifactId>
+            <version>${bucket4j.version}</version>
         </dependency>
 
     </dependencies>

@@ -12,10 +12,10 @@ import java.io.IOException;
 import java.security.Principal;
 
 /**
- * Runs on the internal management port (Actuator child context). When a request carries a
- * Bearer token that the external auth service authorizes — which only happens for admins,
- * since {@code /introspect} returns 2xx exclusively for admin tokens — the request is wrapped
- * so that {@code getUserPrincipal()} reports a non-null principal.
+ * Runs on the internal management port (Actuator child context). When a request carries a Bearer
+ * token whose introspection reports an admin role, the request is wrapped so that
+ * {@code getUserPrincipal()} reports a non-null principal. An ordinary user's token is valid but not
+ * admin, and {@link ExternalAuthPort#isAuthorized} answers {@code false} for it.
  *
  * <p>Actuator's {@code health.show-details=when-authorized} check reads that servlet method
  * (via its {@code SecurityContext}); a non-null principal is enough to expose full health

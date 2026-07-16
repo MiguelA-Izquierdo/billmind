@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RouteAccessPolicyTest {
 
-    private final RouteAccessPolicy policy = new RouteAccessPolicy();
+    private final RouteAccessPolicy policy = new RouteAccessPolicy(new RequestPathMatcher());
 
     @ParameterizedTest
     @CsvSource({

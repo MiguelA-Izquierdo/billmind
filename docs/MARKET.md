@@ -62,10 +62,10 @@ Events must be JSON with a `type` discriminator field:
 
 ## REST API
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/v1/market-rates` | Returns all stored market rates |
-| `DELETE` | `/api/v1/market-rates` | Deletes all stored market rates _(development only — will be removed)_ |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/market-rates` | none (open) | Returns all stored market rates |
+| `DELETE` | `/api/v1/market-rates` | **Admin** — `Authorization: Bearer` | Deletes all stored market rates. Guarded as an admin route (`RouteAccessPolicy` + `@PreAuthorize("hasRole('ADMIN')")`); token validation is delegated to the external auth service. See [`API.md`](API.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md) → *Admin route protection*. |
 
 ### `GET /api/v1/market-rates` — response
 

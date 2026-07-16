@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +39,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 ErrorResponseDTO.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Se ha producido un error interno en el servidor")
         );
+    }
+
+    /**
+     * Rethrown, not answered: a denial raised by {@code @PreAuthorize} must reach
+     * {@code ExceptionTranslationFilter}, the only place that knows whether the caller is anonymous
+     * ({@code 401}) or merely unauthorized ({@code 403}). Without this the catch-all above would
+     * swallow it into a {@code 500}.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public void handleAccessDenied(AccessDeniedException ex) {
+        throw ex;
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

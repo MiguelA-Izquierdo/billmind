@@ -14,7 +14,7 @@ Ensure BillMind's reliability through tests that validate business rules, cross-
 - `JUnit 5` — test framework
 - `AssertJ` — fluent assertions
 - `Mockito` — mocking external dependencies
-- `TestContainers 1.21.0` — real PostgreSQL + pgVector in integration tests
+- `TestContainers 1.21.4` — real PostgreSQL + pgVector in integration tests
 - `@SpringBootTest` / `@DataJpaTest` — Spring context when strictly necessary
 - `MockMvc` — HTTP controller tests
 - `JaCoCo` — code coverage (configured in pom.xml)

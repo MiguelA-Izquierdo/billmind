@@ -11,12 +11,19 @@ import dev.izquierdo.billmind.knowledge.infrastructure.config.KnowledgeSeedData;
 import dev.izquierdo.billmind.knowledge.infrastructure.controller.dto.IngestRequest;
 import dev.izquierdo.billmind.knowledge.infrastructure.controller.dto.KnowledgeSearchResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Guarded twice over: {@code RouteAccessPolicy} classifies the path as admin, and this annotation binds
+ * the same requirement to the handler the dispatcher actually invokes. The second guard is the one that
+ * holds when path matching and routing disagree.
+ */
 @RestController
 @RequestMapping("/api/v1/admin/knowledge")
+@PreAuthorize("hasRole('ADMIN')")
 public class KnowledgeAdminController {
 
     private final CommandBus commandBus;

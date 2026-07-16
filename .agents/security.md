@@ -122,7 +122,7 @@ Dependencies to monitor regularly:
 | `langchain4j` | 1.0.0 | Check CVEs in transitive libraries |
 | `pdfbox` (via langchain4j-document-parser-apache-pdfbox) | transitive | History of PDF parsing CVEs |
 | `postgresql` driver | transitive | Verify version |
-| `testcontainers` | 1.21.0 | Test scope only, low risk |
+| `testcontainers` | 1.21.4 | Test scope only, low risk |
 
 **Audit command:**
 ```bash

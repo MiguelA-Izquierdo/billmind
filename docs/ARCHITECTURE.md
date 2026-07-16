@@ -12,11 +12,12 @@ Reference for sessions where modules are designed or extended. Use with `@CLAUDE
 4. **Chunk size 150, overlap 30** — tuned to AllMiniLM-L6-v2's 256-token limit. Configurable via `KNOWLEDGE_CHUNK_SIZE` and `KNOWLEDGE_CHUNK_OVERLAP`.
 5. **Pluggable LLM provider** — selected at runtime via `LLM_PROVIDER` env var (`ollama` default). Ollama keeps all data local; cloud providers (OpenAI, Anthropic, Gemini, Groq) are available for environments where external API calls are acceptable. See *LLM Provider Strategy* section below.
 6. **Domain Events** — cross-context reactions travel through `DomainEventPublisher`, a **synchronous in-process bus** (`SpringDomainEventPublisher`, a hand-rolled `Map<event class → handlers>` — **not** Spring's `ApplicationEventPublisher`). Producers publish **after** the persistence step (effectively after-commit) and the emitting use case is never wrapped in a wide `@Transactional`. The first consumer is the `metrics/` bounded context. See the *Domain Events* section below for the event catalogue, and `docs/PLAN.md` (principle #11) for the sync/after-commit rationale and the outbox upgrade path. The comparison, by contrast, is computed synchronously via the query bus, not event-driven.
-7. **Frontend-generated session UUID** — sent as `X-Session-Id` header. The backend correlates resources to it but does not authenticate (Phase 1 is anonymous). Auth lands in Milestone 7.
-8. **Admin route protection via external auth microservice** — admin operations (the whole `/api/v1/admin/**` tree, plus `DELETE /api/v1/market-rates`) are guarded by `JwtAuthFilter` before `SessionFilter` runs. The filter delegates token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid and the request proceeds; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain.
-9. **`RouteAccessPolicy` — one classifier, two filters.** Authentication and session correlation are independent axes, so every route resolves to exactly one `RouteAccess`: `ADMIN` (bearer token, no session), `ANONYMOUS` (session, no token), or `OPEN` (neither). `JwtAuthFilter` acts on `ADMIN`, `SessionFilter` acts on `ANONYMOUS`. Because both filters read the same classifier, a route can never be registered with one and forgotten by the other. Anything unrecognized under `/api/v1/` defaults to `ANONYMOUS`, and anything under `/api/v1/admin/**` is `ADMIN` by convention — a new admin endpoint is guarded the moment it is mapped, without touching the policy.
-10. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
-11. **English system prompts with "respond in Spanish" instruction** — small Ollama models follow English instructions more reliably; output language is controlled by an explicit instruction at the end of the prompt.
+7. **Frontend-generated session UUID** — sent as `X-Session-Id` header. The backend correlates resources to it but does not authenticate (Phase 1 is anonymous). Auth lands in Milestone 9.
+8. **Admin route protection via external auth microservice** — admin operations (the whole `/api/v1/admin/**` tree, plus `DELETE /api/v1/market-rates`) delegate token validation to an external user service via `ExternalAuthPort` / `ExternalAuthAdapter`: the adapter calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the `Authorization: Bearer <token>` header as-is; a 200 response means the token is valid; 401/403 and any I/O error fail closed (the adapter returns `false`). The boundary between BillMind and the auth service is the port — swapping the external service requires only a new adapter, not changes to the filter or domain.
+9. **Authenticate in the filter, authorize in the engine.** `JwtAuthFilter` establishes an identity and nothing else; the access decision belongs to Spring Security's `AuthorizationFilter` (fed by `RouteAccessPolicy`) and, one layer deeper, to `@PreAuthorize` on each admin handler. A route is never open merely because a filter chose not to run — see *Admin route protection* below for what each layer catches.
+10. **`RouteAccessPolicy` — one classifier, every guard.** Authentication and session correlation are independent axes, so every route resolves to exactly one `RouteAccess`: `ADMIN` (bearer token, no session), `ANONYMOUS` (session, no token), or `OPEN` (neither). `SessionFilter` acts on `ANONYMOUS`, the authorization manager enforces `ADMIN`, and the rate limiter derives its profile from the same classification — so a route can never be registered with one guard and forgotten by another. Anything unrecognized under `/api/v1/` defaults to `ANONYMOUS`, and anything under `/api/v1/admin/**` is `ADMIN` by convention — a new admin endpoint is guarded the moment it is mapped, without touching the policy. The policy matches on the decoded `RequestPath` the `DispatcherServlet` routes on, never the raw URI: a guard that disagrees with the router is one that can be walked around.
+11. **PII redaction before persistence** — the aggregated invoice corpus is a product moat and must be safe by design. IBAN, DNI, postal address, full name, and phone are replaced with placeholders before storing.
+12. **English system prompts with "respond in Spanish" instruction** — small Ollama models follow English instructions more reliably; output language is controlled by an explicit instruction at the end of the prompt.
 
 ---
 
@@ -97,20 +98,34 @@ Gemini and Groq use Google's / Groq's OpenAI-compatible REST endpoints via `Open
 
 ## Admin route protection (implemented — external auth delegation)
 
-BillMind **never validates tokens itself**. All authentication is delegated to an external user microservice via `ExternalAuthPort`. This applies to admin routes today and will extend to all authenticated endpoints in Milestone 7.
+BillMind **never validates tokens itself**. All authentication is delegated to an external user microservice via `ExternalAuthPort`. This applies to admin routes today and will extend to all authenticated endpoints in Milestone 9.
 
-The filter chain for an incoming request:
+### Authenticating and authorizing are separate steps
+
+A filter that both decides *and* enforces is a single point of failure: `SecurityConfig` used to say `anyRequest().permitAll()`, which idles Spring's authorization engine and leaves the real decision to `JwtAuthFilter.shouldNotFilter()`. One bug in path matching there — and the encoded-path bypass that `AdminRouteGuardBypassTest` pins was exactly that bug — opens `/api/v1/admin/**` with nothing behind it. So the two concerns are now split, and the guard is three layers deep, each covering a failure the others cannot:
+
+| Layer | What it does | The failure it catches |
+|---|---|---|
+| `JwtAuthFilter` | **Authenticates only.** Never rejects, never decides. Puts an `ExternalTokenAuthentication` in the `SecurityContext`. | — (it is no longer a guard) |
+| `RouteAccessAuthorizationManager` (via `anyRequest().access(...)`) | The access **decision**, taken by Spring's `AuthorizationFilter` from `RouteAccessPolicy`. | Wiring: a filter unregistered, the chain reordered, `shouldNotFilter` wrong. |
+| `@PreAuthorize("hasRole('ADMIN')")` on each admin handler | The same requirement, bound to the method the dispatcher actually invokes. | A misclassification by `RouteAccessPolicy` itself — which the layer above, trusting that same policy, would wave through. |
 
 ```
-JwtAuthFilter          ← activates only when RouteAccessPolicy says ADMIN
+RateLimitFilter        ← IP / session layers (pre-auth)
+JwtAuthFilter          ← only when RouteAccessPolicy says ADMIN *and* a Bearer is present
   └─ ExternalAuthAdapter.isAuthorized(bearerToken)
        └─ GET <AUTH_EXTERNAL_URL>/introspect   (Authorization: Bearer <token>)
-            200 → true   →  chain continues
-            4xx / error  →  false → 401 or 403 returned immediately
-SessionFilter          ← activates only when RouteAccessPolicy says ANONYMOUS
-  └─ requires a valid X-Session-Id UUID
-Controller
+            200 → true   → SecurityContext = ExternalTokenAuthentication.authorized  (ROLE_ADMIN)
+            4xx / error  → false → SecurityContext = ExternalTokenAuthentication.rejected (no authority)
+PostAuthRateLimitFilter ← token layer, keyed on the *validated* identity
+SessionFilter          ← only when RouteAccessPolicy says ANONYMOUS; requires a valid X-Session-Id UUID
+AuthorizationFilter    ← the decision: RouteAccessAuthorizationManager
+Controller             ← @PreAuthorize on admin handlers
 ```
+
+The policy driving *authentication* is safe in a way that policy driving *authorization* was not: a route it misclassifies is merely left unauthenticated, and the layers below deny it. Skipping non-admin routes also keeps an anonymous caller from turning the public API into an amplifier against the auth service.
+
+Denials never reach a controller's `try/catch`: `AuthorizationFilter` and `@PreAuthorize` both raise an `AccessDeniedException` that `ExceptionTranslationFilter` hands to `ApiSecurityErrorHandler` — **401** when the caller is anonymous (no token), **403** when a known caller is unauthorized (token rejected by introspection). `GlobalExceptionHandler` rethrows `AccessDeniedException` instead of answering it, so its `Exception` catch-all cannot swallow a 403 into a 500.
 
 | Route | `RouteAccess` | Bearer token | `X-Session-Id` |
 |---|---|---|---|
@@ -124,16 +139,19 @@ Key files:
 |---|---|
 | `_shared/domain/port/ExternalAuthPort` | Port — `isAuthorized(String bearerToken): boolean` |
 | `_shared/infrastructure/adapter/ExternalAuthAdapter` | Adapter — `GET /introspect`, fail-closed on any error |
-| `_shared/infrastructure/auth/JwtAuthFilter` | `OncePerRequestFilter` — extracts Bearer, calls port, rejects with 401/403 |
+| `_shared/infrastructure/auth/JwtAuthFilter` | `OncePerRequestFilter` — extracts Bearer, calls port, populates the `SecurityContext`. Rejects nothing |
+| `_shared/infrastructure/auth/ExternalTokenAuthentication` | The identity: principal is a SHA-256 fingerprint of the token, never the token (rule #6). `ROLE_ADMIN` only when introspection accepted it |
+| `_shared/infrastructure/auth/ApiSecurityErrorHandler` | `AuthenticationEntryPoint` + `AccessDeniedHandler` — renders 401/403 in the API envelope, in Spanish |
 | `_shared/infrastructure/route/RouteAccessPolicy` | Classifies every route as `ADMIN` / `ANONYMOUS` / `OPEN` |
-| `_shared/infrastructure/config/SecurityConfig` | Registers `JwtAuthFilter` before `SessionFilter` |
+| `_shared/infrastructure/route/RouteAccessAuthorizationManager` | Feeds that classification to Spring's authorization engine |
+| `_shared/infrastructure/config/SecurityConfig` | `@EnableMethodSecurity`, `anyRequest().access(...)`, filter order |
 
 Config: `AUTH_EXTERNAL_URL` env var → `app.auth.external-url`.
 
-## Adding user authentication (Milestone 7)
+## Adding user authentication (Milestone 9)
 
-Authentication remains delegated to the external microservice — no local token validation is added to BillMind. The work for Milestone 7 is:
+Authentication remains delegated to the external microservice — no local token validation is added to BillMind. The work for Milestone 9 is:
 
-- Extend `JwtAuthFilter` (or introduce a parallel filter) to cover user-facing endpoints, not just admin routes.
-- `ExternalAuthAdapter.isAuthorized` can be enriched to return the resolved subject/roles from the `/introspect` response if downstream logic needs them (e.g. scoping invoice queries to the authenticated user instead of the session UUID).
+- Widen `JwtAuthFilter` to authenticate user-facing endpoints too (today it skips every non-`ADMIN` route so an anonymous caller cannot force introspection calls). The authorization side needs no new filter: add a `RouteAccess.AUTHENTICATED` and let `RouteAccessAuthorizationManager` require an authenticated principal for it.
+- `ExternalAuthAdapter.isAuthorized` can be enriched to return the resolved subject/roles from the `/introspect` response if downstream logic needs them (e.g. scoping invoice queries to the authenticated user instead of the session UUID). `ExternalTokenAuthentication` would then carry the real authorities instead of a single `ROLE_ADMIN`, and `TokenKeyGenerator` would key the post-auth rate limit by `userId` instead of the token fingerprint.
 - Migration: add nullable `user_id` to `sessions`; on login, link the current anonymous session to the new user. Anonymous historical invoices remain part of the dataset.

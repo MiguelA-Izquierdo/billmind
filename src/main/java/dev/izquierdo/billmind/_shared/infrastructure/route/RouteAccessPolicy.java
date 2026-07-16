@@ -2,7 +2,6 @@ package dev.izquierdo.billmind._shared.infrastructure.route;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 
 import java.util.List;
 import java.util.Map;
@@ -11,13 +10,16 @@ import java.util.Map;
  * Single source of truth for how every route is guarded. {@code JwtAuthFilter} and
  * {@code SessionFilter} both consult it, so a route can never be registered with one filter
  * and forgotten by the other.
+ *
+ * <p>Matching goes through {@link RequestPathMatcher} — the decoded path the {@code DispatcherServlet}
+ * routes on — never the raw {@code getRequestURI()}, so an encoded admin path (e.g. {@code /%61dmin/})
+ * cannot slip past this guard as anonymous while the router still hands it to an admin controller.
  */
 @Component
 public class RouteAccessPolicy {
 
-    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
-
-    private static final String API_PREFIX = "/api/v1/";
+    /** Everything the API serves; anything outside it (static assets, actuator) is {@link RouteAccess#OPEN}. */
+    private static final String API_TREE = "/api/v1/**";
 
     /**
      * Every route under this prefix is admin-only regardless of HTTP method, so a newly added
@@ -35,33 +37,37 @@ public class RouteAccessPolicy {
             "GET", List.of("/api/v1/market-rates")
     );
 
+    private final RequestPathMatcher pathMatcher;
+
+    public RouteAccessPolicy(RequestPathMatcher pathMatcher) {
+        this.pathMatcher = pathMatcher;
+    }
+
     /**
-     * Anything unrecognized under {@value #API_PREFIX} defaults to {@link RouteAccess#ANONYMOUS}:
+     * Anything unrecognized under the API tree defaults to {@link RouteAccess#ANONYMOUS}:
      * a new endpoint is session-scoped until someone decides otherwise.
      */
     public RouteAccess accessFor(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        if (!uri.startsWith(API_PREFIX)) {
+        if (!pathMatcher.matches(API_TREE, request)) {
             return RouteAccess.OPEN;
         }
-        String method = request.getMethod();
-        if (isAdmin(method, uri)) {
+        if (isAdmin(request)) {
             return RouteAccess.ADMIN;
         }
-        if (matches(OPEN_ROUTES, method, uri)) {
+        if (matchesAny(OPEN_ROUTES, request)) {
             return RouteAccess.OPEN;
         }
         return RouteAccess.ANONYMOUS;
     }
 
-    private boolean isAdmin(String method, String uri) {
+    private boolean isAdmin(HttpServletRequest request) {
         boolean underAdminPrefix = ADMIN_PATH_PREFIXES.stream()
-                .anyMatch(pattern -> PATH_MATCHER.match(pattern, uri));
-        return underAdminPrefix || matches(ADMIN_ROUTES, method, uri);
+                .anyMatch(pattern -> pathMatcher.matches(pattern, request));
+        return underAdminPrefix || matchesAny(ADMIN_ROUTES, request);
     }
 
-    private boolean matches(Map<String, List<String>> routes, String method, String uri) {
-        return routes.getOrDefault(method, List.of()).stream()
-                .anyMatch(pattern -> PATH_MATCHER.match(pattern, uri));
+    private boolean matchesAny(Map<String, List<String>> routes, HttpServletRequest request) {
+        return routes.getOrDefault(request.getMethod(), List.of()).stream()
+                .anyMatch(pattern -> pathMatcher.matches(pattern, request));
     }
 }

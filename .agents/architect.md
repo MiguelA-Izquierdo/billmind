@@ -18,7 +18,7 @@ Design BillMind's architecture following **Domain-Driven Design (DDD)** and **He
 **Project stack:**
 - `langchain4j 1.0.0` (BOM-managed; core/openai at 1.0.0 final, integrations at 1.0.0-beta5)
 - `spring-boot 3.5.0`, `spring-data-jpa`, `spring-web`
-- `postgresql`, `testcontainers 1.21.0`, `lombok`, `jacoco`
+- `postgresql`, `testcontainers 1.21.4`, `lombok`, `jacoco`
 
 ---
 

@@ -47,13 +47,31 @@ Admin operations require a Bearer token issued by the external user microservice
 |---|---|---|
 | `Authorization` | `Bearer eyJ…` | JWT issued by the external auth service |
 
-On each admin request BillMind calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the Bearer token. A `200` response authorises the request; `401`/`403` or any connectivity error returns `401`/`403` to the caller respectively. Admin routes do **not** require `X-Session-Id`.
+Authenticating and authorizing are separate steps. `JwtAuthFilter` only establishes an identity: it calls `GET <AUTH_EXTERNAL_URL>/introspect` forwarding the Bearer token and puts the result in the `SecurityContext` (`ROLE_ADMIN` only on a `200`) — it rejects nothing. The access **decision** is taken by Spring Security's authorization engine and enforced again by `@PreAuthorize` on each admin handler. From the caller's side the observable contract is unchanged: a valid token proceeds; a missing token yields `401`; a token rejected by introspection (or any connectivity error, which fails closed) yields `403`. Admin routes do **not** require `X-Session-Id`. See [`ARCHITECTURE.md`](ARCHITECTURE.md) → *Admin route protection* for what each layer catches.
+
+---
+
+## Rate limiting
+
+Every `/api/v1/**` route is rate-limited by a per-endpoint token-bucket limiter (see [`RATELIMIT.md`](RATELIMIT.md)). Two distinct status codes can come back before the request reaches its handler:
+
+| Status | Meaning | When |
+|---|---|---|
+| `429 Too Many Requests` | An actual limit was breached. | The caller exceeded the bucket for the route's profile (session and/or IP layer). |
+| `503 Service Unavailable` | The limiter could not count and failed **closed**. | The rate-limit store is unavailable on a paid/security profile (`UPLOAD`, `CHAT`, `ADMIN`); denying is safer than serving unmetered. |
+
+Both carry a Spanish message in the standard error envelope and a `Retry-After` header (seconds). Responses that consulted a bucket also expose `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds from now).
+
+```json
+{ "success": false, "status": 429, "message": "Has superado el límite de peticiones. Inténtalo de nuevo más tarde." }
+{ "success": false, "status": 503, "message": "El servicio no está disponible temporalmente. Inténtalo de nuevo en unos instantes." }
+```
 
 ---
 
 ## Endpoints
 
-### POST /api/v1/invoices/upload
+### POST /api/v1/invoices
 
 Upload a utility invoice PDF. The API validates the file, extracts text, classifies the document (supply type + provider company), extracts structured fields (billing period, consumption, rates, totals), redacts PII, and persists the invoice to the database.
 
@@ -69,7 +87,7 @@ Content-Type: multipart/form-data
 
 **Responses**
 
-`201 Created` — invoice accepted and persisted:
+`201 Created` — invoice accepted and persisted. The `comparison` field carries the savings breakdown computed synchronously on upload; it is `null` when the invoice has no extracted fields, or when there is insufficient data to compare (missing `pricePerKwh`/`consumptionKwh`, or no market rates loaded yet):
 ```json
 {
   "success": true,
@@ -77,10 +95,27 @@ Content-Type: multipart/form-data
   "message": "Factura subida y procesada correctamente.",
   "data": {
     "invoiceId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "fileName": "factura_luz.pdf"
+    "fileName": "factura_luz.pdf",
+    "comparison": {
+      "userPricePerKwh": 0.1542,
+      "userIsTou": false,
+      "annualKwhEstimate": 3600,
+      "flatBlock": {
+        "bestCompany": "PODO",
+        "bestTariffName": "Tarifa Estable",
+        "bestPricePerKwh": 0.1190,
+        "annualSavingsEuros": 126.72,
+        "alternatives": [
+          { "company": "PODO", "tariffName": "Tarifa Estable", "effectivePricePerKwh": 0.1190, "touRate": false }
+        ]
+      },
+      "touBlock": null
+    }
   }
 }
 ```
+
+The same comparison payload is available on demand at `GET /api/v1/invoices/{id}/comparison`.
 
 `400 Bad Request` — file is not a PDF (validation fails in `UploadInvoiceCommand`):
 ```json
@@ -117,7 +152,7 @@ Content-Type: multipart/form-data
 **Example**
 
 ```bash
-curl -X POST http://localhost:8082/api/v1/invoices/upload \
+curl -X POST http://localhost:8082/api/v1/invoices \
   -H "X-Session-Id: 550e8400-e29b-41d4-a716-446655440000" \
   -F "file=@factura_luz.pdf"
 ```

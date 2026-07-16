@@ -1,6 +1,7 @@
 package dev.izquierdo.billmind._shared.infrastructure.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.izquierdo.billmind._shared.infrastructure.route.RequestPathMatcher;
 import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccessPolicy;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,13 +29,13 @@ class SessionFilterTest {
         sessionService = mock(SessionService.class);
         sessionContext = mock(SessionContext.class);
         chain = mock(FilterChain.class);
-        filter = new SessionFilter(sessionService, sessionContext, new ObjectMapper(), new RouteAccessPolicy());
+        filter = new SessionFilter(sessionService, sessionContext, new ObjectMapper(), new RouteAccessPolicy(new RequestPathMatcher()));
     }
 
     @Test
-    void shouldPassThroughAndUpsertSessionWhenHeaderIsValid() throws Exception {
+    void shouldPassThroughAndUpsertSessionWhenTheRequestCreatesState() throws Exception {
         UUID sessionId = UUID.randomUUID();
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/invoices");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/invoices");
         request.addHeader("X-Session-Id", sessionId.toString());
 
         MockHttpServletResponse response = doFilter(request);
@@ -42,6 +43,29 @@ class SessionFilterTest {
         verify(sessionService).upsert(sessionId);
         verify(sessionContext).setSessionId(sessionId);
         verify(chain).doFilter(any(), any());
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    /**
+     * A read must not write. Otherwise a forged {@code X-Session-Id} on any GET — including a path
+     * that answers 404 — inserts a row, and an unauthenticated caller grows the table at will.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "/api/v1/invoices",
+            "/api/v1/invoices/8b1a9953-4c2e-4d1a-9f3a-1b2c3d4e5f60",
+            "/api/v1/does-not-exist"
+    })
+    void shouldBindTheSessionWithoutWritingItOnAReadRequest(String uri) throws Exception {
+        UUID sessionId = UUID.randomUUID();
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
+        request.addHeader("X-Session-Id", sessionId.toString());
+
+        MockHttpServletResponse response = doFilter(request);
+
+        verify(sessionContext).setSessionId(sessionId);
+        verify(chain).doFilter(any(), any());
+        verifyNoInteractions(sessionService);
         assertThat(response.getStatus()).isEqualTo(200);
     }
 

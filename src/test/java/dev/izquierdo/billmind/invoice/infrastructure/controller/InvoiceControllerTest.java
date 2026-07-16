@@ -4,6 +4,12 @@ import dev.izquierdo.billmind._shared.application.command.CommandBus;
 import dev.izquierdo.billmind._shared.application.query.QueryBus;
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
 import dev.izquierdo.billmind._shared.domain.port.ExternalAuthPort;
+import dev.izquierdo.billmind._shared.infrastructure.auth.ApiSecurityErrorHandler;
+import dev.izquierdo.billmind._shared.infrastructure.ratelimit.RateLimiter;
+import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccessAuthorizationManager;
+import dev.izquierdo.billmind._shared.infrastructure.ratelimit.model.RateLimitVerdict;
+import dev.izquierdo.billmind._shared.infrastructure.ratelimit.policy.RateLimitPolicyResolver;
+import dev.izquierdo.billmind._shared.infrastructure.route.RequestPathMatcher;
 import dev.izquierdo.billmind._shared.infrastructure.route.RouteAccessPolicy;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionContext;
 import dev.izquierdo.billmind._shared.infrastructure.session.SessionService;
@@ -42,7 +48,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InvoiceController.class)
-@Import({SecurityConfig.class, RouteAccessPolicy.class, InvoiceControllerTest.MetricsTestConfig.class})
+@Import({SecurityConfig.class, RequestPathMatcher.class, RouteAccessPolicy.class,
+        RouteAccessAuthorizationManager.class, ApiSecurityErrorHandler.class, RateLimitPolicyResolver.class,
+        InvoiceControllerTest.MetricsTestConfig.class})
 class InvoiceControllerTest {
 
     // The web slice does not include metrics auto-configuration; the controller needs a
@@ -70,16 +78,20 @@ class InvoiceControllerTest {
     @MockitoBean
     private SessionContext sessionContext;
 
-    // JwtAuthFilter is a Filter, so @WebMvcTest instantiates it; its collaborators are not part
-    // of the web slice and must be supplied as mocks.
+    // The security filters are Filter beans, so @WebMvcTest instantiates them; their collaborators
+    // are not part of the web slice and must be supplied as mocks.
     @MockitoBean
     private ExternalAuthPort externalAuthPort;
+
+    @MockitoBean
+    private RateLimiter rateLimiter;
 
     private static final UUID SESSION_ID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
     @BeforeEach
     void setUp() {
         when(sessionContext.getSessionId()).thenReturn(SESSION_ID);
+        when(rateLimiter.check(any(), any(), any())).thenReturn(RateLimitVerdict.unlimited());
     }
 
     // --- Upload ---

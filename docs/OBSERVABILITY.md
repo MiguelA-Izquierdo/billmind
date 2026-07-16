@@ -129,6 +129,8 @@ Metrics exposed via `/actuator/metrics` and `/actuator/prometheus` (on the manag
 | `llm.calls` | Counter | `role`, `provider`, `model`, `operation`, `outcome` | `MetricsLlmTelemetry` |
 | `llm.tokens` | Counter (by count) | `role`, `provider`, `model`, `direction` (input/output) | `MetricsLlmTelemetry` |
 | `llm.cost.usd` | Counter (by USD) | `role`, `provider`, `model` | `MetricsLlmTelemetry` |
+| `ratelimit.requests` | Counter | `profile`, `phase` (pre/post-auth), `outcome` (allowed/throttled/unavailable) | `RateLimitMetrics` |
+| `ratelimit.store.errors` | Counter | `profile` | `RateLimitMetrics` |
 
 The `llm.*` meters are fed by the same per-call hook as the `[LLM]` log line — `TimedChatLanguageModel`
 builds one `LlmCallData` and fans it out to every active telemetry sink. They are on by default
