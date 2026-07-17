@@ -127,7 +127,7 @@ src/main/java/dev/izquierdo/billmind/
 │       ├── adapter/
 │       │   ├── classifier/     # KeywordInvoiceClassifier, LlmInvoiceClassifier
 │       │   ├── fieldextractor/ # ExtractionPromptBuilder, InvoiceFieldsValidator
-│       │   ├── pii/            # HybridPiiRedactor, PiiPatterns
+│       │   ├── pii/            # HybridPiiRedactor (regex layer delegates to _shared PiiScrubber)
 │       │   ├── HybridInvoiceClassifier
 │       │   └── LlmInvoiceFieldExtractor
 │       ├── config/             # ChatModelRolesConfig, per-provider beans

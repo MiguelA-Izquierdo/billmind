@@ -1,6 +1,7 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter.pii;
 
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
+import dev.izquierdo.billmind._shared.infrastructure.pii.PiiScrubber;
 import dev.izquierdo.billmind.invoice.domain.port.PiiRedactor;
 import dev.langchain4j.model.chat.ChatModel;
 import io.micrometer.core.instrument.Counter;
@@ -61,7 +62,7 @@ public class HybridPiiRedactor implements PiiRedactor {
         if (text == null) return "";
         if (text.isBlank()) return text;
 
-        String regexRedacted = PiiPatterns.redact(text);
+        String regexRedacted = PiiScrubber.redact(text);
         String header = truncateAtLineBoundary(regexRedacted);
 
         if (hasPiiSignals(header)) {

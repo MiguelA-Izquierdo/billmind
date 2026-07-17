@@ -27,7 +27,10 @@ cp .env.example .env
 | `DB_NAME` | `billmind` | Database name |
 | `DB_USERNAME` | `billmind` | Database user |
 | `DB_PASSWORD` | `billmind` | Database password |
-| `DDL_AUTO` | `update` | Hibernate schema mode (`spring.jpa.hibernate.ddl-auto`). `update` is the dev/pre-release default; **never deploy `update` to production** — lock it to `validate` (or `none`) once Flyway lands in Milestone 7. |
+| `DDL_AUTO` | `validate` | Hibernate schema mode (`spring.jpa.hibernate.ddl-auto`). The schema is Flyway-managed, so Hibernate only validates the mappings against it. Escape hatch only (e.g. `none`); **never set `update`/`create` on a Flyway-managed DB** — the two would fight over the schema. |
+| `FLYWAY_ENABLED` | `true` | Runs Flyway migrations from `db/migration/` at startup (`spring.flyway.enabled`). Adopts an existing schema via `baseline-on-migrate=true` + `baseline-version=0`. Disabled in the test profile. |
+
+> **Required extensions:** the schema depends on the `vector` (pgVector) and `unaccent` extensions. `V1__baseline.sql` runs `CREATE EXTENSION IF NOT EXISTS` for both, which needs a role with `CREATE` privilege on the database (a superuser locally; the `rds_superuser`/`cloudsqlsuperuser` role on managed Postgres). On a managed instance where the app's migration user is **not** privileged, pre-provision the extensions out of band (e.g. AWS RDS `CREATE EXTENSION` as the master user, or the console's shared-preload/extensions allowlist) before the first migration — the `IF NOT EXISTS` then makes V1 a no-op for that statement. The local Docker image (`pgvector/pgvector:pg16`) and `docker/postgres/init.sql` already handle this.
 
 ---
 

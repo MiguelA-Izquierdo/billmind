@@ -46,7 +46,6 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | LLM tracing → external Langfuse (backend deployed as shared infra, referenced by env var) | 6 | LLM observability |
 | In-process domain event bus + `metrics/` bounded context reacting to the upload funnel and chat engagement | 6 | Cross-context reactions without coupling; instruments the event bus before the metrics domain lands |
-| Semantic response cache | 7 | Cost / latency |
 | Flyway migrations (consolidated initial migration) | 7 | Production-grade deployability before first release |
 | Delegated user identity (external service) + authenticated endpoints + per-user & Redis-backed rate limiting | 9 | Phase 2 — no local user/credential storage; per-user analytics need `user_id` first |
 | `metrics/` domain + persistence + read API (funnel conversion, drop-off reasons, KB coverage gaps) | 10 | Turn the log-only handlers into a queryable product-analytics store |
@@ -127,7 +126,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 **Dependencies:** none.
 
-**Note on schema management:** during Milestones 0–6 the schema is owned by JPA entities (`ddl-auto=update` in dev, `validate` once stable). Flyway is intentionally deferred until Milestone 7 — avoiding migration churn while the domain model is actively evolving is the correct trade-off at this stage. Milestone 7 introduces a single consolidated baseline migration; from that point, all schema changes go through versioned migrations and `ddl-auto` is locked to `validate`.
+**Note on schema management:** through Milestones 0–6 the schema was owned by JPA entities under `ddl-auto=update`. Flyway was deferred until then to avoid migration churn while the domain model was actively evolving. **The Flyway baseline has now landed** (Milestone 7 item): the current schema is consolidated into `V1__baseline.sql`, the default `ddl-auto` is `validate`, and existing databases are adopted via `baseline-on-migrate=true` + `baseline-version=0` (see ARCHITECTURE Design Decision #13). From here all schema changes go through versioned migrations — e.g. the `user_id` column in Milestone 9 ships as `V2` on top of this baseline. `vector_store` stays outside Flyway, owned by the embedding store at runtime.
 
 **Engineering highlights:** request-scoped beans for session correlation, aggregate/projection separation, CQRS with void command dispatch.
 
@@ -324,14 +323,15 @@ port, conversation store, SSE).
 
 **Deliverables:**
 
-- **Flyway** introduced now: consolidate the current schema into a baseline initial migration, switch `ddl-auto` to `validate`, and from this point all schema changes go through versioned migrations. (The `user_id` column added by Milestone 9 lands as a versioned migration on top of this baseline, not as part of it.)
-  - Semantic response cache.
-  - PII redaction in logs.
-  - Advanced prompt-injection defenses.
+- ✓ **Flyway** introduced now: consolidate the current schema into a baseline initial migration, switch `ddl-auto` to `validate`, and from this point all schema changes go through versioned migrations. (The `user_id` column added by Milestone 9 lands as a versioned migration on top of this baseline, not as part of it.)
+  - ✓ PII redaction in logs.
+  - ☐ Advanced prompt-injection defenses. *(still open — today only the extraction prompt is hardened via `ExtractionPromptBuilder`'s sandwich + delimiter stripping; the assistant's user/invoice context has no equivalent guard yet.)*
+
+> **Descoped from M7 — semantic response cache.** Originally listed here for cost/latency, now dropped: the post-M5 `ToolResultCache` (Caffeine, memoizing the argument-deterministic `search_regulation` tool) already captures the bulk of the repeat-query savings for the agentic path, and a general semantic cache adds cache-invalidation and staleness risk disproportionate to the remaining benefit at Phase 1 scale. Revisit only if LLM cost telemetry (`llm.cost.usd`) shows repeated near-duplicate prompts dominating spend.
 
 **Dependencies:** all previous.
 
-**Engineering highlights:** consolidated Flyway baseline with `ddl-auto=validate`, semantic response cache for cost/latency, PII redaction in logs, advanced prompt-injection defenses — the production-readiness layer that ships before user accounts.
+**Engineering highlights:** consolidated Flyway baseline with `ddl-auto=validate`, PII redaction in logs, advanced prompt-injection defenses — the production-readiness layer that ships before user accounts.
 
 ### Milestone 8 — Minimal Frontend *(optional)*
 

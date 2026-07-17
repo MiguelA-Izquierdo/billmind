@@ -1,28 +1,28 @@
-package dev.izquierdo.billmind.invoice.infrastructure.adapter.pii;
+package dev.izquierdo.billmind._shared.infrastructure.pii;
 
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class PiiPatternsTest {
+class PiiScrubberTest {
 
     // ── IBAN ─────────────────────────────────────────────────────────────────
 
     @Test
     void shouldRedactCompactIban() {
-        String result = PiiPatterns.redact("Cuenta: ES9121000418450200051332 para domiciliación");
+        String result = PiiScrubber.redact("Cuenta: ES9121000418450200051332 para domiciliación");
         assertThat(result).contains("[IBAN]").doesNotContain("ES91");
     }
 
     @Test
     void shouldRedactFormattedIban() {
-        String result = PiiPatterns.redact("Cuenta: ES91 2100 0418 4502 0005 1332");
+        String result = PiiScrubber.redact("Cuenta: ES91 2100 0418 4502 0005 1332");
         assertThat(result).contains("[IBAN]").doesNotContain("ES91");
     }
 
     @Test
     void shouldNotRedactNonSpanishIban() {
-        String result = PiiPatterns.redact("IBAN extranjero: FR7630006000011234567890189");
+        String result = PiiScrubber.redact("IBAN extranjero: FR7630006000011234567890189");
         assertThat(result).doesNotContain("[IBAN]").contains("FR76");
     }
 
@@ -30,19 +30,19 @@ class PiiPatternsTest {
 
     @Test
     void shouldRedactDni() {
-        String result = PiiPatterns.redact("Titular DNI 12345678Z domicilio");
+        String result = PiiScrubber.redact("Titular DNI 12345678Z domicilio");
         assertThat(result).contains("[DNI]").doesNotContain("12345678Z");
     }
 
     @Test
     void shouldNotRedactDniWithLowercaseLetter() {
-        String result = PiiPatterns.redact("ref 12345678z código");
+        String result = PiiScrubber.redact("ref 12345678z código");
         assertThat(result).doesNotContain("[DNI]");
     }
 
     @Test
     void shouldNotRedactSevenDigitSequence() {
-        String result = PiiPatterns.redact("referencia 1234567Z valor");
+        String result = PiiScrubber.redact("referencia 1234567Z valor");
         assertThat(result).doesNotContain("[DNI]");
     }
 
@@ -50,19 +50,19 @@ class PiiPatternsTest {
 
     @Test
     void shouldRedactNieStartingWithX() {
-        String result = PiiPatterns.redact("NIE: X1234567Z");
+        String result = PiiScrubber.redact("NIE: X1234567Z");
         assertThat(result).contains("[NIE]").doesNotContain("X1234567Z");
     }
 
     @Test
     void shouldRedactNieStartingWithY() {
-        String result = PiiPatterns.redact("NIE Y9876543A del titular");
+        String result = PiiScrubber.redact("NIE Y9876543A del titular");
         assertThat(result).contains("[NIE]").doesNotContain("Y9876543A");
     }
 
     @Test
     void shouldRedactNieStartingWithZ() {
-        String result = PiiPatterns.redact("Extranjero Z0000001B");
+        String result = PiiScrubber.redact("Extranjero Z0000001B");
         assertThat(result).contains("[NIE]");
     }
 
@@ -70,13 +70,13 @@ class PiiPatternsTest {
 
     @Test
     void shouldRedactCifWithLetterControl() {
-        String result = PiiPatterns.redact("Emisor CIF A1234567H facturación");
+        String result = PiiScrubber.redact("Emisor CIF A1234567H facturación");
         assertThat(result).contains("[CIF]").doesNotContain("A1234567H");
     }
 
     @Test
     void shouldRedactCifWithDigitControl() {
-        String result = PiiPatterns.redact("CIF: B12345678");
+        String result = PiiScrubber.redact("CIF: B12345678");
         assertThat(result).contains("[CIF]").doesNotContain("B12345678");
     }
 
@@ -84,25 +84,25 @@ class PiiPatternsTest {
 
     @Test
     void shouldRedactMobilePhone() {
-        String result = PiiPatterns.redact("Contacto: 600123456 horario comercial");
+        String result = PiiScrubber.redact("Contacto: 600123456 horario comercial");
         assertThat(result).contains("[TELÉFONO]").doesNotContain("600123456");
     }
 
     @Test
     void shouldRedactLandlinePhone() {
-        String result = PiiPatterns.redact("Teléfono 912345678 atención al cliente");
+        String result = PiiScrubber.redact("Teléfono 912345678 atención al cliente");
         assertThat(result).contains("[TELÉFONO]").doesNotContain("912345678");
     }
 
     @Test
     void shouldRedactFormattedPhone() {
-        String result = PiiPatterns.redact("Tel: 600-123-456");
+        String result = PiiScrubber.redact("Tel: 600-123-456");
         assertThat(result).contains("[TELÉFONO]");
     }
 
     @Test
     void shouldNotRedactNumberStartingWithFive() {
-        String result = PiiPatterns.redact("referencia 512345678 interna");
+        String result = PiiScrubber.redact("referencia 512345678 interna");
         assertThat(result).doesNotContain("[TELÉFONO]");
     }
 
@@ -110,13 +110,13 @@ class PiiPatternsTest {
 
     @Test
     void shouldRedactEmail() {
-        String result = PiiPatterns.redact("Contacto: cliente@ejemplo.es para consultas");
+        String result = PiiScrubber.redact("Contacto: cliente@ejemplo.es para consultas");
         assertThat(result).contains("[EMAIL]").doesNotContain("cliente@ejemplo.es");
     }
 
     @Test
     void shouldRedactEmailWithSubdomain() {
-        String result = PiiPatterns.redact("usuario@correo.empresa.com");
+        String result = PiiScrubber.redact("usuario@correo.empresa.com");
         assertThat(result).contains("[EMAIL]");
     }
 
@@ -124,28 +124,28 @@ class PiiPatternsTest {
 
     @Test
     void shouldRedactValidPostalCode() {
-        String result = PiiPatterns.redact("Dirección: Calle Mayor 1, 28001 Madrid");
+        String result = PiiScrubber.redact("Dirección: Calle Mayor 1, 28001 Madrid");
         assertThat(result).contains("[CP]").doesNotContain("28001");
     }
 
     @Test
     void shouldRedactBarcelonaPostalCode() {
-        String result = PiiPatterns.redact("Domicilio en 08001 Barcelona");
+        String result = PiiScrubber.redact("Domicilio en 08001 Barcelona");
         assertThat(result).contains("[CP]").doesNotContain("08001");
     }
 
     @Test
     void shouldNotRedactInvalidProvince() {
-        String result = PiiPatterns.redact("código 53001 no existe");
+        String result = PiiScrubber.redact("código 53001 no existe");
         assertThat(result).doesNotContain("[CP]").contains("53001");
     }
 
-    // ── MÚLTIPLES PII EN EL MISMO TEXTO ──────────────────────────────────────
+    // ── MÚLTIPLES PII / CASOS LÍMITE ─────────────────────────────────────────
 
     @Test
     void shouldRedactMultiplePiiTypesInOneText() {
         String text = "Titular: 12345678Z, email: a@b.com, cuenta ES9121000418450200051332, CP 28001";
-        String result = PiiPatterns.redact(text);
+        String result = PiiScrubber.redact(text);
 
         assertThat(result)
             .contains("[DNI]", "[EMAIL]", "[IBAN]", "[CP]")
@@ -155,6 +155,16 @@ class PiiPatternsTest {
     @Test
     void shouldNotAlterTextWithNoPii() {
         String text = "Potencia contratada: 3,3 kW. Consumo: 245 kWh. Precio: 0,18 €/kWh.";
-        assertThat(PiiPatterns.redact(text)).isEqualTo(text);
+        assertThat(PiiScrubber.redact(text)).isEqualTo(text);
+    }
+
+    @Test
+    void shouldReturnNullWhenNull() {
+        assertThat(PiiScrubber.redact(null)).isNull();
+    }
+
+    @Test
+    void shouldReturnEmptyWhenEmpty() {
+        assertThat(PiiScrubber.redact("")).isEmpty();
     }
 }

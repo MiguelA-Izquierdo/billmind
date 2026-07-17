@@ -47,6 +47,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- Flyway — versioned schema migrations. Baselines the schema Hibernate used to own
+             under ddl-auto=update; from here the DB is migration-driven and Hibernate only
+             validates. flyway-database-postgresql is required since Flyway 10 split out the
+             PostgreSQL support module. Both versions are managed by the Spring Boot BOM. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>

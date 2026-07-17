@@ -1,8 +1,14 @@
-package dev.izquierdo.billmind.invoice.infrastructure.adapter.pii;
+package dev.izquierdo.billmind._shared.infrastructure.pii;
 
 import java.util.regex.Pattern;
 
-final class PiiPatterns {
+/**
+ * Pure, dependency-free regex PII scrubber shared across bounded contexts.
+ * Single source of truth for the Spanish PII patterns: reused by the invoice
+ * ingestion redactor and by the logging pipeline (see PiiRedactingMessageConverter).
+ * Deterministic and side-effect free — safe on any hot path, including log appenders.
+ */
+public final class PiiScrubber {
 
     // ES + 2 check digits + 20 account digits (groups of 4, optional separators)
     private static final Pattern IBAN = Pattern.compile(
@@ -29,9 +35,11 @@ final class PiiPatterns {
         "\\b(?:0[1-9]|[1-4]\\d|5[0-2])\\d{3}\\b"
     );
 
-    private PiiPatterns() {}
+    private PiiScrubber() {}
 
-    static String redact(String text) {
+    /** Redacts known PII tokens. Null-safe: returns the input unchanged when null or blank. */
+    public static String redact(String text) {
+        if (text == null || text.isEmpty()) return text;
         text = IBAN.matcher(text).replaceAll("[IBAN]");
         text = DNI.matcher(text).replaceAll("[DNI]");
         text = NIE.matcher(text).replaceAll("[NIE]");
