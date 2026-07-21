@@ -3,6 +3,7 @@ package dev.izquierdo.billmind.assistant.infrastructure.adapter.tool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
+import dev.izquierdo.billmind._shared.infrastructure.llm.prompt.PromptFence;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
@@ -46,6 +47,8 @@ public class AssistantTools {
     static final String SEARCH_MARKET_RATES    = "search_market_rates";
     /** Public so the agentic adapter can tell which tool is safe to cache (argument-deterministic). */
     public static final String SEARCH_REGULATION = "search_regulation";
+
+    private static final int MAX_TOOL_RESULT_CHARS = 8_000;
 
     private static final String NO_INVOICE = "No se ha proporcionado factura, así que no hay datos "
             + "de la factura del usuario para esta consulta.";
@@ -110,17 +113,22 @@ public class AssistantTools {
      * Executes the tool named by {@code request} and returns text the model reads as the tool result.
      * Snippets actually retrieved by {@link #SEARCH_REGULATION} are appended to {@code citationSink}
      * so the turn's citations reflect only what was really used.
+     *
+     * <p>Every result is fenced, uniformly: a tool result carries regulatory chunks and market rows
+     * the model cannot tell apart from our own wording, so the whole channel is treated as untrusted
+     * rather than deciding case by case which branch happens to embed third-party text.
      */
     public String dispatch(ToolExecutionRequest request, InvoiceFields fields,
                            List<RegulatorySnippet> citationSink) {
         String name = request.name();
         log.debug("[TOOL] dispatch name={} arguments={}", name, request.arguments());
-        return switch (name) {
+        String result = switch (name) {
             case GET_INVOICE_COMPARISON -> comparison(fields);
             case SEARCH_MARKET_RATES    -> marketRates(fields, request);
             case SEARCH_REGULATION      -> regulation(request, citationSink);
             default -> "Herramienta desconocida: " + name;
         };
+        return PromptFence.random().wrap(name, result, MAX_TOOL_RESULT_CHARS);
     }
 
     private String comparison(InvoiceFields fields) {
@@ -154,7 +162,10 @@ public class AssistantTools {
      * which told a user that Octopus does not operate in Spain).
      */
     private static String notInCatalogue(String company, List<MarketRateSnapshot> rates) {
-        return "BillMind no tiene tarifas registradas de '" + company + "' en su catálogo. Esto NO "
+        // The company name here is the model's own tool argument coming back into its context;
+        // flattening it keeps that from being a channel for self-authored pseudo-data.
+        return "BillMind no tiene tarifas registradas de '" + AssistantContextFormatter.name(company)
+                + "' en su catálogo. Esto NO "
                 + "significa que la compañía no exista ni que no opere en España: simplemente no "
                 + "está entre los datos de mercado disponibles. Compañías con tarifas en el "
                 + "catálogo: " + companiesIn(rates) + ".";
@@ -164,6 +175,7 @@ public class AssistantTools {
         return rates.stream()
                 .map(MarketRateSnapshot::company)
                 .filter(Objects::nonNull)
+                .map(AssistantContextFormatter::name)
                 .distinct()
                 .sorted()
                 .collect(Collectors.joining(", "));

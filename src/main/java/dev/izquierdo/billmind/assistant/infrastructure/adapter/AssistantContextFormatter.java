@@ -5,6 +5,7 @@ import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind._shared.infrastructure.llm.prompt.PromptText;
 import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 
@@ -24,6 +25,9 @@ public final class AssistantContextFormatter {
 
     private static final DecimalFormatSymbols SPANISH_SYMBOLS =
             new DecimalFormatSymbols(Locale.forLanguageTag("es-ES"));
+
+    /** Real company and tariff names are short; anything longer is noise or an attempt at structure. */
+    static final int MAX_NAME_CHARS = 60;
 
     private AssistantContextFormatter() {
     }
@@ -67,7 +71,7 @@ public final class AssistantContextFormatter {
         if (rates.isEmpty()) return "Sin datos de mercado disponibles.";
         StringBuilder sb = new StringBuilder();
         for (MarketRateSnapshot r : rates) {
-            sb.append(r.company()).append(" — ").append(r.tariffName())
+            sb.append(name(r.company())).append(" — ").append(name(r.tariffName()))
               .append(" (vigente desde ").append(r.validFrom()).append(")\n");
             if (r.pricePerKwh() != null)
                 sb.append("  Precio plano: ").append(num(r.pricePerKwh())).append(" €/kWh\n");
@@ -101,8 +105,8 @@ public final class AssistantContextFormatter {
 
     private static void appendOfferBlock(StringBuilder sb, String label, ComparisonSummary.OfferBlock block) {
         if (block == null) return;
-        sb.append(label).append(": ").append(block.bestCompany()).append(" — ")
-          .append(block.bestTariffName()).append(" a ").append(num(block.bestPricePerKwh())).append(" €/kWh.\n");
+        sb.append(label).append(": ").append(name(block.bestCompany())).append(" — ")
+          .append(name(block.bestTariffName())).append(" a ").append(num(block.bestPricePerKwh())).append(" €/kWh.\n");
         if (block.annualSavingsEuros().signum() > 0) {
             sb.append("  Ahorro anual estimado frente a la tarifa actual: ")
               .append(eur(block.annualSavingsEuros())).append(" €.\n");
@@ -110,9 +114,17 @@ public final class AssistantContextFormatter {
             sb.append("  El usuario ya paga igual o menos que esta tarifa (sin ahorro).\n");
         }
         for (ComparisonSummary.Alternative a : block.alternatives()) {
-            sb.append("  Alternativa: ").append(a.company()).append(" — ").append(a.tariffName())
+            sb.append("  Alternativa: ").append(name(a.company())).append(" — ").append(name(a.tariffName()))
               .append(": ").append(num(a.pricePerKwh())).append(" €/kWh\n");
         }
+    }
+
+    /**
+     * Renders a company or tariff name. These arrive from the external Kafka producer, and the row
+     * layout is line-based — an unflattened name could forge an extra tariff row. See PromptText.
+     */
+    public static String name(String value) {
+        return PromptText.inline(value, MAX_NAME_CHARS);
     }
 
     /** Formats a decimal for the Spanish prompt: comma separator, no grouping, trailing zeros stripped. */

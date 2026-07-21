@@ -159,10 +159,15 @@ separator, Spanish locale). No duplicated formatting logic across the two modes.
 
 ## System prompt (tools mode)
 
-Distinct from the eager template: it contains the invoice data inline, the rules (including the
-"respond in Spanish" instruction, per the project language convention), and guidance on *when* to
-use each tool. It has **no** eager market/comparison/regulatory sections — the model sees the tool
-specs through the tool-calling protocol itself, not through prompt text.
+Distinct from the eager template: it contains the invoice data inline (inside a `PromptFence`), the
+rules (including the "respond in Spanish" instruction, per the project language convention), and
+guidance on *when* to use each tool. It has **no** eager market/comparison/regulatory sections — the
+model sees the tool specs through the tool-calling protocol itself, not through prompt text.
+
+Tool results are fenced uniformly in `AssistantTools.dispatch`, and the eager adapter keeps its four
+context sections out of the `system` role entirely — they travel in the user message, each fenced,
+followed by a trailing instruction block. The tools path gets that role separation for free, since a
+tool result is already its own message. See ARCHITECTURE Design Decision #14.
 
 The rules describe *situations*, never tool names. Naming the tools in the prompt turned them into
 vocabulary the model shared with the user: `llama-3.3-70b-versatile` answered "te recomiendo que

@@ -97,7 +97,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
    4. **Determinism where possible.** The LLM reasons; numerical math (annual savings) lives in deterministic Java tools. Never ask the LLM to multiply.
    5. **Mandatory citations.** Every assistant reply cites the knowledge base documents it used. No citation, no render.
    6. **Cost / latency awareness.** Token budgets. Small models for classification; larger for reasoning.
-   7. **Prompt injection defense.** User input is never concatenated into the system prompt. Sandwich pattern: instructions → delimited data → instructions.
+   7. **Prompt injection defense.** Untrusted text is never concatenated into a prompt — it is fenced by `PromptFence` (per-request nonce markers, so content authored before the request cannot forge a closing delimiter) or flattened by `PromptText` when interpolated inline. "Untrusted" is broader than user input: it covers regulatory chunks, Kafka-sourced market rows and the model's own tool arguments echoed back. Sandwich pattern throughout — instructions → fenced data → instructions — and retrieved data sits in the `user` role, never `system`. See ARCHITECTURE Design Decision #14.
    8. **Evaluation as a first-class citizen.** Golden set grows with each milestone. CI fails on quality regression.
    9. **Observability from Milestone 6.** Structured traces, tokens, latencies, estimated cost per session.
    10. **Hexagonal rules untouchable.** No Spring/LangChain4j imports in `domain/`. Ever.
@@ -317,7 +317,7 @@ port, conversation store, SSE).
 
 **Engineering highlights:** hybrid RAGAS-style metrics (deterministic embedding gate always green in CI + opt-in LLM-as-judge faithfulness), quality regression gate in CI, structured LLM observability with token and latency tracking.
 
-### Milestone 7 — Production Hardening & Deployability
+### Milestone 7 — Production Hardening & Deployability ✓ COMPLETE
 
 **Objective:** make the project deployable and close out the remaining non-identity production/security hardening. Authenticated user identity is deliberately **not** part of this milestone — it is sequenced later (Milestone 9), because per-user analytics in `metrics/` depend on the `user_id` link existing first. Milestone 7 is what makes BillMind shippable while it is still anonymous-only.
 
@@ -325,7 +325,9 @@ port, conversation store, SSE).
 
 - ✓ **Flyway** introduced now: consolidate the current schema into a baseline initial migration, switch `ddl-auto` to `validate`, and from this point all schema changes go through versioned migrations. (The `user_id` column added by Milestone 9 lands as a versioned migration on top of this baseline, not as part of it.)
   - ✓ PII redaction in logs.
-  - ☐ Advanced prompt-injection defenses. *(still open — today only the extraction prompt is hardened via `ExtractionPromptBuilder`'s sandwich + delimiter stripping; the assistant's user/invoice context has no equivalent guard yet.)*
+  - ✓ **Advanced prompt-injection defenses.** One mechanism for the whole codebase in `_shared/infrastructure/llm/prompt/`: `PromptFence` (per-request nonce markers, control-char stripping, length cap) for blocks, `PromptText` (whitespace flattening + cap) for short inline values. Applied at every point where untrusted text reaches a model — invoice OCR (`ExtractionPromptBuilder`, which lost its own `<<< >>>`), the eager assistant's four context sections, every agentic tool result (fenced uniformly in `AssistantTools.dispatch`), and the company/tariff names arriving from the Kafka producer. Structural changes shipped alongside: retrieved data moved out of the `system` role into the `user` message, and the sandwich closed with a trailing instruction block. See ARCHITECTURE Design Decision #14.
+    - **Threat model note.** The anonymous upload path was already safe by construction — extraction is typed, so `formatFields` emits only numbers and dates and carries no free text into a prompt. The real vectors are second-order: regulatory chunks (admin-gated ingest, but third-party PDFs landing in the highest-trust prompt position) and market rows (a producer the plan trusts by design). This is therefore defense in depth, not the closing of a live hole.
+    - **Known residual.** The guarantee is structural, not semantic: flattening demotes a forged market row to inert text inside the company name rather than deleting it, and no fence makes a model ignore an instruction sitting legitimately inside its own block. Closing the market-row residual fully would mean normalizing or rejecting at ingestion (`ElectricityPriceConsumer`) — deliberately out of scope here, since it changes the ingest contract and would not cover the model's own echoed tool arguments.
 
 > **Descoped from M7 — semantic response cache.** Originally listed here for cost/latency, now dropped: the post-M5 `ToolResultCache` (Caffeine, memoizing the argument-deterministic `search_regulation` tool) already captures the bulk of the repeat-query savings for the agentic path, and a general semantic cache adds cache-invalidation and staleness risk disproportionate to the remaining benefit at Phase 1 scale. Revisit only if LLM cost telemetry (`llm.cost.usd`) shows repeated near-duplicate prompts dominating spend.
 
