@@ -17,6 +17,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -181,6 +182,23 @@ class LlmInvoiceFieldExtractorTest {
 
         assertThat(result).isInstanceOf(ElectricityFields.class);
         verify(chatModel, times(2)).chat(anyString());
+    }
+
+    @Test
+    void shouldFenceMalformedResponseWithNonceInsteadOfFixedDelimiter() {
+        doReturn("invalid json response")
+                .doReturn(ELECTRICITY_JSON)
+                .when(chatModel).chat(anyString());
+
+        extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(chatModel, times(2)).chat(promptCaptor.capture());
+        String repairPrompt = promptCaptor.getAllValues().get(1);
+
+        // The repair prompt must fence the untrusted text with a nonce marker, never the old fixed <<< >>>.
+        assertThat(repairPrompt).contains("[UNTRUSTED:MALFORMED_JSON:");
+        assertThat(repairPrompt).doesNotContain("<<<").doesNotContain(">>>");
     }
 
     @Test

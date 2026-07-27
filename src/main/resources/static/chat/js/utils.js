@@ -33,9 +33,14 @@ export function fmtEuros(v) {
   return Number(v).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 }
 
+// €/kWh: 2 decimals read as noise-free but collapse tariffs (0,11 vs 0,11),
+// so 3 is the ceiling — enough to tell rates apart, short enough to scan.
 export function fmtPrice(val) {
   if (val == null) return '—';
-  return Number(val).toFixed(6).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
+  return Number(val).toLocaleString('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
+  });
 }
 
 export function fmtKwh(val) {

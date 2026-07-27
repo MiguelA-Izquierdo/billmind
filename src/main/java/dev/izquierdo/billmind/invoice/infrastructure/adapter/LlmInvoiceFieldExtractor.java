@@ -3,6 +3,7 @@ package dev.izquierdo.billmind.invoice.infrastructure.adapter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitizer;
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
+import dev.izquierdo.billmind._shared.infrastructure.llm.prompt.PromptFence;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
@@ -103,6 +104,10 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
     private static final String JSON_REPAIR_INSTRUCTIONS =
             "The text below is malformed JSON. Return ONLY the corrected JSON — no prose, no markdown.";
 
+    private static final String REPAIR_LABEL = "MALFORMED_JSON";
+
+    private static final int MAX_REPAIR_CHARS = 8_000;
+
     // Registry: add a new SupplyDomain here without touching extract().
     private record ExtractionConfig(String instructions, Class<? extends InvoiceFields> fieldType) {}
 
@@ -172,8 +177,11 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
 
     private InvoiceFields repairAndParse(String malformed, Class<? extends InvoiceFields> fieldType) {
         MDC.put(TimedChatLanguageModel.MDC_OPERATION, "json-repair");
-        String safe = malformed.replace(">>>", "").replace("<<<", "");
-        String repairPrompt = JSON_REPAIR_INSTRUCTIONS + "\n<<<\n" + safe + "\n>>>\nCorrected:";
+        // The malformed text is the model's own prior output, derived from untrusted OCR — fence it
+        // with a per-request nonce (the shared mechanism), never a fixed delimiter.
+        PromptFence fence = PromptFence.random();
+        String repairPrompt = JSON_REPAIR_INSTRUCTIONS + "\n\n"
+                + fence.wrap(REPAIR_LABEL, malformed, MAX_REPAIR_CHARS) + "\nCorrected:";
         String repaired;
         try {
             repaired = chatModel.chat(repairPrompt);

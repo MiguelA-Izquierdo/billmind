@@ -64,7 +64,7 @@ Cross-context reactions travel through `DomainEventPublisher`. The implementatio
 
 ## Adding the regulatory knowledge base (Milestone 2)
 
-Invoice text is **not** vectorized. The pgVector store holds the regulatory knowledge base only (CNMC circulars, REE/ESIOS guides, BOE regulations). The chat assistant uses dual context: the user's full invoice text passed directly in the prompt + semantic retrieval from the knowledge base for regulatory questions.
+Invoice text is **not** vectorized. The pgVector store holds the regulatory knowledge base only (CNMC circulars, REE/ESIOS guides, BOE regulations). The chat assistant uses dual context: the invoice's extracted structured fields (`InvoiceFields`) passed directly in the prompt + semantic retrieval from the knowledge base for regulatory questions. Note: the full `rawTextRedacted` is persisted but is **not** passed to the assistant, so bill lines outside the extracted field set are not available to the chat (a known post-MVP gap).
 
 - New bounded context `knowledge/` with `KnowledgeDocument` aggregate and `KnowledgeChunk`.
 - Port `KnowledgeSearchRepository` in `knowledge/domain/port/`.

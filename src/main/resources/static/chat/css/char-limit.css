@@ -129,6 +129,100 @@
 }
 @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
 
+/* ── Welcome toast — bigger, commercial variant of the bot bubble ────────── */
+.char-limit-toast.clt-welcome { width: min(560px, calc(100vw - 32px)); }
+.clt-welcome .clt-bubble {
+  padding: 26px 30px 24px;
+  text-align: left;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.clt-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 2;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 8px;
+  transition: color .15s, background .15s;
+}
+.clt-close:hover { color: var(--text); background: rgba(255,255,255,.06); }
+
+.cw-title {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  line-height: 1.25;
+  color: var(--text);
+  margin: 6px 0 12px;
+}
+.cw-body {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--muted);
+  margin-bottom: 11px;
+}
+.cw-body strong { color: var(--text); font-weight: 600; }
+.cw-soon { color: var(--accent); font-size: 12.5px; }
+
+.cw-privacy {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  background: rgba(52,211,153,.10);
+  border: 1px solid rgba(52,211,153,.32);
+  border-radius: 12px;
+  padding: 11px 14px;
+  margin: 6px 0 18px;
+}
+.cw-privacy strong { color: var(--green); font-weight: 700; }
+
+.cw-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.cw-cta {
+  flex: 1 1 170px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 11px;
+  padding: 12px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(108,111,245,.42);
+  transition: background .15s, transform .1s, box-shadow .15s;
+}
+.cw-cta:hover { background: var(--accent2); box-shadow: 0 8px 26px rgba(108,111,245,.5); }
+.cw-cta:active { transform: scale(.97); }
+.cw-ghost {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 11px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.cw-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .char-limit-toast.clt-welcome.clt-visible {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* ── Char counter ────────────────────────────────────────── */
 .input-bottom {
   display: flex;

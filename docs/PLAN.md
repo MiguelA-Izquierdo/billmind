@@ -12,7 +12,7 @@ A visitor opens the app, uploads a utility invoice PDF, and the system:
 
 - Extracts structured fields (price/kWh, contracted power, billing period, totals).
   - Compares the invoice against current market rate data (received in real-time via Kafka events from an external price service) to estimate potential savings.
-  - Lets the user **chat** about their invoice. The assistant has access to the full invoice text and retrieves relevant context from a regulatory knowledge base (CNMC, REE, BOE) via RAG.
+  - Lets the user **chat** about their invoice. The assistant has access to the invoice's extracted structured fields (not the full raw text) and retrieves relevant context from a regulatory knowledge base (CNMC, REE, BOE) via RAG.
 
 No login. The frontend generates a UUID per visitor and sends it as `X-Session-Id`. The backend correlates resources (uploaded invoices, conversations) to that UUID without authenticating it.
 
@@ -32,7 +32,7 @@ Visitors can register to get persistent history, multiple invoices over time, an
 |---|---|---|
 | Enriched `Invoice` aggregate + table | 0 | Today the classifier metadata is discarded |
 | `sessions` table + `SessionContext` + `X-Session-Id` filter | 0 | Anonymous correlator, FK targets |
-| LangChain4j `AiServices` + JSON Schema structured outputs | 1 | Move from string parsing to typed extraction |
+| Typed extraction adapter over the imperative `ChatModel` API — prompted JSON, sanitized, deserialized into `InvoiceFields`, domain-validated | 1 | Move from string parsing to typed extraction |
 | `PiiRedactor` applied to full invoice text | 1 | GDPR + dataset safety |
 | Regulatory knowledge base ingestion pipeline | 2 | Populate the RAG corpus before the assistant can use it |
 | Hybrid retrieval over knowledge base (pgVector + `tsvector` BM25 + RRF) | 2 | Pure vector search misses keyword-heavy regulatory queries |
@@ -42,7 +42,7 @@ Visitors can register to get persistent history, multiple invoices over time, an
 | `comparison/` bounded context — deterministic savings engine | 3 | Core product value: quantify overpayment immediately on upload |
 | Comparison result embedded in `POST /api/v1/invoices` response | 3 | No extra step — savings visible the moment the invoice is processed |
 | `assistant/` bounded context | 5 | Explains the savings, answers follow-up questions |
-| SSE streaming + `conversationId` handshake | 5 | Real LLM UX with in-memory multi-turn |
+| SSE event stream + `conversationId` handshake | 5 | Multi-turn chat UX with in-memory history |
 | Eval harness + golden set + RAGAS-style metrics | 6 | Quality regression in CI |
 | LLM tracing → external Langfuse (backend deployed as shared infra, referenced by env var) | 6 | LLM observability |
 | In-process domain event bus + `metrics/` bounded context reacting to the upload funnel and chat engagement | 6 | Cross-context reactions without coupling; instruments the event bus before the metrics domain lands |
@@ -85,7 +85,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 **Note on shared energy columns:** `consumption_kwh` and `price_per_kwh` in the `invoices` table are reused for gas invoices (`GasFields`) in addition to electricity (`ElectricityFields`). Gas invoices also populate `consumption_m3` (the native unit), but the energy-equivalent kWh and the price per kWh are stored in the same columns as electricity. This is an intentional short-term trade-off: a single flat table is simpler to query and avoids premature normalization during active development. The downside is that analytics queries (e.g. "average price per kWh for gas vs electricity") must filter on `supply_type` to avoid mixing units — this is non-obvious from the schema alone. Milestone 7 (schema consolidation with Flyway) is the right moment to revisit this: options are (a) per-supply-type subtables or a `invoice_fields` JSONB column, (b) a dedicated `electricity_fields` / `gas_fields` side-table keyed on `invoice_id`, or (c) keeping the flat schema with a clear column naming convention (`energy_kwh`, `energy_price_per_kwh`) and a view per supply type for analytics.
 
-**Note on vector store scope:** invoice chunks are NOT vectorized. The vector store holds the regulatory knowledge base (CNMC tariff methodology, REE documentation, BOE regulations). The chat assistant uses dual context: the user's full invoice text passed directly (it fits in any modern context window) + semantic retrieval from the knowledge base for regulatory questions. This avoids forcing RAG onto structured numerical data where SQL aggregations are more reliable.
+**Note on vector store scope:** invoice chunks are NOT vectorized. The vector store holds the regulatory knowledge base (CNMC tariff methodology, REE documentation, BOE regulations). The chat assistant uses dual context: the invoice's extracted structured fields passed directly + semantic retrieval from the knowledge base for regulatory questions. (`rawTextRedacted` is persisted but not passed to the assistant — surfacing bill lines outside the extracted field set is a post-MVP concern.) This avoids forcing RAG onto structured numerical data where SQL aggregations are more reliable.
 
 ---
 
@@ -138,12 +138,12 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 - Port `InvoiceFieldExtractor`.
   - Record `InvoiceFields`.
-  - Adapter using LangChain4j `AiServices` + JSON Schema enforcement.
+  - Adapter over the imperative `ChatModel` API (never `AiServices` — see `.agents/developer.md`): a per-supply-type prompt carrying the target JSON shape, sanitized and deserialized into the sealed `InvoiceFields` hierarchy.
   - `PiiRedactor` applied before persisting.
 
 **Dependencies:** Milestone 0.
 
-**Engineering highlights:** typed extraction via LangChain4j AiServices with JSON Schema enforcement, GDPR-compliant PII redaction pipeline, retry with exponential backoff.
+**Engineering highlights:** typed extraction into the sealed `InvoiceFields` hierarchy with domain validation and a one-shot JSON-repair retry on a malformed response, GDPR-compliant PII redaction pipeline.
 
 **Architectural decision — multi-model role routing (resolved):** two named beans `fastChatModel` and `smartChatModel` are defined in `ChatModelRolesConfig`. In dev both alias the single configured provider. In production they can be independently routed to different providers by replacing the aliases with provider-specific beans (`llm.role.fast.*` / `llm.role.smart.*` properties). Role assignment: `fastChatModel` → classification, PII redaction; `smartChatModel` → structured extraction, RAG, agent reasoning.
 
@@ -183,7 +183,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 **Note on the price producer:** BillMind only consumes. The service that fetches prices from external sources (e.g. REE ESIOS API) and publishes `ElectricityPriceEvent` is a separate system, developed independently. BillMind trusts its events without question.
 
-**Engineering highlights:** event-driven market price ingestion via Kafka (KRaft) with flat-rate and TOU pricing support, idempotent upsert, DLT + domain-error topics, TestContainers integration tests; hybrid pgVector + BM25 retrieval with RRF, automated IVFFlat index lifecycle, recall@k / MRR quality gate in CI.
+**Engineering highlights:** event-driven market price ingestion via Kafka (KRaft) with flat-rate and TOU pricing support, idempotent persistence (a replayed event hits the unique constraint and is dropped), DLT + domain-error topics, TestContainers integration tests; hybrid pgVector + BM25 retrieval with RRF, automated IVFFlat index lifecycle, recall@k / MRR quality gate in CI.
 
 ### Milestone 3 — `comparison/` module — Savings Engine ✓ COMPLETE
 
@@ -234,17 +234,17 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 - Bounded context `assistant/` fully implemented.
   - Domain: `Conversation`, `ConversationMessage`, `MessageRole`, `ChatResult`, `RegulatorySnippet`. Ports: `AssistantRepository`, `AssistantLlmPort`, `InvoiceContextPort`, `RegulationSearchPort`.
   - `ChatUseCase` with dual context strategy:
-    - User's invoice full text → passed in the system prompt (no retrieval needed, fits in context window).
+    - User's invoice extracted structured fields → passed in the prompt (no retrieval needed).
     - Regulatory knowledge base → semantic RAG retrieval (CNMC, REE, BOE documents from Milestone 2).
   - Multi-turn conversation: `conversationId` returned as first SSE event; subsequent requests include it to continue the same thread. `ChatUseCase` finds the existing `Conversation` or creates a new one; history is passed to the LLM as alternating `UserMessage`/`AiMessage`.
   - **No DB persistence for conversations** — `InMemoryAssistantRepository` is sufficient for Phase 1 anonymous use. Conversations are scoped to the server process lifetime; refreshing the browser starts a fresh thread, which is acceptable without user accounts. DB persistence is a Phase 2 concern alongside JWT auth.
-  - `POST /api/v1/assistant/chat` with SSE streaming: emits `conversation` (id), `token` (streamed text), `citations`, `[DONE]`.
+  - `POST /api/v1/assistant/chat` over an SSE event stream: emits `conversation` (id), `message` (the full answer in a single event — not token-by-token), `citations`, `[DONE]`. SSE is the transport envelope for the typed events; the LLM call is blocking, so there is no incremental token streaming.
   - Citations wired: `ChatResult` carries `List<ChatCitation>` from the retrieved regulatory snippets; rendered as chips in the UI.
-  - Static HTML: full chat UI with invoice selector, suggestions, SSE token streaming, citation chips, comparison savings card.
+  - Static HTML: full chat UI with invoice selector, suggestions, SSE-delivered messages, citation chips, comparison savings card.
 
 **Dependencies:** Milestone 1 (invoice fields), Milestone 2 (knowledge base), Milestone 3 (comparison result shown alongside chat).
 
-**Engineering highlights:** in-memory multi-turn conversation history, dual-context RAG (invoice text in system prompt + regulatory retrieval), SSE streaming with conversationId handshake, citation rendering.
+**Engineering highlights:** in-memory multi-turn conversation history, dual-context RAG (invoice structured fields in prompt + regulatory retrieval), SSE streaming with conversationId handshake, citation rendering.
 
 ### Post-Milestone 5 — Assistant context strategy (iterations 1–2) ✓ COMPLETE
 
@@ -356,7 +356,7 @@ port, conversation store, SSE).
 
 **Deliverables:**
 
-- **Identity fully delegated to the external user microservice** (the model already in place for admin routes via `JwtAuthFilter` / `RouteAccessPolicy`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 9 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
+- **Identity fully delegated to the external user microservice** — [`user-service`](https://github.com/MiguelA-Izquierdo/user-service), a standalone Spring Boot + DDD service by the same author, already used for admin-route authentication (the model in place via `JwtAuthFilter` / `RouteAccessPolicy`). BillMind never stores credentials, never manages registration/login, and never issues or validates tokens itself — it trusts the identity asserted by the upstream service/gateway. Milestone 9 only extends the existing delegated-validation pattern to authenticated user-facing endpoints.
   - **No `users` table in BillMind.** `sessions` gains a nullable `user_id` column holding the opaque external user identifier — a foreign reference owned by the identity service, not a locally owned entity. Added as a versioned Flyway migration on top of the Milestone 7 baseline.
   - Session linking: when an authenticated request arrives, BillMind associates the current anonymous session with the external `user_id` carried in the validated token. The registration and login flows themselves live entirely in the external service.
   - Extend `JwtAuthFilter` / `RouteAccessPolicy` to cover authenticated user endpoints (same delegated-validation pattern as admin routes): the filter widens beyond `ADMIN` routes, and a new `RouteAccess.AUTHENTICATED` is enforced by the existing `RouteAccessAuthorizationManager` — no new filter.

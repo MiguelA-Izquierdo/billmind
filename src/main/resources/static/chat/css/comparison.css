@@ -82,6 +82,15 @@
 .cmp-val { font-size: 13px; font-weight: 700; }
 .cmp-val.yours { color: var(--elec); }
 .cmp-val.best  { color: var(--green); }
+/* The unit rides with the number but stays subordinate to it — muted, never
+   tinted by the .yours/.best accent it sits inside. */
+.cmp-unit {
+  margin-left: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .2px;
+}
 .cmp-key { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
 
 /* ── Scenario tabs (flat vs time-of-use) ───────────────────────────

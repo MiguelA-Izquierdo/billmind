@@ -103,6 +103,66 @@ export function showBotToast(text) {
     tt => { _typeTimer = tt; });
 }
 
+// ── Welcome toast — bigger, commercial variant shown on first paint ───────────
+
+const WELCOME_TEMPLATE = `
+  <div id="welcome-toast" class="char-limit-toast clt-welcome" role="dialog"
+       aria-modal="false" aria-label="Bienvenida a BillMind">
+    <div class="clt-bubble">
+      <button class="clt-close" id="welcome-close" aria-label="Cerrar" type="button">×</button>
+      <div class="clt-header">
+        <span class="clt-bot clt-talk">🤖</span>
+        <span class="clt-label">BillMind Bot</span>
+      </div>
+      <h2 class="cw-title">👋 ¡Hola! Estoy aquí para bajarte la factura de la luz</h2>
+      <p class="cw-body">
+        Súbeme tu factura y en segundos te digo si estás pagando de más y
+        <strong>cuánto podrías ahorrar</strong> cambiando de tarifa.
+      </p>
+      <p class="cw-body cw-soon">
+        ⚡ De momento solo electricidad — ya estoy aprendiendo gas, agua y telecomunicaciones. Vuelve pronto.
+      </p>
+      <p class="cw-body">
+        ¿Un cargo raro? ¿No entiendes el término de potencia?
+        <strong>Pregúntame lo que quieras</strong>: me leo tu factura entera y la normativa de la CNMC.
+      </p>
+      <div class="cw-privacy">
+        🔒 Antes de analizar borro tu nombre, DNI, IBAN y dirección.
+        <strong>No guardo ningún dato personal.</strong> Sube sin miedo.
+      </div>
+      <div class="cw-actions">
+        <button class="cw-cta" type="button" data-upload-trigger data-welcome-dismiss>
+          Subir mi factura
+        </button>
+        <button class="cw-ghost" type="button" data-welcome-dismiss>Ahora la miro yo</button>
+      </div>
+    </div>
+  </div>
+`;
+
+export function showWelcomeToast() {
+  if (document.getElementById('welcome-toast')) return;
+  document.body.insertAdjacentHTML('beforeend', WELCOME_TEMPLATE);
+
+  const toast = document.getElementById('welcome-toast');
+
+  function hide() {
+    if (!toast.isConnected) return;
+    toast.classList.remove('clt-visible');
+    toast.classList.add('clt-hiding');
+    document.removeEventListener('keydown', onEsc);
+    setTimeout(() => toast.remove(), 320);
+  }
+  function onEsc(e) { if (e.key === 'Escape') hide(); }
+
+  toast.querySelectorAll('[data-welcome-dismiss]').forEach(b => b.addEventListener('click', hide));
+  document.getElementById('welcome-close').addEventListener('click', hide);
+  document.addEventListener('keydown', onEsc);
+
+  void toast.offsetWidth;                 // reflow so the pop-in animation runs
+  toast.classList.add('clt-visible');     // stays until dismissed — no auto-hide
+}
+
 // ── Logic ─────────────────────────────────────────────────────────────────────
 
 function enforce(input) {

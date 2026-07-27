@@ -9,6 +9,7 @@ import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
 import dev.izquierdo.billmind.assistant.infrastructure.adapter.cache.CaffeineToolResultCache;
 import dev.izquierdo.billmind.assistant.infrastructure.adapter.tool.AssistantTools;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.exception.InvalidRequestException;
 import dev.langchain4j.model.chat.ChatModel;
@@ -180,6 +181,41 @@ class AgenticAssistantLlmAdapterTest {
         assertThat(result.citations()).isEmpty();
         verify(tools, never()).dispatch(any(), any(), anyList());
         verify(smartChatModel, times(2)).chat(any(ChatRequest.class));
+    }
+
+    @Test
+    void shouldRecoverInlineToolCallLeakedAsTextAndExecuteIt() {
+        // Groq/llama emits the tool call as <function=...> text instead of a structured tool_calls
+        // field: the adapter must recover it, run the tool, and never leak the markup to the user.
+        when(tools.specifications()).thenReturn(List.of(
+                ToolSpecification.builder().name("get_invoice_comparison").build()));
+        AgenticAssistantLlmAdapter recoveringAdapter = new AgenticAssistantLlmAdapter(
+                smartChatModel, tools, new CaffeineToolResultCache(500, Duration.ofHours(2)));
+        when(smartChatModel.chat(any(ChatRequest.class))).thenReturn(
+                response(AiMessage.from(
+                        "Para comparar. <function=get_invoice_comparison></function> Luego decides.")),
+                response(AiMessage.from("Tu ahorro anual estimado es de 351,83 €.")));
+        when(tools.dispatch(any(), any(), anyList())).thenReturn("resultado comparativa");
+
+        ChatResult result = recoveringAdapter.answer(CONTEXT, QUESTION, List.of());
+
+        assertThat(result.answer()).isEqualTo("Tu ahorro anual estimado es de 351,83 €.");
+        assertThat(result.answer()).doesNotContain("<function");
+        verify(tools).dispatch(any(), any(), anyList());
+        verify(smartChatModel, times(2)).chat(any(ChatRequest.class));
+    }
+
+    @Test
+    void shouldStripResidualToolMarkupFromFinalAnswerWhenNotRecoverable() {
+        // Unknown tool name in the markup -> nothing to recover, but the markup must still be scrubbed.
+        when(smartChatModel.chat(any(ChatRequest.class))).thenReturn(response(AiMessage.from(
+                "Respuesta útil para el usuario. <function=unknown_tool></function>")));
+
+        ChatResult result = adapter.answer(CONTEXT, QUESTION, List.of());
+
+        assertThat(result.answer()).isEqualTo("Respuesta útil para el usuario.");
+        verify(tools, never()).dispatch(any(), any(), anyList());
+        verify(smartChatModel, times(1)).chat(any(ChatRequest.class));
     }
 
     @Test

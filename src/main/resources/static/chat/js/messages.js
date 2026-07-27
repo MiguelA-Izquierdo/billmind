@@ -31,11 +31,11 @@ export function hideBanner() {
   if (el) el.innerHTML = '';
 }
 
-export function appendUserMessage(text, initials) {
+export function appendUserMessage(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
   el.innerHTML = `
-    <div class="msg-avatar">${escHtml(initials)}</div>
+    <div class="msg-avatar">👤</div>
     <div class="msg-content">
       <div class="msg-bubble">${escHtml(text).replace(/\n/g, '<br>')}</div>
       <span class="msg-meta">${fmtTime(new Date())}</span>
@@ -61,11 +61,11 @@ export function appendAssistantMessage(text) {
   return id;
 }
 
-export function appendToken(msgId, token) {
+export function appendMessage(msgId, text) {
   const bubble = document.getElementById(msgId + '-bubble');
   if (!bubble) return;
   bubble.querySelector('.cursor')?.remove();
-  bubble.innerHTML += escHtml(token).replace(/\n/g, '<br>');
+  bubble.innerHTML += escHtml(text).replace(/\n/g, '<br>');
   bubble.innerHTML += '<span class="cursor"></span>';
   scrollBottom();
 }
@@ -185,12 +185,14 @@ function buildPanel(id, c, block, kind, visible) {
   const positive  = savings >= 0;
   const counterId = isTou ? `${id}-counter-tou` : `${id}-counter`;
 
+  // [class, value, unit, label] — a bare 0,218 is meaningless without its unit,
+  // and only "kWh / año" carried one.
   const metrics = isTou
-    ? [['best', fmtPrice(block.bestPricePerKwh), 'Precio medio'],
-       ['',     fmtKwh(c.annualKwhEstimate),     'kWh / año']]
-    : [['yours', fmtPrice(c.userPricePerKwh),     `Tu precio${c.userIsTou ? ' medio' : ''}`],
-       ['best',  fmtPrice(block.bestPricePerKwh), 'Mejor precio'],
-       ['',      fmtKwh(c.annualKwhEstimate),     'kWh / año']];
+    ? [['best', fmtPrice(block.bestPricePerKwh), '€/kWh', 'Precio medio'],
+       ['',     fmtKwh(c.annualKwhEstimate),     '',      'kWh / año']]
+    : [['yours', fmtPrice(c.userPricePerKwh),     '€/kWh', `Tu precio${c.userIsTou ? ' medio' : ''}`],
+       ['best',  fmtPrice(block.bestPricePerKwh), '€/kWh', 'Mejor precio'],
+       ['',      fmtKwh(c.annualKwhEstimate),     '',      'kWh / año']];
 
   // The winning tariff gets its own full-width line: squeezed into the narrow
   // summary column it wrapped over three lines and pushed the badge loose.
@@ -203,9 +205,9 @@ function buildPanel(id, c, block, kind, visible) {
           <div class="cmp-year">/ año${isTou ? '' : ' sin cambios'}</div>
         </div>
         <div class="cmp-grid">
-          ${metrics.map(([cls, val, key]) => `
+          ${metrics.map(([cls, val, unit, key]) => `
             <div class="cmp-item">
-              <span class="cmp-val ${cls}">${val}</span>
+              <span class="cmp-val ${cls}">${val}${unit ? `<span class="cmp-unit">${unit}</span>` : ''}</span>
               <span class="cmp-key">${key}</span>
             </div>`).join('')}
         </div>

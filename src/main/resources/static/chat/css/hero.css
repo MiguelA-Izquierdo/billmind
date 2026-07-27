@@ -114,6 +114,50 @@
   color: var(--muted);
 }
 
+/* ── Privacy: expandable "what we do with your data" ─────────────────────── */
+
+.hero-privacy-more {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surf2);
+  overflow: hidden;
+}
+.hero-privacy-more p strong.hg-safe { color: var(--green); }
+.hero-privacy-more summary {
+  cursor: pointer;
+  padding: 11px 14px;
+  font-weight: 600;
+  color: var(--text);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hero-privacy-more summary::-webkit-details-marker { display: none; }
+.hero-privacy-more summary::before { content: '🔒'; font-size: 13px; }
+.hero-privacy-more summary::after {
+  content: '⌄';
+  margin-left: auto;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform .2s;
+}
+.hero-privacy-more[open] summary::after { transform: rotate(180deg); }
+.hero-privacy-more p {
+  margin: 0;
+  padding: 0 14px 13px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.hero-privacy-more p strong { color: var(--text); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-privacy-more summary::after { transition: none; }
+}
+
 .hero-error {
   margin: 14px auto 0;
   max-width: 380px;

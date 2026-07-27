@@ -3,7 +3,7 @@ import { autoResize } from './utils.js';
 import { loadInvoices, selectInvoice } from './invoices.js';
 import { trigger, onDragEnter, onDragOver, onDragLeave, onDrop, uploadFile } from './uploader.js';
 import { sendMessage, checkBackendStatus } from './chat.js';
-import { initCharLimit } from './char-limit.js';
+import { initCharLimit, showWelcomeToast } from './char-limit.js';
 import { syncChat, showEmptyState, setDrawer, closeDrawer, isDrawerOpen } from './ui.js';
 
 // Session label
@@ -71,3 +71,8 @@ showEmptyState('empty'); // settle the copy for this device before the fetch res
 loadInvoices();
 checkBackendStatus();
 initCharLimit();
+
+// Commercial welcome: reuses the char-limit bot bubble (bigger variant) to pitch
+// the value and promise no PII is stored — present on first paint, stays until
+// the visitor dismisses it (no auto-hide).
+showWelcomeToast();

@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { autoResize } from './utils.js';
 import {
   appendUserMessage, appendAssistantMessage,
-  appendToken, finishStreaming, renderCitations,
+  appendMessage, finishStreaming, renderCitations,
   appendThinking, removeThinking,
   showBanner, hideBanner,
 } from './messages.js';
@@ -18,7 +18,7 @@ export async function sendMessage() {
 
   input.value = '';
   autoResize(input);
-  appendUserMessage(text, SESSION_ID.slice(0, 2).toUpperCase());
+  appendUserMessage(text);
   hideBanner();
 
   const thinkingId = appendThinking();
@@ -69,12 +69,12 @@ export async function sendMessage() {
         try {
           const chunk = JSON.parse(data);
           if (chunk.type === 'conversation') state.conversationId = chunk.id;
-          if (chunk.type === 'token')        appendToken(msgId, chunk.content);
+          if (chunk.type === 'message')      appendMessage(msgId, chunk.content);
           if (chunk.type === 'citation')     citations.push(chunk);
           if (chunk.type === 'citations')    { citations = chunk.items ?? []; renderCitations(msgId, citations); }
-          if (chunk.type === 'error')        appendToken(msgId, chunk.content);
+          if (chunk.type === 'error')        appendMessage(msgId, chunk.content);
         } catch {
-          appendToken(msgId, data);
+          appendMessage(msgId, data);
         }
       }
     }

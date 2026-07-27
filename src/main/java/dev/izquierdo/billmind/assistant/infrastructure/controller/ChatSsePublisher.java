@@ -42,7 +42,8 @@ public class ChatSsePublisher {
             try {
                 ChatResult result = chatSupplier.get();
                 send(emitter, Map.of("type", "conversation", "id", result.conversationId().toString()));
-                send(emitter, Map.of("type", "token", "content", result.answer()));
+                // One event carries the whole answer — this is an SSE transport envelope, not token streaming.
+                send(emitter, Map.of("type", "message", "content", result.answer()));
                 send(emitter, Map.of("type", "citations", "items",
                         result.citations().stream()
                                 .map(c -> Map.of("title", c.title(), "source", c.source(), "docType", c.docType()))

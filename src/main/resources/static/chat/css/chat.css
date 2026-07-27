@@ -31,7 +31,7 @@
   font-size: 14px;
   flex-shrink: 0;
 }
-.msg.user .msg-avatar      { background: var(--accent); font-size: 12px; font-weight: 700; color: #fff; }
+.msg.user .msg-avatar      { background: var(--accent); font-size: 15px; color: #fff; }
 .msg.assistant .msg-avatar { background: var(--surf2); border: 1px solid var(--border); }
 
 .msg-content { display: flex; flex-direction: column; gap: 4px; max-width: calc(100% - 42px); }

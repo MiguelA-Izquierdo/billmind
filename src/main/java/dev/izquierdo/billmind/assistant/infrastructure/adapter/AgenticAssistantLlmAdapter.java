@@ -1,5 +1,6 @@
 package dev.izquierdo.billmind.assistant.infrastructure.adapter;
 
+import dev.izquierdo.billmind._shared.infrastructure.llm.LlmInlineToolCallParser;
 import dev.izquierdo.billmind._shared.infrastructure.llm.prompt.PromptFence;
 import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
 import dev.izquierdo.billmind.assistant.domain.model.ChatResult;
@@ -12,6 +13,7 @@ import dev.izquierdo.billmind.assistant.infrastructure.adapter.cache.CachedToolR
 import dev.izquierdo.billmind.assistant.infrastructure.adapter.cache.ToolResultCache;
 import dev.izquierdo.billmind.assistant.infrastructure.adapter.tool.AssistantTools;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -32,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Agentic assistant adapter: instead of eagerly loading every context source, it inlines only
@@ -41,15 +44,20 @@ import java.util.Set;
  * tracking. Active only when {@code assistant.tools.enabled=true}; otherwise
  * {@link LlmAssistantAdapter} handles the turn.
  *
- * <p>Three safeguards keep a turn robust against unreliable tool calling (observed with Groq's
+ * <p>Four safeguards keep a turn robust against unreliable tool calling (observed with Groq's
  * {@code llama-3.3-70b-versatile}, which intermittently emits a malformed tool call that its own
- * server rejects with {@code 400 tool_use_failed}):
+ * server rejects with {@code 400 tool_use_failed}, or emits it as plain text instead of a
+ * structured tool call):
  * <ol>
  *   <li><b>Short-circuit:</b> when a round only repeats tool calls already served this turn, stop
  *       offering tools and force a textual answer — cutting both wasted rounds and the surface for
  *       a malformed tool call.</li>
  *   <li><b>Resilience:</b> an invalid tool call, or any other model error, degrades to a tool-less
  *       retry and finally to a Spanish fallback message — the SSE stream never propagates the 400.</li>
+ *   <li><b>Recovery:</b> when the model puts a tool call in the message text as Llama's
+ *       {@code <function=...>} markup rather than the structured field, it is parsed back into a real
+ *       tool call and executed ({@link LlmInlineToolCallParser}); any residual markup is stripped
+ *       from the final answer so it never reaches the user.</li>
  *   <li><b>Cache:</b> argument-deterministic regulatory searches are memoized via
  *       {@link ToolResultCache}, so repeats within and across turns skip the retrieval.</li>
  * </ol>
@@ -108,6 +116,8 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
     private final ChatModel smartChatModel;
     private final AssistantTools tools;
     private final ToolResultCache toolResultCache;
+    /** Names the model may legitimately call; recovered inline calls for anything else are ignored. */
+    private final Set<String> knownToolNames;
 
     public AgenticAssistantLlmAdapter(
             @Qualifier("smartChatModel") ChatModel smartChatModel,
@@ -116,6 +126,9 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
         this.smartChatModel  = smartChatModel;
         this.tools           = tools;
         this.toolResultCache = toolResultCache;
+        this.knownToolNames  = tools.specifications().stream()
+                .map(ToolSpecification::name)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Override
@@ -142,16 +155,17 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
                         e.getMessage());
                 return forceFinalAnswer(messages, citationSink);
             }
-            if (!ai.hasToolExecutionRequests()) {
+            List<ToolExecutionRequest> toolRequests = effectiveToolRequests(ai);
+            if (toolRequests.isEmpty()) {
                 return finalResult(ai.text(), citationSink);
             }
-            if (allAlreadyServed(ai, servedThisTurn)) {
+            if (allAlreadyServed(toolRequests, servedThisTurn)) {
                 log.info("[AGENT][round={}] only repeats already-served tool calls; short-circuiting",
                         round + 1);
                 return forceFinalAnswer(messages, citationSink);
             }
-            messages.add(ai);
-            executeToolRequests(ai, context, messages, citationSink, servedThisTurn, round);
+            messages.add(normalizedAiMessage(ai, toolRequests));
+            executeToolRequests(toolRequests, context, messages, citationSink, servedThisTurn, round);
         }
         // Rounds exhausted: force a final textual answer without offering more tools.
         log.warn("[AGENT] tool rounds exhausted (max={}); forcing a final answer without tools",
@@ -159,16 +173,51 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
         return forceFinalAnswer(messages, citationSink);
     }
 
-    private void executeToolRequests(AiMessage ai, ChatContext context, List<ChatMessage> messages,
-                                     List<RegulatorySnippet> citationSink, Set<String> servedThisTurn,
-                                     int round) {
+    private void executeToolRequests(List<ToolExecutionRequest> toolRequests, ChatContext context,
+                                     List<ChatMessage> messages, List<RegulatorySnippet> citationSink,
+                                     Set<String> servedThisTurn, int round) {
         log.info("[AGENT][round={}] tool calls requested: {}", round + 1,
-                ai.toolExecutionRequests().stream().map(ToolExecutionRequest::name).toList());
-        for (ToolExecutionRequest req : ai.toolExecutionRequests()) {
+                toolRequests.stream().map(ToolExecutionRequest::name).toList());
+        for (ToolExecutionRequest req : toolRequests) {
             String result = dispatchWithCache(req, context, citationSink);
             messages.add(ToolExecutionResultMessage.from(req, result));
             servedThisTurn.add(signature(req));
         }
+    }
+
+    /**
+     * The tool calls to act on this round: the structured ones when present, otherwise any recovered
+     * from Llama's inline {@code <function=...>} markup leaking into the text. Recovered calls are
+     * filtered to the known catalogue so a hallucinated name degrades to a plain answer rather than a
+     * "tool unknown" round.
+     */
+    private List<ToolExecutionRequest> effectiveToolRequests(AiMessage ai) {
+        if (ai.hasToolExecutionRequests()) {
+            return ai.toolExecutionRequests();
+        }
+        if (!LlmInlineToolCallParser.containsToolMarkup(ai.text())) {
+            return List.of();
+        }
+        List<ToolExecutionRequest> recovered = LlmInlineToolCallParser.parse(ai.text()).stream()
+                .filter(req -> knownToolNames.contains(req.name()))
+                .toList();
+        if (!recovered.isEmpty()) {
+            log.info("[AGENT] recovered {} inline tool call(s) from text: {}", recovered.size(),
+                    recovered.stream().map(ToolExecutionRequest::name).toList());
+        }
+        return recovered;
+    }
+
+    /**
+     * The assistant message to record before tool results. When the model used the structured field
+     * it is kept as-is; when the calls were recovered from text, a synthesized message carrying the
+     * requests (with ids) is used instead so each {@link ToolExecutionResultMessage} correlates —
+     * the raw {@code <function=...>} prose is dropped.
+     */
+    private static AiMessage normalizedAiMessage(AiMessage ai, List<ToolExecutionRequest> toolRequests) {
+        return ai.hasToolExecutionRequests()
+                ? ai
+                : AiMessage.builder().toolExecutionRequests(toolRequests).build();
     }
 
     /**
@@ -205,11 +254,21 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
         }
     }
 
+    /**
+     * Single exit for a textual answer. Strips any residual inline tool markup here — the one place
+     * every final answer flows through — so leaked {@code <function=...>} tags never reach the user,
+     * whether the turn ended normally, via short-circuit or after a forced tool-less retry.
+     */
     private ChatResult finalResult(String answer, List<RegulatorySnippet> citationSink) {
+        String cleaned = LlmInlineToolCallParser.stripToolMarkup(answer);
+        if (cleaned == null || cleaned.isBlank()) {
+            log.warn("[AGENT] answer was empty after stripping tool markup; degrading to fallback");
+            return fallbackResult(citationSink);
+        }
         List<ChatCitation> citations = toCitations(citationSink);
         log.info("[AGENT] answer produced ({} citations)", citations.size());
-        log.debug("[AGENT] answer text: {}", answer);
-        return new ChatResult(null, answer, citations);
+        log.debug("[AGENT] answer text: {}", cleaned);
+        return new ChatResult(null, cleaned, citations);
     }
 
     private ChatResult fallbackResult(List<RegulatorySnippet> citationSink) {
@@ -218,9 +277,9 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
     }
 
     /** True when every tool call in this round was already served earlier in the same turn. */
-    private static boolean allAlreadyServed(AiMessage ai, Set<String> servedThisTurn) {
-        return ai.toolExecutionRequests().stream()
-                .allMatch(req -> servedThisTurn.contains(signature(req)));
+    private static boolean allAlreadyServed(List<ToolExecutionRequest> toolRequests,
+                                            Set<String> servedThisTurn) {
+        return toolRequests.stream().allMatch(req -> servedThisTurn.contains(signature(req)));
     }
 
     /** Identity of a tool call by name + raw arguments; also the cache key for regulatory searches. */
