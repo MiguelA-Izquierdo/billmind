@@ -165,10 +165,14 @@
   .clt-retry-btn { background:var(--accent); border:none; color:#fff; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; transition:opacity .15s; }
   .clt-retry-btn:hover { opacity:.85; }
   .clt-retry-btn:disabled { opacity:.4; cursor:not-allowed; }
+  /* Salida secundaria: mismo tamaño que Reintentar, sin competir con él por la atención. */
+  .clt-back-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:8px 14px; border-radius:8px; font-size:12px; white-space:nowrap; text-decoration:none; display:inline-flex; align-items:center; transition:all .15s; }
+  .clt-back-btn:hover { border-color:var(--accent); color:var(--text); }
 
   /* ── States ── */
   .state-box { text-align: center; padding: 64px 32px; color: var(--muted); }
   .state-box .icon { font-size: 48px; margin-bottom: 12px; }
+  .state-box .clt-back-btn { margin-top: 20px; }
   .state-box p { font-size: 15px; }
   .state-box.error p { color: #f87171; }
   .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 16px; }
@@ -197,6 +201,7 @@
     <div class="clt-auth" id="clt-auth" style="display:none">
       <input type="password" id="clt-token" class="clt-token-input" placeholder="eyJ…" autocomplete="off" onkeydown="if(event.key==='Enter') retryWithToken()"/>
       <button class="clt-retry-btn" id="clt-retry-btn" onclick="retryWithToken()">Reintentar</button>
+      <a class="clt-back-btn" href="/chat/">← Volver</a>
     </div>
   </div>
 </div>
@@ -250,6 +255,34 @@ function getSessionId() {
 const SESSION_ID = getSessionId();
 document.getElementById('session-label').textContent = 'Sesión: ' + SESSION_ID.slice(0, 8) + '…';
 
+// ── Auth ──────────────────────────────────────────────────
+// Las tarifas son un recurso de administración: esta página es una cáscara vacía y todo lo que
+// muestra sale de una llamada que el servidor solo atiende con un token que él ha validado.
+// El token vive en sessionStorage, no en localStorage: muere al cerrar la pestaña.
+const RATES_URL = '/api/v1/admin/market-rates';
+const TOKEN_KEY = 'billmind-admin-token';
+let pendingAction = loadRates;
+
+const getToken = () => sessionStorage.getItem(TOKEN_KEY);
+
+function setToken(raw) {
+  sessionStorage.setItem(TOKEN_KEY, raw.startsWith('Bearer ') ? raw : `Bearer ${raw}`);
+}
+
+function authHeaders() {
+  const headers = { 'X-Session-Id': SESSION_ID };
+  const token = getToken();
+  if (token) headers['Authorization'] = token;
+  return headers;
+}
+
+// Descarta el token guardado: si el servidor lo ha rechazado, reintentar con él solo gasta cuota.
+function requireToken(message, retryAction) {
+  sessionStorage.removeItem(TOKEN_KEY);
+  pendingAction = retryAction;
+  showBotToast(message, { sticky: true, showAuth: true });
+}
+
 // allRates: todos los registros en bruto (con histórico)
 // tariffGroups: Map<key, [rates ordenados por receivedAt desc]>
 let allRates = [];
@@ -287,7 +320,8 @@ async function loadRates() {
   document.getElementById('main').innerHTML = '<div class="state-box"><div class="spinner"></div><p>Cargando tarifas…</p></div>';
   document.getElementById('stats').innerHTML = '';
   try {
-    const res = await fetch('/api/v1/market-rates', { headers: { 'X-Session-Id': SESSION_ID } });
+    const res = await fetch(RATES_URL, { headers: authHeaders() });
+    if (res.status === 401 || res.status === 403) { lockRates(res.status); return; }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const body = await res.json();
     allRates = body.data ?? [];
@@ -297,6 +331,21 @@ async function loadRates() {
     document.getElementById('main').innerHTML =
       `<div class="state-box error"><div class="icon">⚠️</div><p>No se pudieron cargar las tarifas: ${err.message}</p></div>`;
   }
+}
+
+// La página se queda sin datos, no con datos viejos: lo que ya se hubiera pintado se descarta.
+function lockRates(status) {
+  allRates = [];
+  tariffGroups = new Map();
+  document.getElementById('stats').innerHTML = '';
+  // La salida vive también aquí: el toast se puede cerrar, este bloque no.
+  document.getElementById('main').innerHTML =
+    '<div class="state-box"><div class="icon">🔒</div>' +
+    '<p>Zona restringida. Introduce un token de administrador para ver las tarifas.</p>' +
+    '<a class="clt-back-btn" href="/chat/">← Volver al chat</a></div>';
+  requireToken(status === 403
+    ? 'Tu token es válido, pero no es de administrador. Las tarifas de mercado solo se muestran a administradores.'
+    : 'Zona restringida. Necesito un token de administrador para enseñarte las tarifas: pégalo aquí abajo.', loadRates);
 }
 
 // ── Render ────────────────────────────────────────────────
@@ -563,10 +612,8 @@ function closeBotToast() {
 function openConfirm()  { document.getElementById('modal').classList.add('open'); }
 function closeConfirm() { document.getElementById('modal').classList.remove('open'); }
 
-async function deleteRates(token) {
-  const headers = { 'X-Session-Id': SESSION_ID };
-  if (token) headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-  return fetch('/api/v1/market-rates', { method: 'DELETE', headers });
+async function deleteRates() {
+  return fetch(RATES_URL, { method: 'DELETE', headers: authHeaders() });
 }
 
 async function confirmDelete() {
@@ -575,9 +622,9 @@ async function confirmDelete() {
   btn.disabled = true;
   btn.textContent = 'Eliminando…';
   try {
-    const res = await deleteRates(null);
+    const res = await deleteRates();
     if (res.status === 401) {
-      showBotToast('Token de autenticación no detectado. Protocolo de seguridad activado. El robot no borra nada sin credenciales.', { sticky: true, showAuth: true });
+      requireToken('Token de autenticación no detectado. Protocolo de seguridad activado. El robot no borra nada sin credenciales.', confirmDelete);
       return;
     }
     if (res.status === 403) {
@@ -597,27 +644,24 @@ async function confirmDelete() {
   }
 }
 
+// Guarda el token y reanuda lo que quedó a medias — leer o borrar, según qué pidió credenciales.
+// Si el servidor lo vuelve a rechazar, esa misma acción reabre este diálogo.
 async function retryWithToken() {
-  const token   = document.getElementById('clt-token').value.trim();
+  const input    = document.getElementById('clt-token');
   const retryBtn = document.getElementById('clt-retry-btn');
+  const token    = input.value.trim();
   if (!token) return;
 
+  setToken(token);
+  input.value = '';
   retryBtn.disabled = true;
   retryBtn.textContent = '…';
   try {
-    const res = await deleteRates(token);
-    if (res.ok) {
-      closeBotToast();
-      allRates = [];
-      tariffGroups = new Map();
-      render(activeFilter);
-    } else {
-      showBotToast('No se pudo verificar tu acceso. Asegúrate de que el token es correcto o contacta con el administrador del servicio de autenticación.', { sticky: true, showAuth: true });
-    }
-  } catch (err) {
     closeBotToast();
+    await pendingAction();
+  } catch (err) {
     document.getElementById('main').innerHTML =
-      `<div class="state-box error"><div class="icon">⚠️</div><p>Error al eliminar: ${err.message}</p></div>`;
+      `<div class="state-box error"><div class="icon">⚠️</div><p>Error: ${err.message}</p></div>`;
   } finally {
     retryBtn.disabled = false;
     retryBtn.textContent = 'Reintentar';

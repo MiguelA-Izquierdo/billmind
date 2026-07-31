@@ -99,10 +99,10 @@ class SessionFilterTest {
     @ParameterizedTest
     @CsvSource({
             "GET,    /actuator/health",
-            "GET,    /api/v1/market-rates",
             "POST,   /api/v1/admin/knowledge/ingest",
             "DELETE, /api/v1/admin/knowledge",
-            "DELETE, /api/v1/market-rates"
+            "GET,    /api/v1/admin/market-rates",
+            "DELETE, /api/v1/admin/market-rates"
     })
     void shouldSkipFilterWhenRouteNeedsNoSession(String method, String uri) throws Exception {
         MockHttpServletResponse response = doFilter(new MockHttpServletRequest(method, uri));

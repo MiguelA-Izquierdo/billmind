@@ -107,7 +107,7 @@ class JwtAuthFilterTest {
     /** A non-admin route never reaches the introspection endpoint, even carrying a bearer token. */
     @ParameterizedTest
     @CsvSource({
-            "GET,  /api/v1/market-rates",
+            "GET,  /api/v1/invoices",
             "POST, /api/v1/invoices",
             "GET,  /actuator/health"
     })

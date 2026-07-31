@@ -10,17 +10,24 @@ Endpoints differ wildly in cost and threat, so a single global limit is wrong:
 
 | Profile | Routes | Key | Fail mode | Starting limit |
 |---|---|---|---|---|
-| `UPLOAD` | `POST /invoices` | session + IP ceiling | fail-closed | session ~1/h · IP 10/h |
+| `UPLOAD` | `POST /invoices` | session + IP ceiling | fail-closed | session 3/h · IP 30/h |
 | `CHAT` | `POST /assistant/chat` | session + IP ceiling | fail-closed | session 20/min · IP 60/min |
-| `ADMIN` | `/admin/**`, `DELETE /market-rates` | IP + token hash | fail-closed | 5/min per layer |
-| `PUBLIC_READ` | cheap `GET`s (market-rates, invoices) | IP | fail-open | 60/min |
+| `ADMIN` | `/admin/**` except `GET` | IP + token hash | fail-closed | 5/min per layer |
+| `ADMIN_READ` | `GET /admin/**` (rate listing, KB search) | IP + token hash | fail-closed | 30/min per layer |
+| `PUBLIC_READ` | cheap `GET`s (invoices) | IP | fail-open | 60/min |
 | `DEFAULT` | any unmapped `/api/v1/` | session + IP ceiling | fail-closed | session 30/min · IP 60/min |
 | `NONE` | actuator, static | — | — | unlimited |
 
 Numbers live in `application.properties` (`billmind.ratelimit.*`), nothing hardcoded. `RateLimitPolicy`
 carries a `cost` field so an expensive upload draws more tokens than a cheap read from the same bucket.
 The resolver reuses `RouteAccessPolicy` for the ADMIN/OPEN/ANONYMOUS split so it can't drift from the
-auth filters.
+auth filters, then splits the admin class by verb.
+
+`ADMIN_READ` exists because 5/min was sized to guard destructive routes and only got in the honest
+operator's way on a page they refresh by hand. The widening is not free and is taken deliberately: the
+`IP` layer is the pre-auth cap, so an attacker spraying tokens gets the same 30/min headroom on admin
+`GET`s. What that buys them is attempts against a high-entropy credential and reach over nothing that
+mutates — the routes that change state keep the tight budget. Tune with `RATELIMIT_ADMIN_READ_*`.
 
 ## Build vs buy
 
@@ -48,10 +55,20 @@ Fix: `UPLOAD`/`CHAT`/`DEFAULT` now declare `[SESSION, IP]` — **two separate bu
 - **L1 session** — one honest visitor's fair share; bites when a real user loops.
 - **L2 IP ceiling** — volumes no human produces; bites when someone rotates sessions to escape L1.
 
-Set an order of magnitude above L1 (uploading a bill is rare → 10/h leaves a whole CGNAT untouched
+Set an order of magnitude above L1 (uploading a bill is rare → 30/h leaves a whole CGNAT untouched
 while capping a rotating attacker). `RateLimiter` evaluates layers in order, **first breach wins**, so
 an honest user hits their own session limit before touching the shared IP bucket. Two buckets per
 profile come from `billmind.ratelimit.profiles.<p>.overrides.<key-type>.*`.
+
+The session share is **3 uploads** (`capacity` 15 ÷ `cost` 5), not one: a visitor arrives with the bill
+that made them curious and then goes to fetch the two they wanted to compare it against, and a limit
+that stops them mid-errand reads as breakage, not as protection. Refill is greedy, so the fourth
+unblocks ~20 minutes later rather than on the hour. The ceiling moved with it, 10/h → 30/h, to keep
+the order of magnitude the CGNAT argument above depends on: left at 10 it would fit barely three
+honest visitors per shared egress and they would start throttling each other. The cost is real and
+taken deliberately — that headroom is also what a session-rotating attacker gets — and it is bounded
+by `cost=5` on the session layer, which keeps the paid LLM path from ever being the cheap one to
+hammer.
 
 Related fix: `SessionFilter` now writes a `sessions` row only on non-`GET` requests, so a forged header
 on a read no longer causes an unauthenticated INSERT.

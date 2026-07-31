@@ -6,12 +6,11 @@ In Spain, millions of households pay more for electricity than they need to — 
 
 Behind that, it runs the full pipeline: it ingests and classifies the PDF, extracts the fields with an LLM, redacts PII, compares your rates against live market data, and answers follow-up questions grounded in energy regulation.
 
-> **▶ Live demo — [billmind.your-domain.com](https://REPLACE-WITH-DEPLOY-URL)** · upload a sample invoice, see the savings card, ask a question. No install, no login.
-<!-- TODO: replace REPLACE-WITH-DEPLOY-URL (both occurrences: this callout and the "live demo" badge below) with the real deployed URL once the domain is live. -->
+> **▶ Live demo — [billmindset.com](https://billmindset.com)** · upload a sample invoice, see the savings card, ask a question. No install, no login.
 
 
 
-[![Live demo](https://img.shields.io/badge/live%20demo-online-brightgreen?logo=rocket&logoColor=white)](https://REPLACE-WITH-DEPLOY-URL)
+[![Live demo](https://img.shields.io/badge/live%20demo-online-brightgreen?logo=rocket&logoColor=white)](https://billmindset.com)
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-6DB33F?logo=springboot&logoColor=white)
 ![LangChain4j](https://img.shields.io/badge/LangChain4j-1.0.0-1C3C3C)
@@ -22,7 +21,7 @@ Behind that, it runs the full pipeline: it ingests and classifies the PDF, extra
 
 Built with **Spring Boot 3.5.0**, **Java 21** and **LangChain4j 1.0.0**. Runs on **fully local AI** (Ollama, zero cloud) or **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env var. No login required in Phase 1.
 
-**By the numbers:** invoice to savings card in **~10 s** end-to-end · **589** automated tests across **86** classes (6 Testcontainers integration suites) · a **50-case** Spanish RAG quality gate scored on every CI run — context precision **0.82**, retrieval recall@5 **0.97**, [thresholds and all](#quality-gates--the-actual-numbers) · **5** regulatory documents (CNMC, REE, BOE) indexed for retrieval · runs **100% local** or on **4** cloud LLM providers.
+**By the numbers:** invoice to savings card in **~10 s** end-to-end · **609** automated tests across **86** classes (6 Testcontainers integration suites) · a **50-case** Spanish RAG quality gate scored on every CI run — context precision **0.82**, retrieval recall@5 **0.97**, [thresholds and all](#quality-gates--the-actual-numbers) · **5** regulatory documents (CNMC, REE, BOE) indexed for retrieval · runs **100% local** or on **4** cloud LLM providers.
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="BillMind demo — uploading an invoice, the savings card, and a grounded answer with citations" width="840">
@@ -263,3 +262,10 @@ The rest of the architecture follows the same philosophy. I deliberately chose t
 None of those decisions were necessary for a personal project. I chose them because I wanted the experience of making architectural decisions, defending them, and changing them when they proved to be the wrong choice.
 
 BillMind was never meant to become a product. It was an opportunity to build as if it were one: no fake results, measurable behavior, deterministic business logic where it matters, and no shortcuts on the hard parts.
+
+---
+
+## License
+
+© 2026 Miguel Ángel Izquierdo. All rights reserved.
+No license to use, modify or distribute this software is granted. For any other use, get in touch.

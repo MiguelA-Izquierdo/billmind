@@ -23,7 +23,8 @@ class RouteAccessAuthorizationManagerTest {
     @CsvSource({
             "POST,   /api/v1/admin/knowledge/ingest",
             "GET,    /api/v1/admin/knowledge/search",
-            "DELETE, /api/v1/market-rates"
+            "GET,    /api/v1/admin/market-rates",
+            "DELETE, /api/v1/admin/market-rates"
     })
     void shouldDenyAdminRouteToAnAnonymousCaller(String method, String uri) {
         assertThat(granted(method, uri, anonymous())).isFalse();
@@ -32,7 +33,7 @@ class RouteAccessAuthorizationManagerTest {
     @ParameterizedTest
     @CsvSource({
             "POST,   /api/v1/admin/knowledge/ingest",
-            "DELETE, /api/v1/market-rates"
+            "DELETE, /api/v1/admin/market-rates"
     })
     void shouldGrantAdminRouteToAnAuthorizedToken(String method, String uri) {
         assertThat(granted(method, uri, ExternalTokenAuthentication.authorized("valid"))).isTrue();
@@ -51,7 +52,7 @@ class RouteAccessAuthorizationManagerTest {
 
     @ParameterizedTest
     @CsvSource({
-            "GET,  /api/v1/market-rates",
+            "GET,  /api/v1/invoices",
             "POST, /api/v1/invoices",
             "GET,  /api/v1/invoices/1",
             "GET,  /chat/index.html"

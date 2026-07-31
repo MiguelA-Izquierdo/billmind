@@ -16,6 +16,31 @@ Kafka must be enabled via `KAFKA_ENABLED=true` in your `.env` (required when usi
 
 ---
 
+## Fallback offers when the corpus is empty
+
+Without a Kafka producer, `electricity_rates` stays empty and the comparison engine has nothing to
+benchmark against — so a freshly cloned repo would upload an invoice and get no savings figure. To
+keep the flow demonstrable, `MarketOfferQueryAdapter` reads six example 2.0TD offers from
+`src/main/resources/comparison/fallback-electricity-offers.json` (once, at startup) and serves them
+**only while the rate corpus is empty**.
+
+Deliberately a read path, not a seed:
+
+* **Nothing is persisted.** No rows to clean up, and `GET /api/v1/admin/market-rates` keeps
+  reporting the real corpus — empty is reported as empty.
+* **Real rates win automatically.** The first rate arriving via Kafka makes the fallback disappear;
+  there is no precedence rule to reason about and no mixed corpus.
+* **Three flat-price + three time-of-use offers**, because the comparison builds those two blocks
+  independently and each needs a winner plus alternatives.
+* **The prices are plausible but invented, and the company names are generic**
+  (`Comercializadora Ejemplo Uno`, …) so no offer is ever attributed to a real retailer. They are
+  example data for a working demo, not market intelligence.
+
+Set `COMPARISON_FALLBACK_OFFERS_ENABLED=false` to turn the fallback off and have an empty corpus
+report no alternatives, as it did before this existed.
+
+---
+
 ## Kafka event
 
 **Topic:** `market.electricity-price-updated`
@@ -64,10 +89,12 @@ Events must be JSON with a `type` discriminator field:
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/v1/market-rates` | none (open) | Returns all stored market rates |
-| `DELETE` | `/api/v1/market-rates` | **Admin** — `Authorization: Bearer` | Deletes all stored market rates. Guarded as an admin route (`RouteAccessPolicy` + `@PreAuthorize("hasRole('ADMIN')")`); token validation is delegated to the external auth service. See [`API.md`](API.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md) → *Admin route protection*. |
+| `GET` | `/api/v1/admin/market-rates` | **Admin** — `Authorization: Bearer` | Returns all stored market rates |
+| `DELETE` | `/api/v1/admin/market-rates` | **Admin** — `Authorization: Bearer` | Deletes all stored market rates |
 
-### `GET /api/v1/market-rates` — response
+Both verbs are guarded identically: the rate corpus is the market intelligence the product compares invoices against, so reading it is an admin operation too. They live under `/api/v1/admin/` precisely so that the guard is the path — `RouteAccessPolicy` classifies the whole tree as `ADMIN`, `JwtAuthFilter` introspects the token against the external auth service, and `@PreAuthorize("hasRole('ADMIN')")` on each handler is the third layer. See [`API.md`](API.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md) → *Admin route protection*.
+
+### `GET /api/v1/admin/market-rates` — response
 
 ```json
 {
@@ -100,4 +127,6 @@ Events must be JSON with a `type` discriminator field:
 
 ## Static viewer
 
-A simple HTML page is served at `/market-rates.html` to inspect stored rates without needing a REST client. It fetches `GET /api/v1/market-rates` and renders the results in a table.
+A simple HTML page is served at `/market-rates.html` to inspect stored rates without needing a REST client. It fetches `GET /api/v1/admin/market-rates` and renders the results in a table.
+
+The page itself is served to anyone — a browser navigation carries no `Authorization` header, so with a stateless bearer model there is nothing to validate at that point. What it is *not* is a way in: the page ships empty and every row it shows comes from the guarded endpoint above. Without a token the server has validated, it renders a locked state and asks for one, which it keeps in `sessionStorage` for the tab's lifetime and sends on both the read and the delete. Protecting the file itself would take a session cookie and a login screen — Milestone 9.

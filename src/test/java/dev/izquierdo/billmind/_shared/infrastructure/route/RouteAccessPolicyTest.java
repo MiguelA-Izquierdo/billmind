@@ -18,7 +18,8 @@ class RouteAccessPolicyTest {
             "POST,   /api/v1/admin/knowledge/reindex",
             "GET,    /api/v1/admin/knowledge/search",
             "DELETE, /api/v1/admin/knowledge",
-            "DELETE, /api/v1/market-rates"
+            "GET,    /api/v1/admin/market-rates",
+            "DELETE, /api/v1/admin/market-rates"
     })
     void shouldGuardAdminRoutesWithATokenAndNoSession(String method, String uri) {
         assertThat(policy.accessFor(request(method, uri))).isEqualTo(RouteAccess.ADMIN);
@@ -45,9 +46,10 @@ class RouteAccessPolicyTest {
         assertThat(policy.accessFor(request("GET", "/api/v1/something-new"))).isEqualTo(RouteAccess.ANONYMOUS);
     }
 
+    /** The path market rates used to live on is not a shortcut back into them: it guards nothing now. */
     @Test
-    void shouldReadMarketRatesWithoutTokenOrSession() {
-        assertThat(policy.accessFor(request("GET", "/api/v1/market-rates"))).isEqualTo(RouteAccess.OPEN);
+    void shouldNotLeaveTheFormerPublicMarketRatesPathOpen() {
+        assertThat(policy.accessFor(request("GET", "/api/v1/market-rates"))).isNotEqualTo(RouteAccess.OPEN);
     }
 
     @ParameterizedTest

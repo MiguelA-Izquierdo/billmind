@@ -156,6 +156,14 @@ ollama pull mxbai-embed-large  # 1024d
 
 ---
 
+## Comparison
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPARISON_FALLBACK_OFFERS_ENABLED` | `true` | Serve six example 2.0TD offers while `electricity_rates` is empty, so the savings comparison works on a fresh clone with no Kafka producer. Read-only — nothing is persisted, and real rates arriving via Kafka take over automatically. See [MARKET.md](MARKET.md#fallback-offers-when-the-corpus-is-empty). |
+
+---
+
 ## Assistant
 
 | Variable | Default | Description |
@@ -241,8 +249,8 @@ Each route resolves to a profile (`UPLOAD`, `CHAT`, `ADMIN`, `PUBLIC_READ`, `DEF
 
 | Variable (pattern) | Example default | Description |
 |---|---|---|
-| `RATELIMIT_UPLOAD_CAPACITY` / `_REFILL` / `_PERIOD` / `_COST` | `5` / `5` / `PT1H` / `5` | Session bucket for `POST /invoices` (paid LLM extraction). |
-| `RATELIMIT_UPLOAD_IP_CAPACITY` / `_IP_REFILL` / `_IP_PERIOD` | `10` / `10` / `PT1H` | IP ceiling for uploads. |
+| `RATELIMIT_UPLOAD_CAPACITY` / `_REFILL` / `_PERIOD` / `_COST` | `15` / `15` / `PT1H` / `5` | Session bucket for `POST /invoices` (paid LLM extraction). Capacity divided by cost is what the visitor gets: **3 invoices**. |
+| `RATELIMIT_UPLOAD_IP_CAPACITY` / `_IP_REFILL` / `_IP_PERIOD` | `30` / `30` / `PT1H` | IP ceiling for uploads (`cost` is 1 here, so it is 30 uploads/h flat). |
 | `RATELIMIT_CHAT_CAPACITY` / `_REFILL` / `_PERIOD` | `20` / `20` / `PT1M` | Session bucket for `POST /assistant/chat`. |
 | `RATELIMIT_CHAT_IP_CAPACITY` / `_IP_REFILL` / `_IP_PERIOD` | `60` / `60` / `PT1M` | IP ceiling for chat. |
 | `RATELIMIT_ADMIN_CAPACITY` / `_REFILL` / `_PERIOD` | `5` / `5` / `PT1M` | Same numbers on both the IP (pre-auth) and token (post-auth) layers. |

@@ -215,7 +215,7 @@ class RateLimiterTest {
     @Test
     void shouldFailOpenWhenStoreThrowsOnAFailOpenProfile() {
         when(store.tryConsume(anyString(), any())).thenThrow(new RuntimeException("redis down"));
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/market-rates");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/invoices");
         request.setRemoteAddr(IP);
 
         RateLimitVerdict verdict = rateLimiter.check(request, RateLimitProfile.PUBLIC_READ, RateLimitPhase.PRE_AUTH);
@@ -236,7 +236,7 @@ class RateLimiterTest {
     @Test
     void shouldEnforceOnlyTheIpLayerOfAdminInThePreAuthPhase() {
         when(store.tryConsume(anyString(), any())).thenReturn(RateLimitDecision.allowed(4, 5));
-        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/market-rates");
+        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/admin/market-rates");
         request.setRemoteAddr("9.9.9.9");
         request.addHeader("Authorization", "Bearer some-token");
 
@@ -250,7 +250,7 @@ class RateLimiterTest {
     void shouldEnforceOnlyTheTokenLayerOfAdminInThePostAuthPhase() {
         when(store.tryConsume(anyString(), any())).thenReturn(RateLimitDecision.allowed(4, 5));
         SecurityContextHolder.getContext().setAuthentication(ExternalTokenAuthentication.authorized("some-token"));
-        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/market-rates");
+        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/admin/market-rates");
         request.setRemoteAddr("9.9.9.9");
 
         rateLimiter.check(request, RateLimitProfile.ADMIN, RateLimitPhase.POST_AUTH);
@@ -262,7 +262,7 @@ class RateLimiterTest {
     /** An unauthenticated caller has no token layer, so a forged token cannot mint a bucket. */
     @Test
     void shouldEnforceNoLayerInThePostAuthPhaseWithoutAValidatedToken() {
-        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/market-rates");
+        MockHttpServletRequest request = new MockHttpServletRequest("DELETE", "/api/v1/admin/market-rates");
         request.addHeader("Authorization", "Bearer forged-token");
 
         RateLimitVerdict verdict = rateLimiter.check(request, RateLimitProfile.ADMIN, RateLimitPhase.POST_AUTH);

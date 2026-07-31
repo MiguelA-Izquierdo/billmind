@@ -16,8 +16,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Lives under {@code /api/v1/admin} because the whole rate corpus is admin-only, reads included.
+ * The path carries the access level: {@code RouteAccessPolicy} guards that tree by prefix, so a verb
+ * added here cannot be born open, and {@code JwtAuthFilter} introspects the token before the handler
+ * — which is what makes the {@code @PreAuthorize} below able to decide anything at all.
+ */
 @RestController
-@RequestMapping("/api/v1/market-rates")
+@RequestMapping("/api/v1/admin/market-rates")
 public class ElectricityRateController {
 
     private final QueryBus queryBus;
@@ -29,6 +35,7 @@ public class ElectricityRateController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SuccessResponseDTO> getElectricityRates() {
         List<ElectricityRate> rates = queryBus.dispatch(new GetElectricityRatesQuery());
         List<ElectricityRateResponse> data = rates.stream().map(ElectricityRateResponse::from).toList();

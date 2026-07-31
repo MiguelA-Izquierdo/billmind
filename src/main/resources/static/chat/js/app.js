@@ -59,6 +59,7 @@ document.getElementById('send-btn').addEventListener('click', sendMessage);
 // Suggestions
 ['s1', 's2', 's3', 's4', 's5'].forEach(id => {
   document.getElementById(id).addEventListener('click', function () {
+    closeDrawer(); 
     chatInput.value = this.textContent.trim();
     chatInput.focus();
     autoResize(chatInput);

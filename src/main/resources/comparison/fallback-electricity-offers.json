@@ -1,0 +1,47 @@
+{
+  "note": "Fallback 2.0TD offers used ONLY when electricity_rates holds no rates, so a freshly cloned repo can exercise the savings comparison without a Kafka producer. These are never persisted. Prices are plausible Spanish retail-market figures but are NOT real published tariffs — the company names are deliberately generic so no offer is ever attributed to a real retailer. Three flat-price offers + three time-of-use offers, so both comparison blocks get a winner and two alternatives.",
+  "offers": [
+    {
+      "company": "Comercializadora Ejemplo Uno",
+      "tariffName": "Plan Fijo 12 Meses",
+      "pricePerKwh": 0.149000,
+      "contractedPowerPrice": 0.115000
+    },
+    {
+      "company": "Comercializadora Ejemplo Dos",
+      "tariffName": "Tarifa Plana Hogar",
+      "pricePerKwh": 0.142000,
+      "contractedPowerPrice": 0.121000
+    },
+    {
+      "company": "Comercializadora Ejemplo Tres",
+      "tariffName": "Precio Único Sin Tramos",
+      "pricePerKwh": 0.139000,
+      "contractedPowerPrice": 0.118000
+    },
+    {
+      "company": "Comercializadora Ejemplo Cuatro",
+      "tariffName": "Tres Periodos Ahorro",
+      "pricePerKwhPunta": 0.185000,
+      "pricePerKwhLlano": 0.135000,
+      "pricePerKwhValle": 0.089000,
+      "contractedPowerPrice": 0.113000
+    },
+    {
+      "company": "Comercializadora Ejemplo Cinco",
+      "tariffName": "Discriminación Horaria Plus",
+      "pricePerKwhPunta": 0.178000,
+      "pricePerKwhLlano": 0.128000,
+      "pricePerKwhValle": 0.082000,
+      "contractedPowerPrice": 0.119000
+    },
+    {
+      "company": "Comercializadora Ejemplo Seis",
+      "tariffName": "Valle Nocturno",
+      "pricePerKwhPunta": 0.169000,
+      "pricePerKwhLlano": 0.124000,
+      "pricePerKwhValle": 0.079000,
+      "contractedPowerPrice": 0.122000
+    }
+  ]
+}

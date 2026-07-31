@@ -242,7 +242,29 @@ curl http://localhost:8082/api/v1/invoices/a1b2c3d4-e5f6-7890-abcd-ef1234567890 
 
 ---
 
-### DELETE /api/v1/market-rates
+### GET /api/v1/admin/market-rates
+
+Returns every stored market rate. **Admin endpoint** — requires a valid Bearer token. Reading the rate
+corpus is guarded exactly like emptying it; see [`MARKET.md`](MARKET.md) for the response shape.
+
+**Headers**
+
+| Header | Required | Description |
+|---|---|---|
+| `Authorization` | Yes | `Bearer <token>` issued by the external auth service |
+
+**Responses** — `200 OK` with the rate list; `401` / `403` exactly as the `DELETE` below.
+
+**Example**
+
+```bash
+curl http://localhost:8082/api/v1/admin/market-rates \
+  -H "Authorization: Bearer eyJ…"
+```
+
+---
+
+### DELETE /api/v1/admin/market-rates
 
 Deletes all electricity rate records from the database. **Admin endpoint** — requires a valid Bearer token.
 
@@ -272,7 +294,7 @@ Deletes all electricity rate records from the database. **Admin endpoint** — r
 **Example**
 
 ```bash
-curl -X DELETE http://localhost:8082/api/v1/market-rates \
+curl -X DELETE http://localhost:8082/api/v1/admin/market-rates \
   -H "Authorization: Bearer eyJ…"
 ```
 

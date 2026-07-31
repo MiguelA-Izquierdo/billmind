@@ -30,17 +30,26 @@ class RateLimitPolicyResolverTest {
     @ParameterizedTest
     @CsvSource({
             "POST,   /api/v1/admin/knowledge/ingest",
-            "GET,    /api/v1/admin/knowledge/search",
             "PUT,    /api/v1/admin/anything/new",
-            "DELETE, /api/v1/market-rates"
+            "DELETE, /api/v1/admin/market-rates"
     })
-    void shouldClassifyAdminRoutesAsAdmin(String method, String uri) {
+    void shouldClassifyAdminWritesAsAdmin(String method, String uri) {
         assertThat(resolver.profileFor(request(method, uri))).isEqualTo(RateLimitProfile.ADMIN);
+    }
+
+    /** Reads inside the admin tree get the wider budget, but never leave the admin classes. */
+    @ParameterizedTest
+    @CsvSource({
+            "GET, /api/v1/admin/market-rates",
+            "GET, /api/v1/admin/knowledge/search",
+            "GET, /api/v1/admin/anything/new"
+    })
+    void shouldClassifyAdminReadsAsAdminRead(String method, String uri) {
+        assertThat(resolver.profileFor(request(method, uri))).isEqualTo(RateLimitProfile.ADMIN_READ);
     }
 
     @ParameterizedTest
     @CsvSource({
-            "GET, /api/v1/market-rates",
             "GET, /api/v1/invoices",
             "GET, /api/v1/invoices/42",
             "GET, /api/v1/invoices/42/comparison"

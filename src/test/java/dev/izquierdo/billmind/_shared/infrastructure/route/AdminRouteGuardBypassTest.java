@@ -25,6 +25,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -91,8 +93,17 @@ class AdminRouteGuardBypassTest {
 
     @Test
     void shouldRejectPlainMarketRatesDeleteWithoutToken() throws Exception {
-        mockMvc.perform(delete("/api/v1/market-rates"))
+        mockMvc.perform(delete("/api/v1/admin/market-rates"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /** Reading the rate corpus is guarded exactly like deleting it — the tree is guarded, not the verb. */
+    @Test
+    void shouldRejectPlainMarketRatesReadWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/market-rates"))
+                .andExpect(status().isUnauthorized());
+
+        verify(queryBus, never()).dispatch(any());
     }
 
     // --- Bypasses: raw URI hides the admin identity the dispatcher still routes on ---
@@ -109,7 +120,7 @@ class AdminRouteGuardBypassTest {
     @Test
     void shouldRejectPercentEncodedMarketRatesDeleteWithoutToken() throws Exception {
         mockMvc.perform(delete("/placeholder")
-                        .with(rawUri("/api/v1/market-rate%73"))
+                        .with(rawUri("/api/v1/%61dmin/market-rates"))
                         .header("X-Session-Id", SESSION_ID))
                 .andExpect(status().isUnauthorized());
     }

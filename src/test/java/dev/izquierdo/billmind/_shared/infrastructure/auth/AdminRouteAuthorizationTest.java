@@ -120,12 +120,30 @@ class AdminRouteAuthorizationTest {
         verify(queryBus).dispatch(any());
     }
 
+    /** Market rates live inside the admin tree, so reading the corpus is guarded like emptying it. */
     @Test
-    void shouldGuardTheMarketRatesDeleteWhichLivesOutsideTheAdminTree() throws Exception {
-        mockMvc.perform(delete("/api/v1/market-rates"))
+    void shouldGuardBothVerbsOfMarketRatesWithoutAToken() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/market-rates"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/v1/admin/market-rates"))
                 .andExpect(status().isUnauthorized());
 
+        verify(queryBus, never()).dispatch(any());
         verify(commandBus, never()).dispatch(any());
+    }
+
+    /**
+     * The {@code @PreAuthorize} on the read handler is not decoration: with the policy misclassifying
+     * the route, the engine waves it through and the handler-level guard is the last thing standing.
+     */
+    @Test
+    void shouldStillDenyTheMarketRatesReadWhenTheRoutePolicyMisclassifiesTheRoute() throws Exception {
+        when(routeAccessPolicy.accessFor(any())).thenReturn(RouteAccess.ANONYMOUS);
+
+        mockMvc.perform(get("/api/v1/admin/market-rates").header("X-Session-Id", SESSION_ID))
+                .andExpect(status().isUnauthorized());
+
+        verify(queryBus, never()).dispatch(any());
     }
 
     /**

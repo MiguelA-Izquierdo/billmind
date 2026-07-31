@@ -23,7 +23,6 @@ public class RateLimitPolicyResolver {
     private static final String UPLOAD_PATH = "/api/v1/invoices";
     private static final String CHAT_PATH = "/api/v1/assistant/chat";
     private static final String INVOICE_READ_PATTERN = "/api/v1/invoices/**";
-    private static final String MARKET_RATES_PATH = "/api/v1/market-rates";
 
     private final RouteAccessPolicy routeAccessPolicy;
     private final RequestPathMatcher pathMatcher;
@@ -36,16 +35,16 @@ public class RateLimitPolicyResolver {
     public RateLimitProfile profileFor(HttpServletRequest request) {
         RouteAccess access = routeAccessPolicy.accessFor(request);
         return switch (access) {
-            case ADMIN -> RateLimitProfile.ADMIN;
-            case OPEN -> openProfile(request);
+            case ADMIN -> adminProfile(request);
+            // Nothing under the API tree is OPEN: this is static assets and actuator.
+            case OPEN -> RateLimitProfile.NONE;
             case ANONYMOUS -> anonymousProfile(request);
         };
     }
 
-    private RateLimitProfile openProfile(HttpServletRequest request) {
-        return pathMatcher.matches("GET", MARKET_RATES_PATH, request)
-                ? RateLimitProfile.PUBLIC_READ
-                : RateLimitProfile.NONE;
+    /** Reads get their own budget; the tight one exists to guard the routes that change state. */
+    private RateLimitProfile adminProfile(HttpServletRequest request) {
+        return "GET".equals(request.getMethod()) ? RateLimitProfile.ADMIN_READ : RateLimitProfile.ADMIN;
     }
 
     private RateLimitProfile anonymousProfile(HttpServletRequest request) {

@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Single source of truth for how every route is guarded. {@code JwtAuthFilter} and
@@ -22,20 +21,12 @@ public class RouteAccessPolicy {
     private static final String API_TREE = "/api/v1/**";
 
     /**
-     * Every route under this prefix is admin-only regardless of HTTP method, so a newly added
-     * admin endpoint is guarded without having to be registered in {@link #ADMIN_ROUTES}.
+     * Every route under this prefix is admin-only regardless of HTTP method, so a newly added admin
+     * endpoint is guarded the moment it is mapped. This is the only way a route becomes admin: an
+     * endpoint that needs guarding is moved into the tree rather than registered in a list beside it,
+     * which is what keeps the guard from ever disagreeing with the URL.
      */
     private static final List<String> ADMIN_PATH_PREFIXES = List.of("/api/v1/admin/**");
-
-    /** Admin routes living outside the {@code /api/v1/admin} tree, keyed by HTTP method. */
-    private static final Map<String, List<String>> ADMIN_ROUTES = Map.of(
-            "DELETE", List.of("/api/v1/market-rates")
-    );
-
-    /** API routes readable without a token and without a session, keyed by HTTP method. */
-    private static final Map<String, List<String>> OPEN_ROUTES = Map.of(
-            "GET", List.of("/api/v1/market-rates")
-    );
 
     private final RequestPathMatcher pathMatcher;
 
@@ -51,23 +42,11 @@ public class RouteAccessPolicy {
         if (!pathMatcher.matches(API_TREE, request)) {
             return RouteAccess.OPEN;
         }
-        if (isAdmin(request)) {
-            return RouteAccess.ADMIN;
-        }
-        if (matchesAny(OPEN_ROUTES, request)) {
-            return RouteAccess.OPEN;
-        }
-        return RouteAccess.ANONYMOUS;
+        return isAdmin(request) ? RouteAccess.ADMIN : RouteAccess.ANONYMOUS;
     }
 
     private boolean isAdmin(HttpServletRequest request) {
-        boolean underAdminPrefix = ADMIN_PATH_PREFIXES.stream()
-                .anyMatch(pattern -> pathMatcher.matches(pattern, request));
-        return underAdminPrefix || matchesAny(ADMIN_ROUTES, request);
-    }
-
-    private boolean matchesAny(Map<String, List<String>> routes, HttpServletRequest request) {
-        return routes.getOrDefault(request.getMethod(), List.of()).stream()
+        return ADMIN_PATH_PREFIXES.stream()
                 .anyMatch(pattern -> pathMatcher.matches(pattern, request));
     }
 }

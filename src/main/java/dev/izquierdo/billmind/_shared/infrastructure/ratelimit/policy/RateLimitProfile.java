@@ -28,8 +28,20 @@ public enum RateLimitProfile {
     /** {@code POST /assistant/chat} — RAG + streaming LLM, paid. */
     CHAT(FailMode.FAIL_CLOSED, List.of(KeyType.SESSION, KeyType.IP)),
 
-    /** Admin routes — brute-force sensitive, two layers. */
+    /** Admin routes that change state — brute-force sensitive, two layers. */
     ADMIN(FailMode.FAIL_CLOSED, List.of(KeyType.IP, KeyType.TOKEN)),
+
+    /**
+     * Admin reads. Same two identities and the same fail-closed stance as {@link #ADMIN}, wider
+     * bucket: a listing is refreshed by hand and changes nothing, so the budget sized for guarding
+     * destructive routes only got in the honest operator's way.
+     *
+     * <p>The widening is not free — the {@code IP} layer is the pre-auth cap, so an attacker spraying
+     * tokens gets that same headroom on admin {@code GET}s. It buys them attempts against a
+     * high-entropy credential and reaches nothing that mutates, which is the trade this profile makes
+     * deliberately and the mutating routes refuse.
+     */
+    ADMIN_READ(FailMode.FAIL_CLOSED, List.of(KeyType.IP, KeyType.TOKEN)),
 
     /** Cheap public reads — no LLM, no cost exposure. */
     PUBLIC_READ(FailMode.FAIL_OPEN, List.of(KeyType.IP)),
