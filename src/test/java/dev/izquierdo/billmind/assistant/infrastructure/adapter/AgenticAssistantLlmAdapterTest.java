@@ -46,7 +46,9 @@ class AgenticAssistantLlmAdapterTest {
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), new BigDecimal("45.50"),
             null, null, null, null, null, null, null, null, null);
 
-    private static final ChatContext CONTEXT = ChatContext.invoiceOnly(FIELDS);
+    private static final String INVOICE_TEXT = "ALQUILER EQUIPOS DE MEDIDA ... 12,45 €";
+
+    private static final ChatContext CONTEXT = ChatContext.invoiceOnly(FIELDS, INVOICE_TEXT);
     private static final String QUESTION = "¿Qué es el término de potencia?";
 
     @BeforeEach

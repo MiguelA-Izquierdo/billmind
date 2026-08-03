@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -53,14 +54,16 @@ public class ChatContextAssembler {
      * as absent.
      */
     public ChatContext assemble(UUID invoiceId, UUID sessionId, String question) {
-        InvoiceFields invoiceFields = invoiceId != null
-                ? invoiceContextPort.loadInvoice(invoiceId, sessionId).map(Invoice::getFields).orElse(null)
-                : null;
+        Optional<Invoice> invoice = invoiceId != null
+                ? invoiceContextPort.loadInvoice(invoiceId, sessionId)
+                : Optional.empty();
+        InvoiceFields invoiceFields = invoice.map(Invoice::getFields).orElse(null);
 
         // In agentic mode the LLM pulls regulation, market rates and comparison on demand via
-        // tools, so we skip the eager (and costly) loads and inline only the invoice.
+        // tools, so we skip the eager (and costly) loads and inline only the invoice. The raw text
+        // rides along unformatted for the search tool; the fields are still what reaches the prompt.
         if (toolsEnabled) {
-            return ChatContext.invoiceOnly(invoiceFields);
+            return ChatContext.invoiceOnly(invoiceFields, invoice.map(Invoice::getRawTextRedacted).orElse(null));
         }
 
         List<RegulatorySnippet> regulatory = regulationSearchPort.search(question, maxKnowledgeResults);

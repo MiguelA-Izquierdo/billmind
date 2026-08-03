@@ -152,7 +152,7 @@ class LlmAssistantAdapterTest {
 
     @Test
     void shouldHandleAContextWithoutInvoiceOrRegulation() {
-        ChatContext empty = new ChatContext(null, List.of(), List.of(), null);
+        ChatContext empty = new ChatContext(null, null, List.of(), List.of(), null);
 
         ChatResult result = adapter.answer(empty, "pregunta", List.of());
 
@@ -167,7 +167,7 @@ class LlmAssistantAdapterTest {
     }
 
     private static ChatContext contextWith(RegulatorySnippet snippet) {
-        return new ChatContext(electricityFields(), List.of(snippet), List.of(), null);
+        return new ChatContext(electricityFields(), null, List.of(snippet), List.of(), null);
     }
 
     private static ElectricityFields electricityFields() {

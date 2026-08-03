@@ -9,6 +9,7 @@ import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.TelecomFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.WaterFields;
+import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
 import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
@@ -32,10 +33,10 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Catalogue and dispatcher for the assistant's agentic tools. Exposes the three retrieval
- * capabilities the LLM can call on demand — deterministic comparison, market rates and
- * regulatory search — instead of receiving them eagerly in the system prompt. Only wired
- * when {@code assistant.tools.enabled=true}; see {@code AgenticAssistantLlmAdapter}.
+ * Catalogue and dispatcher for the assistant's agentic tools. Exposes the four retrieval
+ * capabilities the LLM can call on demand — deterministic comparison, market rates, regulatory
+ * search and the invoice's own text — instead of receiving them eagerly in the system prompt. Only
+ * wired when {@code assistant.tools.enabled=true}; see {@code AgenticAssistantLlmAdapter}.
  */
 @Component
 @ConditionalOnProperty(name = "assistant.tools.enabled", havingValue = "true")
@@ -45,6 +46,7 @@ public class AssistantTools {
 
     static final String GET_INVOICE_COMPARISON = "get_invoice_comparison";
     static final String SEARCH_MARKET_RATES    = "search_market_rates";
+    static final String SEARCH_INVOICE_TEXT    = "search_invoice_text";
     /** Public so the agentic adapter can tell which tool is safe to cache (argument-deterministic). */
     public static final String SEARCH_REGULATION = "search_regulation";
 
@@ -106,7 +108,22 @@ public class AssistantTools {
                         .build())
                 .build();
 
-        return List.of(comparison, marketRates, regulation);
+        ToolSpecification invoiceText = ToolSpecification.builder()
+                .name(SEARCH_INVOICE_TEXT)
+                .description("Busca palabras dentro del texto literal de la factura del usuario y "
+                        + "devuelve las líneas que coinciden. Los datos de la factura que ves arriba "
+                        + "son solo un resumen: conceptos como el término de potencia, el impuesto "
+                        + "eléctrico, el alquiler del contador, los descuentos o cualquier cargo "
+                        + "propio de la compañía SOLO están aquí. Úsala siempre antes de decir que "
+                        + "no dispones de un dato de la factura.")
+                .parameters(JsonObjectSchema.builder()
+                        .addStringProperty("query", "Palabras tal y como aparecerían impresas en la "
+                                + "factura, p. ej. 'alquiler contador' o 'impuesto eléctrico'.")
+                        .required("query")
+                        .build())
+                .build();
+
+        return List.of(comparison, marketRates, regulation, invoiceText);
     }
 
     /**
@@ -118,17 +135,29 @@ public class AssistantTools {
      * the model cannot tell apart from our own wording, so the whole channel is treated as untrusted
      * rather than deciding case by case which branch happens to embed third-party text.
      */
-    public String dispatch(ToolExecutionRequest request, InvoiceFields fields,
+    public String dispatch(ToolExecutionRequest request, ChatContext context,
                            List<RegulatorySnippet> citationSink) {
         String name = request.name();
         log.debug("[TOOL] dispatch name={} arguments={}", name, request.arguments());
+        InvoiceFields fields = context != null ? context.invoiceFields() : null;
         String result = switch (name) {
             case GET_INVOICE_COMPARISON -> comparison(fields);
             case SEARCH_MARKET_RATES    -> marketRates(fields, request);
             case SEARCH_REGULATION      -> regulation(request, citationSink);
+            case SEARCH_INVOICE_TEXT    -> invoiceText(context, request);
             default -> "Herramienta desconocida: " + name;
         };
         return PromptFence.random().wrap(name, result, MAX_TOOL_RESULT_CHARS);
+    }
+
+    /** Searches the invoice's own text; the result is fenced by {@link #dispatch} like any other. */
+    private String invoiceText(ChatContext context, ToolExecutionRequest request) {
+        if (context == null || context.invoiceText() == null) return NO_INVOICE;
+        String query = readStringArgument(request, "query");
+        if (query == null || query.isBlank()) {
+            return "Falta el parámetro 'query' para buscar en el texto de la factura.";
+        }
+        return InvoiceTextSearch.search(context.invoiceText(), query);
     }
 
     private String comparison(InvoiceFields fields) {

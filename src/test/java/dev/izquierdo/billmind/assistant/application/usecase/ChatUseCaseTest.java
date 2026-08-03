@@ -53,7 +53,7 @@ class ChatUseCaseTest {
     void setUp() {
         command      = new ChatCommand(SESSION_ID, INVOICE_ID, CONVERSATION_ID, MESSAGE);
         conversation = Conversation.create(SESSION_ID, INVOICE_ID);
-        context      = new ChatContext(null, List.of(), List.of(), null);
+        context      = new ChatContext(null, null, List.of(), List.of(), null);
         llmResult    = new ChatResult(null, "Pagas 12 € de potencia.", List.of());
     }
 
@@ -128,7 +128,7 @@ class ChatUseCaseTest {
     @Test
     void shouldWorkWithoutInvoiceId() {
         ChatCommand noInvoiceCommand = new ChatCommand(SESSION_ID, null, null, "¿Qué es el PVPC?");
-        ChatContext emptyContext = new ChatContext(null, List.of(), List.of(), null);
+        ChatContext emptyContext = new ChatContext(null, null, List.of(), List.of(), null);
         when(conversationService.resolve(noInvoiceCommand)).thenReturn(conversation);
         when(contextAssembler.assemble(null, SESSION_ID, "¿Qué es el PVPC?")).thenReturn(emptyContext);
         when(llmPort.answer(eq(emptyContext), eq("¿Qué es el PVPC?"), anyList())).thenReturn(llmResult);

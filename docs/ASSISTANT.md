@@ -126,6 +126,7 @@ flag is on. The catalogue advertised to the model each round:
 | `get_invoice_comparison` | *(none)* | `ComparisonContextPort.summarize(fields)` | "Am I paying too much? / which tariff is cheaper?" |
 | `search_market_rates` | `company` *(optional, string)* | `MarketRatesContextPort.loadLatestRates(domain)` | Questions about a specific company or tariff |
 | `search_regulation` | `query` *(required, string)* | `RegulationSearchPort.search(query, n)` | Concepts, regulation, invoice-term definitions |
+| `search_invoice_text` | `query` *(required, string)* | `InvoiceTextSearch` over `ChatContext.invoiceText` | Any figure on the user's own bill that is not one of the extracted fields |
 
 - **`get_invoice_comparison` takes no params** because the comparison is a deterministic function
   of the user's own invoice. The tool exists so the model *explains* the precomputed result
@@ -136,9 +137,50 @@ flag is on. The catalogue advertised to the model each round:
 - **`search_regulation` requires `query`** — the model formulates the semantic search string from
   the user's question. Uses `knowledge.search.default-max-results` (default 5), the same knob the
   eager path uses.
+- **`search_invoice_text` requires `query`** — see below.
 
 Argument JSON is parsed tolerantly with Jackson: a missing key, blank JSON, or malformed input is
 treated as "argument absent" rather than failing the turn.
+
+### `search_invoice_text` — reaching the lines the field set leaves out
+
+`ElectricityFields` keeps a fixed subset of the bill, so the power term in €/kW/day, the electricity
+tax, the meter rental, discounts and any retailer-specific charge exist **only** in
+`rawTextRedacted`. Those are ordinary questions a user asks in front of their bill, and before this
+tool the assistant answered that it did not have the figure.
+
+The text is not inlined. `ChatContextAssembler` already loads the whole `Invoice`, so it now carries
+`rawTextRedacted` on `ChatContext` unformatted, and only a *searched fragment* ever reaches a prompt.
+That is the whole point of making it a tool: inlining the document would cost the same tokens on
+every turn of every conversation and would not fit a large PDF at all, while a search returns a
+handful of lines and costs nothing on the turns nobody asks.
+
+`InvoiceTextSearch` is deliberately keyword-based and dependency-free:
+
+1. **Fold** query and lines to lowercase without diacritics, so `eléctrico` matches `ELECTRICO` —
+   which is how OCR usually renders it.
+2. **Stem** each query word to its first 6 characters, so `contador` also finds `contadores`.
+   Words shorter than 4 characters and a short stop-word list are dropped: they match every line and
+   rank nothing.
+3. **Score** each line by how many distinct stems it contains. Requiring *all* terms would miss
+   `ALQUILER EQUIPOS DE MEDIDA` for the query "alquiler contador"; accepting *any* would return
+   noise. Scoring keeps the partial match and ranks the better one higher.
+4. **Cap and reorder** — the best 10 lines, capped at 3 000 characters, then re-sorted into document
+   order so a multi-line block still reads top to bottom. Relevance decides what survives; position
+   decides how it prints. This cap is what bounds the context cost regardless of PDF size.
+
+Two deliberate non-features. There is **no fuzzy matching**: an invoice is full of codes and numbers,
+and edit-distance tolerance trades "finds nothing" for "finds the wrong line", which is worse because
+the model believes it. And there is **no embedding step**: the concepts are named almost verbatim in
+the question, and the model has already rewritten the user's wording — typos included — into the
+search terms before this runs.
+
+A miss returns a literal stating that the words were not found and that this does **not** mean the
+charge is absent, plus alternative wordings to retry with. Same reasoning as `notInCatalogue`: a bare
+"no results" gets reported to the user as a fact about their bill.
+
+The result is **not cached** — unlike `search_regulation`, it is a function of *this* invoice, so it
+is neither argument-deterministic nor shareable across sessions.
 
 ### Citation accuracy
 

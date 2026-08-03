@@ -3,6 +3,7 @@ package dev.izquierdo.billmind.assistant.infrastructure.adapter.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
+import dev.izquierdo.billmind.assistant.domain.model.ChatContext;
 import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.model.MarketRateSnapshot;
 import dev.izquierdo.billmind.assistant.domain.model.RegulatorySnippet;
@@ -46,6 +47,17 @@ class AssistantToolsTest {
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), new BigDecimal("45.50"),
             null, null, null, null, null, null, null, null, null);
 
+    private static final String INVOICE_TEXT = """
+            COMERCIALIZADORA EJEMPLO - FACTURA ELECTRICIDAD
+            Termino de potencia: 4,60 kW x 0,113000 €/kW/dia .... 15,59 €
+            Energia consumida: 320 kWh x 0,148900 €/kWh ......... 47,65 €
+            ALQUILER EQUIPOS DE MEDIDA ......................... 12,45 €
+            Impuesto electrico 5,11% ............................ 3,23 €
+            TOTAL .............................................. 89,95 €
+            """;
+
+    private static final ChatContext CONTEXT = ChatContext.invoiceOnly(FIELDS, INVOICE_TEXT);
+
     @BeforeEach
     void setUp() {
         tools = new AssistantTools(comparisonContextPort, marketRatesContextPort,
@@ -64,19 +76,20 @@ class AssistantToolsTest {
     // --- catalogue ---
 
     @Test
-    void shouldExposeThreeToolsWithExpectedNames() {
+    void shouldExposeFourToolsWithExpectedNames() {
         List<String> names = tools.specifications().stream().map(ToolSpecification::name).toList();
         assertThat(names).containsExactlyInAnyOrder(
-                "get_invoice_comparison", "search_market_rates", "search_regulation");
+                "get_invoice_comparison", "search_market_rates", "search_regulation",
+                "search_invoice_text");
     }
 
     @Test
-    void shouldMarkQueryAsRequiredOnlyForRegulationTool() {
-        ToolSpecification regulation = specificationNamed("search_regulation");
-        ToolSpecification marketRates = specificationNamed("search_market_rates");
-
-        assertThat(regulation.parameters().required()).containsExactly("query");
-        assertThat(marketRates.parameters().required()).isNullOrEmpty();
+    void shouldMarkQueryAsRequiredOnBothSearchToolsButNotOnMarketRates() {
+        assertThat(specificationNamed("search_regulation").parameters().required())
+                .containsExactly("query");
+        assertThat(specificationNamed("search_invoice_text").parameters().required())
+                .containsExactly("query");
+        assertThat(specificationNamed("search_market_rates").parameters().required()).isNullOrEmpty();
     }
 
     private ToolSpecification specificationNamed(String name) {
@@ -92,7 +105,7 @@ class AssistantToolsTest {
                 new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null);
         when(comparisonContextPort.summarize(FIELDS)).thenReturn(Optional.of(summary));
 
-        String result = tools.dispatch(request("get_invoice_comparison", "{}"), FIELDS, new ArrayList<>());
+        String result = tools.dispatch(request("get_invoice_comparison", "{}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("Precio efectivo actual del usuario");
         verify(comparisonContextPort).summarize(FIELDS);
@@ -114,7 +127,7 @@ class AssistantToolsTest {
                 .thenReturn(List.of(rate("Naturgy", "Plan A"), rate("Iberdrola", "Plan B")));
 
         String result = tools.dispatch(
-                request("search_market_rates", "{\"company\":\"naturgy\"}"), FIELDS, new ArrayList<>());
+                request("search_market_rates", "{\"company\":\"naturgy\"}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("Naturgy").doesNotContain("Iberdrola");
     }
@@ -124,7 +137,7 @@ class AssistantToolsTest {
         when(marketRatesContextPort.loadLatestRates(SupplyDomain.ELECTRICITY))
                 .thenReturn(List.of(rate("Naturgy", "Plan A"), rate("Iberdrola", "Plan B")));
 
-        String result = tools.dispatch(request("search_market_rates", "{}"), FIELDS, new ArrayList<>());
+        String result = tools.dispatch(request("search_market_rates", "{}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("Naturgy").contains("Iberdrola");
     }
@@ -136,7 +149,7 @@ class AssistantToolsTest {
                         rate("Endesa", "Plan C")));
 
         String result = tools.dispatch(
-                request("search_market_rates", "{\"company\":\"Octopus\"}"), FIELDS, new ArrayList<>());
+                request("search_market_rates", "{\"company\":\"Octopus\"}"), CONTEXT, new ArrayList<>());
 
         // The model must not read a missing company as "does not operate in Spain".
         assertThat(result)
@@ -150,7 +163,7 @@ class AssistantToolsTest {
         when(marketRatesContextPort.loadLatestRates(SupplyDomain.ELECTRICITY)).thenReturn(List.of());
 
         String result = tools.dispatch(
-                request("search_market_rates", "{\"company\":\"Endesa\"}"), FIELDS, new ArrayList<>());
+                request("search_market_rates", "{\"company\":\"Endesa\"}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("no tiene ninguna tarifa de mercado registrada");
     }
@@ -163,7 +176,7 @@ class AssistantToolsTest {
                 .thenReturn(List.of(new RegulatorySnippet("T", "REE", "GUIDE", "contenido")));
 
         String result = tools.dispatch(
-                request("search_regulation", "{\"query\":\"q\"}"), FIELDS, new ArrayList<>());
+                request("search_regulation", "{\"query\":\"q\"}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).containsPattern("\\[UNTRUSTED:SEARCH_REGULATION:[0-9a-f]{8}]");
         assertThat(result).containsPattern("\\[/UNTRUSTED:[0-9a-f]{8}]");
@@ -176,7 +189,7 @@ class AssistantToolsTest {
                 .thenReturn(List.of(new RegulatorySnippet("T", "REE", "GUIDE", malicious)));
 
         String result = tools.dispatch(
-                request("search_regulation", "{\"query\":\"q\"}"), FIELDS, new ArrayList<>());
+                request("search_regulation", "{\"query\":\"q\"}"), CONTEXT, new ArrayList<>());
 
         // The injected closer is inert but syntactically valid, so anchor on the real nonce —
         // the one the opening marker carries.
@@ -197,7 +210,7 @@ class AssistantToolsTest {
         List<RegulatorySnippet> sink = new ArrayList<>();
 
         String result = tools.dispatch(
-                request("search_regulation", "{\"query\":\"término de potencia\"}"), FIELDS, sink);
+                request("search_regulation", "{\"query\":\"término de potencia\"}"), CONTEXT, sink);
 
         assertThat(result).contains("Guía 2.0TD").contains("contenido");
         assertThat(sink).containsExactly(snippet);
@@ -206,7 +219,7 @@ class AssistantToolsTest {
 
     @Test
     void shouldReportMissingQueryWhenRegulationCalledWithoutQuery() {
-        String result = tools.dispatch(request("search_regulation", "{}"), FIELDS, new ArrayList<>());
+        String result = tools.dispatch(request("search_regulation", "{}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("Falta el parámetro 'query'");
         verify(regulationSearchPort, never()).search(org.mockito.ArgumentMatchers.any(), eq(MAX_RESULTS));
@@ -217,16 +230,54 @@ class AssistantToolsTest {
         when(regulationSearchPort.search("inexistente", MAX_RESULTS)).thenReturn(List.of());
 
         String result = tools.dispatch(
-                request("search_regulation", "{\"query\":\"inexistente\"}"), FIELDS, new ArrayList<>());
+                request("search_regulation", "{\"query\":\"inexistente\"}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("Sin resultados regulatorios");
+    }
+
+    // --- search_invoice_text ---
+
+    /** The meter rental is the canonical case: charged on the bill, absent from the field set. */
+    @Test
+    void shouldReturnTheInvoiceLinesMatchingTheQuery() {
+        String result = tools.dispatch(
+                request("search_invoice_text", "{\"query\":\"alquiler contador\"}"),
+                CONTEXT, new ArrayList<>());
+
+        assertThat(result).contains("ALQUILER EQUIPOS DE MEDIDA").contains("12,45");
+        assertThat(result).doesNotContain("Energia consumida");
+    }
+
+    @Test
+    void shouldReportNoInvoiceWhenTextSearchRunsWithoutAnInvoice() {
+        String result = tools.dispatch(
+                request("search_invoice_text", "{\"query\":\"alquiler\"}"), null, new ArrayList<>());
+
+        assertThat(result).contains("No se ha proporcionado factura");
+    }
+
+    @Test
+    void shouldReportMissingQueryWhenTextSearchCalledWithoutQuery() {
+        String result = tools.dispatch(
+                request("search_invoice_text", "{}"), CONTEXT, new ArrayList<>());
+
+        assertThat(result).contains("Falta el parámetro 'query'");
+    }
+
+    /** The invoice text is third-party OCR, so it is fenced like every other tool result. */
+    @Test
+    void shouldFenceTheInvoiceTextResult() {
+        String result = tools.dispatch(
+                request("search_invoice_text", "{\"query\":\"impuesto\"}"), CONTEXT, new ArrayList<>());
+
+        assertThat(result).containsPattern("\\[UNTRUSTED:SEARCH_INVOICE_TEXT:[0-9a-f]{8}]");
     }
 
     // --- robustness ---
 
     @Test
     void shouldReturnUnknownToolMessageForUnrecognizedName() {
-        String result = tools.dispatch(request("do_something_else", "{}"), FIELDS, new ArrayList<>());
+        String result = tools.dispatch(request("do_something_else", "{}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).contains("Herramienta desconocida");
     }
@@ -237,7 +288,7 @@ class AssistantToolsTest {
                 .thenReturn(List.of(rate("Naturgy", "Plan A")));
 
         String result = tools.dispatch(
-                request("search_market_rates", "not-json"), FIELDS, new ArrayList<>());
+                request("search_market_rates", "not-json"), CONTEXT, new ArrayList<>());
 
         // Malformed args -> company treated as absent -> all rates returned.
         assertThat(result).contains("Naturgy");
