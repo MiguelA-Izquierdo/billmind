@@ -70,6 +70,30 @@ class MarketOfferQueryAdapterTest {
         assertThat(offers).allSatisfy(o -> assertThat(o.contractedPowerPrice()).isNotNull());
     }
 
+    /**
+     * A corpus that went stale is not a fresh install: the fallback exists so a clone with no Kafka
+     * producer can still demo the comparison, never to paper over rates that expired.
+     */
+    @Test
+    void shouldReportNoAlternativesWhenEveryRateHasExpired() {
+        when(repository.findLatestPerTariff()).thenReturn(List.of());
+        when(repository.findAll()).thenReturn(List.of(rate("Compañía Caducada", "Tarifa Caducada")));
+
+        List<MarketOffer> offers = adapterWithFallback().findBySupplyType(SupplyDomain.ELECTRICITY);
+
+        assertThat(offers).isEmpty();
+    }
+
+    @Test
+    void shouldServeFallbackOffersWhenCorpusWasNeverFilled() {
+        when(repository.findLatestPerTariff()).thenReturn(List.of());
+        when(repository.findAll()).thenReturn(List.of());
+
+        List<MarketOffer> offers = adapterWithFallback().findBySupplyType(SupplyDomain.ELECTRICITY);
+
+        assertThat(offers).hasSize(6);
+    }
+
     @Test
     void shouldReturnEmptyWhenCorpusIsEmptyAndFallbackDisabled() {
         when(repository.findLatestPerTariff()).thenReturn(List.of());

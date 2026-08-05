@@ -16,6 +16,22 @@ Kafka must be enabled via `KAFKA_ENABLED=true` in your `.env` (required when usi
 
 ---
 
+## Rate validity
+
+Both validity dates come from the producer: `validFrom` is required, `validTo` is optional and null
+means open-ended. A rate is expired once `validTo` is before today (`validTo` is inclusive, so
+"valid until today" is still valid today).
+
+Expired rates are excluded from everything that quotes a current price — the savings comparison, the
+chat's market context and the assistant's company-comparison tool, all of which read
+`findLatestPerTariff()`. They remain in `findAll()`, which feeds `GET /api/v1/admin/market-rates` and
+the static viewer: that listing is the history, and history keeps its expired entries.
+
+One consequence to be aware of: a tariff whose newest entry has expired drops out entirely rather
+than falling back to an older, still-open row — the producer already superseded that price.
+
+---
+
 ## Fallback offers when the corpus is empty
 
 Without a Kafka producer, `electricity_rates` stays empty and the comparison engine has nothing to
@@ -28,6 +44,9 @@ Deliberately a read path, not a seed:
 
 * **Nothing is persisted.** No rows to clean up, and `GET /api/v1/admin/market-rates` keeps
   reporting the real corpus — empty is reported as empty.
+* **Only for a corpus that was never filled.** If rates were ingested but all of them have expired,
+  the comparison reports no alternatives instead of the examples: a stale corpus is a real problem,
+  and quoting invented prices would hide it.
 * **Real rates win automatically.** The first rate arriving via Kafka makes the fallback disappear;
   there is no precedence rule to reason about and no mixed corpus.
 * **Three flat-price + three time-of-use offers**, because the comparison builds those two blocks

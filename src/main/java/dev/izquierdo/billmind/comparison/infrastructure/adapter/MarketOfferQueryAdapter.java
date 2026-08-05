@@ -48,6 +48,13 @@ public class MarketOfferQueryAdapter implements MarketOfferQueryPort {
                 .<MarketOffer>map(this::toMarketOffer)
                 .toList();
         if (!offers.isEmpty()) return offers;
+        // findAll() keeps expired rates, so a non-empty corpus here means rates arrived and went
+        // stale. The fallback covers a corpus that was never filled — quoting example prices for a
+        // stale one would be inventing a market.
+        if (!electricityRateRepository.findAll().isEmpty()) {
+            log.warn("Market rates exist but none are currently valid — reporting no alternatives");
+            return List.of();
+        }
         log.debug("No market rates persisted — serving {} fallback example offers", fallbackOffers.size());
         return fallbackOffers;
     }

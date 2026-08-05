@@ -61,11 +61,20 @@ class JpaElectricityRateRepositoryTest {
                 .validFrom(LocalDate.of(2025, 1, 1))
                 .source("REE")
                 .build());
-        when(jpa.findLatestPerTariff()).thenReturn(List.of(dup1, dup2, dup3, other));
+        when(jpa.findLatestPerTariff(any(LocalDate.class))).thenReturn(List.of(dup1, dup2, dup3, other));
 
         List<ElectricityRate> result = repository.findLatestPerTariff();
 
         assertEquals(2, result.size());
+    }
+
+    @Test
+    void shouldQueryExpiryWithTodaysDate() {
+        when(jpa.findLatestPerTariff(any(LocalDate.class))).thenReturn(List.of());
+
+        repository.findLatestPerTariff();
+
+        verify(jpa).findLatestPerTariff(LocalDate.now());
     }
 
     private ElectricityRate buildRate(UUID id) {
