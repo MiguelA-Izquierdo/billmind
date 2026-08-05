@@ -112,11 +112,13 @@
     <div class="sidebar-body">
       <div class="sidebar-section">
         <h4>Preguntas sugeridas</h4>
-        <button class="suggestion-btn" id="s1" disabled>¿Estoy pagando más de lo que debería por kWh?</button>
-        <button class="suggestion-btn" id="s2" disabled>¿Qué es el término de potencia y cómo afecta a mi factura?</button>
-        <button class="suggestion-btn" id="s3" disabled>¿Cuál es la diferencia entre tarifa plana y discriminación horaria?</button>
-        <button class="suggestion-btn" id="s4" disabled>¿Cuánto podría ahorrar cambiando de tarifa?</button>
-        <button class="suggestion-btn" id="s5" disabled>Explícame los cargos de la factura uno por uno.</button>
+        <!-- One per assistant capability: comparison, rate catalogue, the invoice's
+             own text, and the regulatory KB. The label is sent verbatim (app.js). -->
+        <button class="suggestion-btn" id="s1" disabled>¿Estoy pagando de más? Compara mi factura con el mercado.</button>
+        <button class="suggestion-btn" id="s2" disabled>¿De qué compañías tienes precios ahora mismo?</button>
+        <button class="suggestion-btn" id="s3" disabled>¿Qué tarifa concreta me saldría más barata y cuánto ahorraría al año?</button>
+        <button class="suggestion-btn" id="s4" disabled>¿Cuánto me cobran por el término de potencia y por el alquiler del contador?</button>
+        <button class="suggestion-btn" id="s5" disabled>Desglósame la factura y explícame qué significa cada cargo.</button>
       </div>
       <div class="sidebar-section">
         <h4>Estado del sistema</h4>
@@ -157,6 +159,25 @@
           <p class="hero-meta">PDF · hasta 5 MB · de momento solo electricidad</p>
           <p class="hero-error" id="hero-error" role="alert" hidden></p>
         </div>
+
+        <!-- Outside the dropzone on purpose: every click inside it opens the file picker.
+             Most visitors won't hand over their own invoice, so this is a co-primary path. -->
+        <section class="hero-sample" aria-labelledby="hero-sample-title">
+          <span class="hero-sample-badge">Demo</span>
+          <h3 class="hero-sample-title" id="hero-sample-title">¿No quieres subir tu factura?</h3>
+          <p class="hero-sample-sub">
+            Descarga esta factura de ejemplo y súbela: verás el análisis completo sin usar ningún dato tuyo.
+          </p>
+          <a class="hero-sample-btn" href="/factura-ejemplo.pdf" download="factura-ejemplo.pdf">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Descargar factura de ejemplo
+          </a>
+          <p class="hero-sample-steps">Descárgala · vuelve aquí · suéltala arriba</p>
+        </section>
 
         <ol class="hero-steps">
           <li class="hero-step">

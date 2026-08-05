@@ -36,7 +36,8 @@ public class RateLimitPolicyResolver {
         RouteAccess access = routeAccessPolicy.accessFor(request);
         return switch (access) {
             case ADMIN -> adminProfile(request);
-            // Nothing under the API tree is OPEN: this is static assets and actuator.
+            // Nothing under the API tree is OPEN: this is static assets, actuator and /ping,
+            // whose cost is bounded by its own cached verdict rather than by a bucket.
             case OPEN -> RateLimitProfile.NONE;
             case ANONYMOUS -> anonymousProfile(request);
         };

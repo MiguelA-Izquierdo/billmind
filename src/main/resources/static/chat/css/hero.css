@@ -114,6 +114,79 @@
   color: var(--muted);
 }
 
+/* ── Sample invoice: a way in for visitors who won't upload their own ────── */
+
+.hero-sample {
+  position: relative;
+  border: 1px solid rgba(108,111,245,.34);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(108,111,245,.12), rgba(108,111,245,.04)),
+    var(--surf2);
+  padding: 20px 22px 18px;
+  text-align: center;
+}
+
+.hero-sample-badge {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 4px 12px rgba(108,111,245,.4);
+}
+
+.hero-sample-title {
+  margin: 6px 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.1px;
+}
+
+.hero-sample-sub {
+  max-width: 400px;
+  margin: 0 auto 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.hero-sample-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(108,111,245,.14);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background .15s, color .15s, transform .1s;
+}
+.hero-sample-btn svg { width: 15px; height: 15px; }
+.hero-sample-btn:hover,
+.hero-sample-btn:focus-visible {
+  background: var(--accent);
+  color: #fff;
+  outline: none;
+}
+.hero-sample-btn:active { transform: scale(.97); }
+
+.hero-sample-steps {
+  margin-top: 11px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 /* ── Privacy: expandable "what we do with your data" ─────────────────────── */
 
 .hero-privacy-more {
@@ -281,6 +354,9 @@
   .hero-title { font-size: 19px; }
   .hero-sub { margin-bottom: 16px; }
   .hero-step { padding: 9px 10px; }
+  .hero-sample { padding: 15px 18px 13px; }
+  .hero-sample-sub { margin-bottom: 10px; }
+  .hero-sample-steps { margin-top: 8px; }
 }
 
 @media (max-width: 640px) {

@@ -4,6 +4,8 @@ import { showUploadOverlay, setUploadProgress, enterProcessing, hideOverlay } fr
 import { showBanner, showComparisonResult } from './messages.js';
 import { loadInvoices, selectInvoice } from './invoices.js';
 import { showBotToast } from './char-limit.js';
+import { describeFailure } from './errors.js';
+import { startCooldown } from './cooldown.js';
 import {
   syncChat, setDragVeil, isEmptyStateVisible,
   showHeroError, clearHeroError, announce, closeDrawer,
@@ -96,7 +98,12 @@ function postInvoice(file, onProgress, onBytesSent) {
     };
     xhr.upload.onload = onBytesSent;
 
-    xhr.onload    = () => resolve({ status: xhr.status, body: safeJson(xhr.responseText) });
+    // Retry-After is the only place the exact wait travels; CORS exposes it (see SecurityConfig).
+    xhr.onload    = () => resolve({
+      status:     xhr.status,
+      body:       safeJson(xhr.responseText),
+      retryAfter: Number(xhr.getResponseHeader('Retry-After')) || 0,
+    });
     xhr.onerror   = () => reject(new Error('network'));
     xhr.ontimeout = () => reject(new Error('timeout'));
     xhr.onabort   = () => reject(new Error('aborted'));
@@ -149,10 +156,10 @@ export async function uploadFile(file) {
   announce('Subiendo y analizando tu factura.');
 
   try {
-    const { status, body } = await postInvoice(file, setUploadProgress, enterProcessing);
+    const { status, body, retryAfter } = await postInvoice(file, setUploadProgress, enterProcessing);
 
     if (status < 200 || status >= 300) {
-      reportFailure(status, body);
+      reportFailure(status, body, retryAfter);
       return;
     }
 
@@ -183,13 +190,25 @@ function handleTransportError(err) {
   reportError('No se ha podido conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.');
 }
 
-function reportFailure(status, body) {
+function reportFailure(status, body, retryAfter) {
+  hideOverlay(false);
+
   if (status === 422 && body.message?.includes('suministro')) {
     showBotToast(buildRejectionToast(body.message));
-  } else {
-    reportError(body.message ?? `Error al subir la factura (HTTP ${status})`);
+    return;
   }
-  hideOverlay(false);
+
+  const failure = describeFailure({ status, message: body.message, retryAfter });
+
+  // "You've used it all up" is the bot's line, not an error banner — and the banner then holds
+  // the countdown while the upload button stays locked.
+  if (failure.kind === 'throttled') {
+    showBotToast(failure.text);
+    startCooldown('Has agotado tus subidas por ahora.', failure.retryAfter);
+    return;
+  }
+
+  reportError(failure.text);
 }
 
 function selectUploaded(invoiceId) {

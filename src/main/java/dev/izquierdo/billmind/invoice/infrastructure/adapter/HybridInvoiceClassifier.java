@@ -1,6 +1,5 @@
 package dev.izquierdo.billmind.invoice.infrastructure.adapter;
 
-import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind.invoice.domain.model.InvoiceClassification;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind.invoice.domain.port.InvoiceClassifier;
@@ -43,32 +42,19 @@ public class HybridInvoiceClassifier implements InvoiceClassifier {
         Timer.Sample sample = Timer.start(meterRegistry);
         Optional<SupplyDomain> keywordMatch = keywordClassifier.classify(text);
         if (keywordMatch.isPresent()) {
-            InvoiceClassification result = new InvoiceClassification(keywordMatch.get(), extractCompany(text));
+            InvoiceClassification result =
+                    new InvoiceClassification(keywordMatch.get(), llmClassifier.extractCompany(text));
             sample.stop(classifyTimer("keyword"));
             log.debug("Keyword classification → type={}, company={}", result.getType(), result.getCompany());
             return result;
         }
 
-        InvoiceClassification result = runLlmClassification(text);
+        // Provider failures arrive already classified from TimedChatLanguageModel — a throttle stays
+        // a throttle instead of being flattened into "service unavailable" here.
+        InvoiceClassification result = llmClassifier.classify(text);
         sample.stop(classifyTimer("llm"));
         log.debug("LLM classification → type={}, company={}", result.getType(), result.getCompany());
         return result;
-    }
-
-    private String extractCompany(String text) {
-        try {
-            return llmClassifier.extractCompany(text);
-        } catch (RuntimeException e) {
-            throw new LlmServiceUnavailableException(e);
-        }
-    }
-
-    private InvoiceClassification runLlmClassification(String text) {
-        try {
-            return llmClassifier.classify(text);
-        } catch (RuntimeException e) {
-            throw new LlmServiceUnavailableException(e);
-        }
     }
 
     private Timer classifyTimer(String strategy) {

@@ -25,8 +25,6 @@ import java.time.Duration;
  */
 public abstract class AbstractRateLimitFilter extends OncePerRequestFilter {
 
-    private static final String THROTTLED_MESSAGE =
-            "Has superado el límite de peticiones. Inténtalo de nuevo más tarde.";
     private static final String UNAVAILABLE_MESSAGE =
             "El servicio no está disponible temporalmente. Inténtalo de nuevo en unos instantes.";
 
@@ -76,7 +74,10 @@ public abstract class AbstractRateLimitFilter extends OncePerRequestFilter {
 
     private void reject(HttpServletResponse response, RateLimitVerdict verdict) throws IOException {
         int status = verdict.httpStatus();
-        String message = status == 429 ? THROTTLED_MESSAGE : UNAVAILABLE_MESSAGE;
+        // The bucket knows how long the wait is — say it, instead of a bare "try later".
+        String message = status == 429
+                ? ThrottleMessages.throttled(verdict.retryAfter())
+                : UNAVAILABLE_MESSAGE;
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), ErrorResponseDTO.of(status, message));

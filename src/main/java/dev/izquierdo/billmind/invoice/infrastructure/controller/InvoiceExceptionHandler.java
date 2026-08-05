@@ -2,8 +2,8 @@ package dev.izquierdo.billmind.invoice.infrastructure.controller;
 
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
+import dev.izquierdo.billmind._shared.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException;
-import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

@@ -53,19 +53,23 @@ Authenticating and authorizing are separate steps. `JwtAuthFilter` only establis
 
 ## Rate limiting
 
-Every `/api/v1/**` route is rate-limited by a per-endpoint token-bucket limiter (see [`RATELIMIT.md`](RATELIMIT.md)). Two distinct status codes can come back before the request reaches its handler:
+Every `/api/v1/**` route is rate-limited by a per-endpoint token-bucket limiter (see [`RATELIMIT.md`](RATELIMIT.md)). Three distinct status codes mean "you were denied, not served":
 
 | Status | Meaning | When |
 |---|---|---|
-| `429 Too Many Requests` | An actual limit was breached. | The caller exceeded the bucket for the route's profile (session and/or IP layer). |
+| `429 Too Many Requests` | An actual limit was breached. | The caller exceeded the bucket for the route's profile (session and/or IP layer) — **or** the model provider throttled us on a route that calls an LLM. |
 | `503 Service Unavailable` | The limiter could not count and failed **closed**. | The rate-limit store is unavailable on a paid/security profile (`UPLOAD`, `CHAT`, `ADMIN`); denying is safer than serving unmetered. |
+| `503 Service Unavailable` | The model provider is down, timing out, or refusing our credentials. | Raised from inside the handler, so `X-RateLimit-*` may be present on it. |
 
-Both carry a Spanish message in the standard error envelope and a `Retry-After` header (seconds). Responses that consulted a bucket also expose `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds from now).
+All carry a Spanish message in the standard error envelope. `429` carries `Retry-After` (seconds) whenever the wait is known — our own bucket always knows it, a provider only sometimes says. Responses that consulted a bucket also expose `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds from now).
 
 ```json
-{ "success": false, "status": 429, "message": "Has superado el límite de peticiones. Inténtalo de nuevo más tarde." }
+{ "success": false, "status": 429, "message": "Has agotado tus consultas por ahora. Vuelve a intentarlo en 12 minutos." }
+{ "success": false, "status": 429, "message": "Estamos atendiendo muchas consultas ahora mismo. Vuelve a intentarlo en 2 minutos." }
 { "success": false, "status": 503, "message": "El servicio no está disponible temporalmente. Inténtalo de nuevo en unos instantes." }
 ```
+
+The closing sentence degrades to "Inténtalo de nuevo más tarde." when the wait is unknown. A client should read the `Retry-After` header rather than parse it out of the text.
 
 ---
 
@@ -140,7 +144,13 @@ The same comparison payload is available on demand at `GET /api/v1/invoices/{id}
 }
 ```
 
-`500 Internal Server Error` — unexpected failure:
+`429` / `503` — the upload calls the LLM twice (classification and field extraction), so besides the
+limiter it can also return the provider's own throttle or outage. See [Rate limiting](#rate-limiting).
+
+`500 Internal Server Error` — unexpected failure. Reserved for genuinely unforeseen faults: a
+provider being throttled, down or unreachable is classified before it gets here (Design Decision #15),
+and the body is always this fixed string — the underlying failure is kept as the exception cause, for
+the logs only.
 ```json
 {
   "success": false,
@@ -317,3 +327,32 @@ while the DB / Kafka / disk breakdown and liveness/readiness probes require auth
 ```json
 { "status": "UP" }
 ```
+
+### GET /ping
+
+The one health signal on the **public** application port, for uptime monitors and load balancers
+that cannot reach the management port. No `X-Session-Id`, no token, no CORS restriction.
+
+```bash
+curl -i http://localhost:8082/ping
+```
+
+| Status | Meaning |
+|---|---|
+| `200 OK` | PostgreSQL — and Kafka, when `KAFKA_ENABLED=true` — answered. |
+| `503 Service Unavailable` | One of them did not. |
+
+The body is **always empty**, in both directions: the caller learns whether the service can work
+and nothing more. Which dependency failed, and why, stays on the authenticated Actuator endpoint
+above. The answer carries `Cache-Control: no-store` so no proxy keeps serving a stale `200`.
+
+It sits outside `/api/v1/**` deliberately. Inside that tree every unrecognized route is classified
+as anonymous-with-session, which would make `X-Session-Id` mandatory — a header no monitor sends.
+Being outside it also means the rate limiter does not meter it; instead `DependencyHealthProbe`
+caches its verdict for 5 seconds, so hammering `/ping` cannot translate into one database
+connection plus one Kafka `AdminClient` per request.
+
+The database check is capped at 2 seconds. A dead Postgres blocks in `getConnection()` for the
+pool's `connection-timeout` (30s by default), which the validation query never bounds — long
+enough for a monitor to time out on a probe that already knows the answer. The probe runs on its
+own thread and gives up at the cap, so the caller always gets the `503` rather than a hung socket.

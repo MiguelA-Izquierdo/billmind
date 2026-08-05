@@ -19,7 +19,7 @@ Behind that, it runs the full pipeline: it ingests and classifies the PDF, extra
 
 Built with **Spring Boot 3.5.0**, **Java 21** and **LangChain4j 1.0.0**. Runs on **fully local AI** (Ollama, zero cloud) or **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env var. No login required in Phase 1.
 
-**By the numbers:** invoice to savings card in **~10 s** end-to-end · **629** automated tests across **88** classes (6 Testcontainers integration suites) · a **50-case** Spanish RAG quality gate scored on every CI run — context precision **0.82**, retrieval recall@5 **0.97**, [thresholds and all](docs/ENGINEERING.md#quality-gates) · **5** regulatory documents (CNMC, REE, BOE) indexed for retrieval · runs **100% local** or on **4** cloud LLM providers.
+**By the numbers:** invoice to savings card in **~10 s** end-to-end · **693** automated tests across **88** classes (6 Testcontainers integration suites) · a **50-case** Spanish RAG quality gate scored on every CI run — context precision **0.82**, retrieval recall@5 **0.97**, [thresholds and all](docs/ENGINEERING.md#quality-gates) · **5** regulatory documents (CNMC, REE, BOE) indexed for retrieval · runs **100% local** or on **4** cloud LLM providers.
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="BillMind demo — uploading an invoice, the savings card, and a grounded answer with citations" width="840">
@@ -198,4 +198,5 @@ BillMind was never meant to become a product. It was an opportunity to build as 
 ## License
 
 © 2026 Miguel Ángel Izquierdo. All rights reserved.
-No license to use, modify or distribute this software is granted. For any other use, get in touch.
+
+Clone it, run it, read it, take it apart — that's what it's here for. Commercial use and redistribution are not granted; for anything along those lines, get in touch.

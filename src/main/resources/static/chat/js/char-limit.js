@@ -136,6 +136,13 @@ const WELCOME_TEMPLATE = `
         </button>
         <button class="cw-ghost" type="button" data-welcome-dismiss>Ahora la miro yo</button>
       </div>
+      <p class="cw-sample">
+        ¿No tienes una a mano?
+        <a href="/factura-ejemplo.pdf" download="factura-ejemplo.pdf" data-welcome-dismiss>
+          Descarga mi factura de ejemplo
+        </a>
+        y súbela: funciona igual.
+      </p>
     </div>
   </div>
 `;

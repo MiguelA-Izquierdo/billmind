@@ -56,6 +56,7 @@ class RouteAccessPolicyTest {
     @CsvSource({
             "GET, /actuator/health",
             "GET, /chat/index.html",
+            "GET, /ping",
             "GET, /"
     })
     void shouldLeaveNonApiRoutesOpen(String method, String uri) {

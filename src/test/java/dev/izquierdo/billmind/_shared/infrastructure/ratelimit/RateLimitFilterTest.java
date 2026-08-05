@@ -63,7 +63,9 @@ class RateLimitFilterTest {
         assertThat(response.getStatus()).isEqualTo(429);
         assertThat(response.getHeader("Retry-After")).isEqualTo("30");
         assertThat(response.getHeader("X-RateLimit-Reset")).isEqualTo("60");
-        assertThat(response.getContentAsString()).contains("Has superado el límite");
+        assertThat(response.getContentAsString())
+                .contains("Has agotado tus consultas")
+                .contains("Vuelve a intentarlo en un minuto.");
     }
 
     @Test

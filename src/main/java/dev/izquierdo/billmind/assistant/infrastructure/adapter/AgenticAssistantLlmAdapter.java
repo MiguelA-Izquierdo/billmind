@@ -19,6 +19,8 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.izquierdo.billmind._shared.domain.exceptions.LlmRateLimitedException;
+import dev.izquierdo.billmind._shared.domain.exceptions.LlmServiceUnavailableException;
 import dev.langchain4j.exception.InvalidRequestException;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -143,6 +145,10 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
         List<RegulatorySnippet> citationSink = new ArrayList<>();
         try {
             return runToolLoop(context, messages, citationSink);
+        } catch (LlmRateLimitedException | LlmServiceUnavailableException e) {
+            // Not degraded into the generic fallback: "wait a bit" and "I couldn't answer that" are
+            // different things to the user, and only the first one tells them what to do next.
+            throw e;
         } catch (RuntimeException e) {
             log.error("[AGENT] unrecoverable error in agent loop: {}", e.getMessage(), e);
             return fallbackResult(citationSink);
@@ -254,6 +260,8 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
         try {
             String answer = smartChatModel.chat(withoutTools(messages)).aiMessage().text();
             return finalResult(answer, citationSink);
+        } catch (LlmRateLimitedException | LlmServiceUnavailableException e) {
+            throw e;
         } catch (RuntimeException e) {
             log.error("[AGENT] tool-less fallback call failed: {}", e.getMessage(), e);
             return fallbackResult(citationSink);

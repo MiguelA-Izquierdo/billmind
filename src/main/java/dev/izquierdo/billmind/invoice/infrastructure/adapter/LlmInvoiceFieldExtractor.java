@@ -5,7 +5,6 @@ import dev.izquierdo.billmind._shared.infrastructure.llm.LlmResponseJsonSanitize
 import dev.izquierdo.billmind._shared.infrastructure.llm.TimedChatLanguageModel;
 import dev.izquierdo.billmind._shared.infrastructure.llm.prompt.PromptFence;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
-import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind._shared.domain.model.SupplyDomain;
 import dev.izquierdo.billmind._shared.domain.model.fields.ElectricityFields;
 import dev.izquierdo.billmind._shared.domain.model.fields.GasFields;
@@ -50,6 +49,14 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "  Labels: '€/kWh', 'precio energía', 'término de energía activa', 'coste de la energía'.\n" +
             "CRITICAL: if P1/P2/P3 prices are all equal (or one single price is multiplied across periods), treat as FLAT RATE — set pricePerKwh, leave P1/P2/P3 null.\n" +
             "Never set both pricePerKwh and any pricePerKwhP1/P2/P3.\n\n" +
+            "=== LAST RESORT: EFFECTIVE AVERAGE PRICE ===\n" +
+            "Some tariffs split consumption by commercial period names that map to none of the labels above\n" +
+            "('Horas Happy', 'Horas Gratis', 'Resto de horas', 'Horas Ahorro', 'Tempo'). Never force them into\n" +
+            "P1/P2/P3, and never return every price null. Derive the effective average instead:\n" +
+            "  pricePerKwh = (euros charged for energy) / (total kWh consumed)\n" +
+            "Use the 'Energía' subtotal ONLY — never the invoice total, which also carries power, taxes,\n" +
+            "meter rental and levies. Round to 6 decimals, set pricePerKwh, leave pricePerKwhP1/P2/P3 null.\n" +
+            "Apply the same rule when no unit price appears anywhere but an energy subtotal and kWh do.\n\n" +
             "=== consumptionKwh ===\n" +
             "Total consumption. Labels: 'kWh', 'Energía consumida'. For TOU: sum all periods.\n\n" +
             "=== consumptionKwhP1/P2/P3 ===\n" +
@@ -67,7 +74,18 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "\"totalAmount\":80.95,\"consumptionKwh\":350.0," +
             "\"consumptionKwhP1\":120.0,\"consumptionKwhP2\":130.0,\"consumptionKwhP3\":100.0," +
             "\"pricePerKwh\":null," +
-            "\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45}";
+            "\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45}\n\n" +
+            // Commercial period names ("Horas Happy" / "Resto de horas") map to no P1/P2/P3 label:
+            // 12,46 € of energy over 64,257 kWh → 0.193909 €/kWh, free hours already priced in.
+            "Input: ENDESA Tempo Happy | Periodo de facturación: del 31/12/2023 a 31/01/2024 | Consumo total 64,257 kWh | " +
+            "Energía 12,46 € | Horas Happy de mayor consumo 11,456 kWh x 0 Eur/kWh 0,00 € | " +
+            "Resto de horas 52,801 kWh x 0,235931 Eur/kWh 12,46 € | " +
+            "Potencias contratadas: punta 6,928 kW; valle 6,928 kW | TOTAL 41,92 €\n" +
+            "Output: {\"billingPeriodStart\":\"2023-12-31\",\"billingPeriodEnd\":\"2024-01-31\"," +
+            "\"totalAmount\":41.92,\"consumptionKwh\":64.257," +
+            "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
+            "\"pricePerKwh\":0.193909," +
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":6.928}";
 
     private static final String GAS_INSTRUCTIONS =
             "Extract fields from the gas invoice delimited below.\n" +
@@ -149,12 +167,9 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             long   startNs = System.nanoTime();
             log.info("Field extraction started [type={}]", config.fieldType().getSimpleName());
 
-            String rawResponse;
-            try {
-                rawResponse = chatModel.chat(prompt);
-            } catch (RuntimeException e) {
-                throw new LlmServiceUnavailableException(e);
-            }
+            // Provider failures arrive already classified from TimedChatLanguageModel: a 429 stays a
+            // 429 all the way to the caller instead of collapsing into "service unavailable".
+            String rawResponse = chatModel.chat(prompt);
             log.debug("LLM response [type={}]: {}", config.fieldType().getSimpleName(), rawResponse);
 
             InvoiceFields parsed;
@@ -182,12 +197,7 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
         PromptFence fence = PromptFence.random();
         String repairPrompt = JSON_REPAIR_INSTRUCTIONS + "\n\n"
                 + fence.wrap(REPAIR_LABEL, malformed, MAX_REPAIR_CHARS) + "\nCorrected:";
-        String repaired;
-        try {
-            repaired = chatModel.chat(repairPrompt);
-        } catch (RuntimeException e) {
-            throw new LlmServiceUnavailableException(e);
-        }
+        String repaired = chatModel.chat(repairPrompt);
         log.debug("Repair response [type={}]: {}", fieldType.getSimpleName(), repaired);
         try {
             return parse(repaired, fieldType);

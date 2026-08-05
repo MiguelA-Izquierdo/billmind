@@ -1,10 +1,12 @@
 package dev.izquierdo.billmind._shared.infrastructure;
 
+import dev.izquierdo.billmind._shared.domain.exceptions.LlmRateLimitedException;
+import dev.izquierdo.billmind._shared.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind._shared.domain.exceptions.ValidationErrorsException;
 import dev.izquierdo.billmind._shared.infrastructure.dto.ErrorResponseDTO;
+import dev.izquierdo.billmind._shared.infrastructure.ratelimit.ThrottleMessages;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceFieldExtractionException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.InvoiceNotFoundException;
-import dev.izquierdo.billmind.invoice.domain.exceptions.LlmServiceUnavailableException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.NotASupplyInvoiceException;
 import dev.izquierdo.billmind.invoice.domain.exceptions.UnsupportedSupplyTypeException;
 import dev.izquierdo.billmind.assistant.domain.exceptions.ConversationNotFoundException;
@@ -100,6 +102,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
                 ErrorResponseDTO.of(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage())
         );
+    }
+
+    /**
+     * The model provider throttled us. Answered as {@code 429} rather than {@code 503} so the caller
+     * can tell "wait, then retry" from "something broke", and with {@code Retry-After} whenever the
+     * provider said how long — the UI turns that header into a countdown.
+     */
+    @ExceptionHandler(LlmRateLimitedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleLlmRateLimitedException(LlmRateLimitedException ex) {
+        logException(ex);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+        if (ex.hasRetryAfter()) {
+            response.header("Retry-After", Long.toString(Math.max(1, ex.retryAfter().toSeconds())));
+        }
+        return response.body(ErrorResponseDTO.of(HttpStatus.TOO_MANY_REQUESTS.value(),
+                ThrottleMessages.llmThrottled(ex.getMessage(), ex.retryAfter())));
     }
 
     @ExceptionHandler(LlmServiceUnavailableException.class)

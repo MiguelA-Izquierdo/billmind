@@ -17,7 +17,7 @@ import java.util.List;
 @Component
 public class RouteAccessPolicy {
 
-    /** Everything the API serves; anything outside it (static assets, actuator) is {@link RouteAccess#OPEN}. */
+    /** Everything the API serves; anything outside it (static assets, actuator, {@code /ping}) is {@link RouteAccess#OPEN}. */
     private static final String API_TREE = "/api/v1/**";
 
     /**

@@ -68,7 +68,10 @@ public class TimedChatLanguageModel implements ChatModel {
             String error   = e.getClass().getSimpleName();
             logCall(operation, type, latencyMs, null, null, error);
             emit(operation, type, startedAt, latencyMs, null, null, error);
-            throw e;
+            // Telemetry keeps the provider's own class name; callers get ours. Classifying here —
+            // the one point every LLM call crosses — is what keeps a 429 from reaching the user as
+            // a generic 500, without each adapter learning a provider's exception vocabulary.
+            throw LlmFailures.translate(e);
         }
     }
 

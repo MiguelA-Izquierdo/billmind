@@ -2,6 +2,7 @@ import { SESSION_ID } from './session.js';
 import { state } from './state.js';
 import { fmtDate, fmtEuros, fmtSupply } from './utils.js';
 import { showBanner, hideBanner, clearMessages } from './messages.js';
+import { describeFailure } from './errors.js';
 import { loadComparison } from './comparison.js';
 import { checkBackendStatus } from './chat.js';
 import {
@@ -57,7 +58,11 @@ export async function loadInvoices() {
     const res = await fetch(INVOICES_ENDPOINT, {
       headers: { 'X-Session-Id': SESSION_ID },
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new HttpFailure(res.status, err.message,
+        Number(res.headers.get('Retry-After')) || 0);
+    }
     const body = await res.json();
     const invoices = body.data?.content ?? body.data ?? [];
 
@@ -76,7 +81,17 @@ export async function loadInvoices() {
   } catch (err) {
     sel.hidden = false;
     sel.innerHTML = '<option value="">Error al cargar facturas</option>';
-    showBanner('No se pudieron cargar las facturas: ' + err.message, 'error');
+    // A network failure carries no status; describeFailure then falls back to its generic copy.
+    showBanner(describeFailure(err instanceof HttpFailure ? err : {}).text, 'error');
+  }
+}
+
+/** Carries the status through the throw so the catch can describe it instead of printing it. */
+class HttpFailure extends Error {
+  constructor(status, message, retryAfter) {
+    super(message ?? `HTTP ${status}`);
+    this.status     = status;
+    this.retryAfter = retryAfter;
   }
 }
 

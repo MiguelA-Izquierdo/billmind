@@ -4,10 +4,13 @@ import { autoResize } from './utils.js';
 import {
   appendUserMessage, appendAssistantMessage,
   appendMessage, finishStreaming, renderCitations,
-  appendThinking, removeThinking,
+  appendThinking, removeThinking, removeMessage,
   showBanner, hideBanner,
 } from './messages.js';
 import { syncChat, announce } from './ui.js';
+import { showBotToast } from './char-limit.js';
+import { describeFailure } from './errors.js';
+import { startCooldown } from './cooldown.js';
 
 const CHAT_ENDPOINT = '/api/v1/assistant/chat';
 
@@ -39,13 +42,18 @@ export async function sendMessage() {
 
     removeThinking(thinkingId);
 
+    // The stream never opened: this is a plain JSON error, rate limiter included.
     if (!res.ok) {
       if (res.status === 404) {
         appendAssistantMessage('El asistente aún no está disponible en esta versión.');
-      } else {
-        const err = await res.json().catch(() => ({}));
-        showBanner(err.message ?? 'Error al contactar el asistente (HTTP ' + res.status + ')', 'error');
+        return;
       }
+      const err = await res.json().catch(() => ({}));
+      reportFailure({
+        status:     res.status,
+        message:    err.message,
+        retryAfter: Number(res.headers.get('Retry-After')) || 0,
+      });
       return;
     }
 
@@ -54,6 +62,7 @@ export async function sendMessage() {
     const decoder = new TextDecoder();
     let buffer    = '';
     let citations = [];
+    let failure   = null;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -72,23 +81,48 @@ export async function sendMessage() {
           if (chunk.type === 'message')      appendMessage(msgId, chunk.content);
           if (chunk.type === 'citation')     citations.push(chunk);
           if (chunk.type === 'citations')    { citations = chunk.items ?? []; renderCitations(msgId, citations); }
-          if (chunk.type === 'error')        appendMessage(msgId, chunk.content);
+          // The status was committed when the stream opened, so failures arrive as events.
+          if (chunk.type === 'error')        failure = { code: chunk.code, message: chunk.content, retryAfter: chunk.retryAfter };
         } catch {
           appendMessage(msgId, data);
         }
       }
+    }
+
+    if (failure) {
+      removeMessage(msgId); // an answer that failed left an empty bubble behind
+      reportFailure(failure);
+      return;
     }
     finishStreaming(msgId);
     announce('Respuesta completada.');
 
   } catch (err) {
     removeThinking(thinkingId);
-    showBanner('Error de red: ' + err.message, 'error');
+    showBanner('No he podido conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.', 'error');
   } finally {
     state.isStreaming = false;
     syncChat();
     document.getElementById('chat-input').focus();
   }
+}
+
+/**
+ * Every chat failure ends here, wherever it came from — HTTP status or SSE event. A throttle gets
+ * the bot's voice plus a countdown that locks the input; anything else is a banner. No branch of
+ * this function can print a status code.
+ */
+function reportFailure(raw) {
+  const failure = describeFailure(raw);
+
+  if (failure.kind === 'throttled') {
+    showBotToast(failure.text);
+    startCooldown('Estoy recargando.', failure.retryAfter);
+    announce(failure.text);
+    return;
+  }
+  showBanner(failure.text, 'error');
+  announce(failure.text);
 }
 
 export async function checkBackendStatus() {

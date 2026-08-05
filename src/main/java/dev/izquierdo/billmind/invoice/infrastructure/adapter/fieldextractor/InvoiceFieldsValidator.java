@@ -39,6 +39,10 @@ public class InvoiceFieldsValidator {
                                || e.pricePerKwhP3() != null;
                 require(!hasFlat || !hasTou,
                         "pricePerKwh cannot coexist with TOU prices (P1/P2/P3)");
+                // The comparison engine needs a flat price, or P1+P3 to weight into one. Anything
+                // less is a mute invoice: it would be stored only to fail silently at comparison.
+                require(hasFlat || (e.pricePerKwhP1() != null && e.pricePerKwhP3() != null),
+                        "no usable price: needs pricePerKwh, or both pricePerKwhP1 and pricePerKwhP3");
             }
             case GasFields g -> {
                 requireNonNegative(g.consumptionM3(),  "consumptionM3");

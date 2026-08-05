@@ -30,7 +30,9 @@ export function syncChat() {
   // Having an invoice is what unlocks the chat; streaming only pauses input,
   // so the "upload first" hint must not reappear mid-answer.
   const hasInvoice = !!state.selectedInvoiceId && !state.isUploading;
-  const canType    = hasInvoice && !state.isStreaming;
+  // A 429 told us exactly how long to wait — pressing send before then only earns another one.
+  const cooling    = state.cooldownUntil > Date.now();
+  const canType    = hasInvoice && !state.isStreaming && !cooling;
 
   const input   = document.getElementById('chat-input');
   const wrapper = document.querySelector('.input-wrapper');
@@ -40,10 +42,8 @@ export function syncChat() {
 
   // Until now the input looked identical locked and unlocked, so nothing told
   // you the chat had just become usable.
-  wrapper.classList.toggle('ready', hasInvoice);
-  input.placeholder = hasInvoice
-    ? 'Pregúntame lo que quieras sobre tu factura…'
-    : 'Sube una factura para poder preguntar…';
+  wrapper.classList.toggle('ready', hasInvoice && !cooling);
+  input.placeholder = placeholderFor(hasInvoice, cooling);
 
   if (hasInvoice && !wasUnlocked) pulseInput(wrapper);
   wasUnlocked = hasInvoice;
@@ -52,10 +52,16 @@ export function syncChat() {
   document.getElementById('hint-ready').hidden  = !hasInvoice;
 
   document.querySelectorAll('button[data-upload-trigger]')
-    .forEach(btn => { btn.disabled = state.isUploading; });
+    .forEach(btn => { btn.disabled = state.isUploading || cooling; });
 
   ['s1', 's2', 's3', 's4', 's5']
     .forEach(id => { document.getElementById(id).disabled = !canType; });
+}
+
+function placeholderFor(hasInvoice, cooling) {
+  if (cooling)     return 'Recargando… en un momento seguimos.';
+  if (!hasInvoice) return 'Sube una factura para poder preguntar…';
+  return 'Pregúntame lo que quieras sobre tu factura…';
 }
 
 /** Fires once, when the chat unlocks — not after every streamed answer. */

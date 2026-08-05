@@ -106,6 +106,11 @@ export function removeThinking(id) {
   document.getElementById(id)?.remove();
 }
 
+/** Drops a bubble that never got its answer, so a failure leaves no empty shell behind. */
+export function removeMessage(msgId) {
+  document.getElementById(msgId)?.remove();
+}
+
 export function showComparisonResult(data) {
   if (!data) return;
   const c = data.comparison;
