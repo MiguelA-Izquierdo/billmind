@@ -103,3 +103,4 @@ models/
 # Claude Code tooling
 # =====================
 memory/
+.claude/settings.local.json

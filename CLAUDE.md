@@ -206,7 +206,7 @@ User-facing `message` strings are in Spanish.
 
 ---
 
-## Available Agents (`.agents/`)
+## Available Agents (`.ai/agents/`)
 
 | Agent | File | When to invoke |
 |---|---|---|

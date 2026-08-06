@@ -1,0 +1,98 @@
+BillMind Source-Available License
+Version 1.0
+
+Copyright © 2026 Miguel Ángel Izquierdo. All rights reserved.
+
+This software is source-available, not open source. The source code is
+published so that it can be read, run and studied. No other rights are
+granted except those written below.
+
+"The Software" means the contents of this repository, including its source
+code, configuration, documentation and any other material distributed with it.
+"You" means the individual or entity exercising the permissions below.
+
+
+1. WHAT YOU MAY DO
+
+Without asking for permission, You may:
+
+  a) Copy the Software and run it on hardware You control, including a
+     private server, for personal, educational or evaluation purposes.
+
+  b) Read, study and analyse the Software, and modify Your own copy for
+     those same purposes.
+
+  c) Quote portions of the source code or documentation — in an article, a
+     talk, a review or a teaching context — provided the quotation credits
+     Miguel Ángel Izquierdo and identifies this repository as the source.
+
+  d) Report issues, and submit patches or pull requests. By submitting a
+     contribution You license it to the copyright holder under these same
+     terms, so that it can be incorporated and distributed as part of the
+     Software.
+
+
+2. WHAT IS NOT GRANTED
+
+No licence is granted, expressly or by implication, to:
+
+  a) Use the Software, in whole or in part, for any commercial purpose. This
+     includes use inside a business or organisation to support its
+     operations, use in the delivery of a product or service to a client,
+     and use in anything from which revenue is derived, whether directly or
+     indirectly.
+
+  b) Redistribute the Software or any derivative work of it, in source or
+     compiled form, to any third party — including publishing a fork, a
+     mirror or a repackaged version of it.
+
+  c) Offer the Software, or any derivative work of it, to third parties as a
+     hosted or managed service.
+
+  d) Remove, obscure or alter this licence, the copyright notice, or the
+     attribution required by section 1(c).
+
+A public fork created solely to open a pull request against this repository
+is permitted under section 1(d) and is not redistribution under section 2(b).
+
+
+3. THIRD-PARTY COMPONENTS
+
+The Software depends on third-party libraries and models that are not covered
+by this licence. Each remains subject to the terms of its own licence, which
+are not modified or superseded by this document. This licence applies only to
+the material authored for this repository.
+
+
+4. RESERVATION OF RIGHTS
+
+Every right not expressly granted in section 1 is reserved. Nothing here
+transfers ownership, and no trademark rights are granted. Permission for any
+use outside section 1 — commercial use, redistribution, hosting as a service,
+or relicensing — may be granted in writing on request. Get in touch:
+
+  Miguel Ángel Izquierdo — izquierdomigueladev@gmail.com
+  https://github.com/MiguelA-Izquierdo
+
+
+5. TERMINATION
+
+The permissions in section 1 end automatically if You breach any term of this
+licence. They are reinstated if You cure the breach within 30 days of first
+becoming aware of it, unless the copyright holder has already given You
+notice of termination.
+
+
+6. NO WARRANTY AND NO LIABILITY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+BillMind estimates savings from the invoices it is given and answers questions
+about Spanish energy regulation using a language model. Its output is
+informational and may be wrong. It is not financial, legal or contractual
+advice, and no decision with financial consequences should rest on it alone.

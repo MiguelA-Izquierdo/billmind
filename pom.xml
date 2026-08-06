@@ -20,6 +20,7 @@
         <langchain4j.version>1.0.0</langchain4j.version>
         <testcontainers.version>1.21.4</testcontainers.version>
         <bucket4j.version>8.19.0</bucket4j.version>
+        <archunit.version>1.3.0</archunit.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -218,6 +219,15 @@
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j_jdk17-caffeine</artifactId>
             <version>${bucket4j.version}</version>
+        </dependency>
+
+        <!-- ArchUnit — the layering rules of ARCHITECTURE.md as executable tests. Domain purity is
+             an invariant, not a convention: it fails the build, not a review. -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>

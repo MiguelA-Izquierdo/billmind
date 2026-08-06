@@ -19,7 +19,7 @@ Behind that, it runs the full pipeline: it ingests and classifies the PDF, extra
 
 Built with **Spring Boot 3.5.0**, **Java 21** and **LangChain4j 1.0.0**. Runs on **fully local AI** (Ollama, zero cloud) or **cloud providers** (Anthropic, OpenAI, Gemini, Groq) via a single env var. No login required in Phase 1.
 
-**By the numbers:** invoice to savings card in **~10 s** end-to-end · **693** automated tests across **88** classes (6 Testcontainers integration suites) · a **50-case** Spanish RAG quality gate scored on every CI run — context precision **0.82**, retrieval recall@5 **0.97**, [thresholds and all](docs/ENGINEERING.md#quality-gates) · **5** regulatory documents (CNMC, REE, BOE) indexed for retrieval · runs **100% local** or on **4** cloud LLM providers.
+**By the numbers:** invoice to savings card in **~10 s** end-to-end · **710** automated tests across **90** classes (6 Testcontainers integration suites) · a **50-case** Spanish RAG quality gate scored on every CI run — context precision **0.82**, retrieval recall@5 **0.97**, [thresholds and all](docs/ENGINEERING.md#quality-gates) · **5** regulatory documents (CNMC, REE, BOE) indexed for retrieval · runs **100% local** or on **4** cloud LLM providers.
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="BillMind demo — uploading an invoice, the savings card, and a grounded answer with citations" width="840">
@@ -27,7 +27,7 @@ Built with **Spring Boot 3.5.0**, **Java 21** and **LangChain4j 1.0.0**. Runs on
   <em>The full flow: upload an invoice → instant savings card → ask a question → grounded answer with inline citations.</em>
 </p>
 
-**Quick links:** [What it does](#what-it-does) · [Architecture](#architecture-at-a-glance) · [Engineering details](docs/ENGINEERING.md) · [Quick start](#quick-start) · [Docs](#docs) · [Why I built this](#why-i-built-this)
+**Quick links:** [What it does](#what-it-does) · [Architecture](#architecture-at-a-glance) · [Engineering details](docs/ENGINEERING.md) · [Quick start](#quick-start) · [Docs](#docs) · [Why I built this](#why-i-built-this) · [How this was built](#how-this-was-built)
 
 ---
 
@@ -49,7 +49,7 @@ Run it locally in one command ([Quick start](#quick-start)), then open **http://
 
 ## Architecture at a glance
 
-Hexagonal Architecture (Ports & Adapters) + DDD. Each bounded context owns its domain; cross-context reactions travel through an **in-process domain-event bus**, never direct calls. The `domain/` layer imports only `java.*` — no Spring, JPA, LangChain4j or Lombok. Full package map and numbered design decisions in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Hexagonal Architecture (Ports & Adapters) + DDD. Each bounded context owns its domain; cross-context reactions travel through an **in-process domain-event bus**, never direct calls. The `domain/` layer imports only `java.*` — no Spring, JPA, LangChain4j or Lombok. That is an invariant, not a convention: [`ArchitectureRulesTest`](src/test/java/dev/izquierdo/billmind/architecture/ArchitectureRulesTest.java) enforces domain purity and the inward dependency direction with ArchUnit, so a violation fails the build instead of waiting for a reviewer. Full package map and numbered design decisions in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ```mermaid
 flowchart TD
@@ -195,8 +195,30 @@ BillMind was never meant to become a product. It was an opportunity to build as 
 
 ---
 
+## How this was built
+
+Every line of production code in BillMind was implemented with AI assistance — Claude Code as the implementer, me as the engineer directing it. My role was to design the architecture, define the boundaries, establish the engineering constraints and review every implementation decision.
+
+That was the point, not a shortcut. I wanted to find out first-hand what this way of working actually demands, because I believe it is where the profession is heading, and I would rather understand that by building something real than by reading opinions about it.
+
+What I found is that the work does not disappear. It moves upstream, to the decisions a model cannot make for you:
+
+- **Where the boundaries go** — which bounded contexts exist, and what is allowed to cross between them.
+- **What must never touch an LLM** — the savings math is plain Java for a reason; a hallucinated number must not be able to reach a euro figure.
+- **What an acceptable failure looks like** — a throttled provider answers `429` with the wait it named, not a `500`, and that classification happens at the one point every call already crossed.
+- **What "good" means as a number** — the RAG thresholds that fail the build are mine, and so is the reasoning for why each one sits exactly where it sits.
+- **And, more often than anything else, what not to build.**
+
+Directing also means rejecting. The commit that introduced `LlmFailures` deleted four `catch` blocks a previous round had produced — they worked, but they were fan-out, and they flattened "wait a moment" into "the service is down". Knowing that the working version was the wrong one is the job.
+
+Every decision of that kind is written down with its reasoning in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/ENGINEERING.md`](docs/ENGINEERING.md) — not as documentation added afterwards, but because deciding *was* the work. The assistant's own configuration lives in [`CLAUDE.md`](CLAUDE.md) and [`.ai/`](.ai/): it is tooling, like the linter, and no part of it ships in the runtime.
+
+I can defend every line in this repository. I just didn't type them.
+
+---
+
 ## License
 
-© 2026 Miguel Ángel Izquierdo. All rights reserved.
+© 2026 Miguel Ángel Izquierdo. Source-available, not open source — see [`LICENSE`](LICENSE) for the terms that govern.
 
-Clone it, run it, read it, take it apart — that's what it's here for. Commercial use and redistribution are not granted; for anything along those lines, get in touch.
+Clone it, run it, read it, take it apart — that's what it's here for, and quoting it with attribution is welcome. Commercial use, redistribution and hosting it as a service are not granted; for anything along those lines, [get in touch](mailto:izquierdomigueladev@gmail.com).

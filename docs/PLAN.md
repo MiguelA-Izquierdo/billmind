@@ -138,7 +138,7 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 - Port `InvoiceFieldExtractor`.
   - Record `InvoiceFields`.
-  - Adapter over the imperative `ChatModel` API (never `AiServices` — see `.agents/developer.md`): a per-supply-type prompt carrying the target JSON shape, sanitized and deserialized into the sealed `InvoiceFields` hierarchy.
+  - Adapter over the imperative `ChatModel` API (never `AiServices` — see `.ai/agents/developer.md`): a per-supply-type prompt carrying the target JSON shape, sanitized and deserialized into the sealed `InvoiceFields` hierarchy.
   - `PiiRedactor` applied before persisting.
 
 **Dependencies:** Milestone 0.
