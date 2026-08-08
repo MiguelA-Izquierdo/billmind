@@ -1,6 +1,5 @@
 package dev.izquierdo.billmind.invoice.infrastructure.config.chat;
 
-import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,14 +13,11 @@ public class OpenAiChatModelConfig {
     @Value("${llm.openai.api-key}")
     private String apiKey;
 
-    @Value("${llm.openai.model:gpt-4o}")
-    private String model;
-
     @Bean
-    public ChatModel chatLanguageModel() {
-        return OpenAiChatModel.builder()
+    public ChatModelFactory chatModelFactory() {
+        return modelName -> OpenAiChatModel.builder()
                 .apiKey(apiKey)
-                .modelName(model)
+                .modelName(modelName)
                 .build();
     }
 }

@@ -1,7 +1,6 @@
 package dev.izquierdo.billmind.invoice.infrastructure.config.chat;
 
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
-import dev.langchain4j.model.chat.ChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,14 +13,11 @@ public class AnthropicChatModelConfig {
     @Value("${llm.anthropic.api-key}")
     private String apiKey;
 
-    @Value("${llm.anthropic.model:claude-sonnet-4-6}")
-    private String model;
-
     @Bean
-    public ChatModel chatLanguageModel() {
-        return AnthropicChatModel.builder()
+    public ChatModelFactory chatModelFactory() {
+        return modelName -> AnthropicChatModel.builder()
                 .apiKey(apiKey)
-                .modelName(model)
+                .modelName(modelName)
                 .build();
     }
 }

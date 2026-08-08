@@ -7,23 +7,23 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 
 /**
- * Defines two semantic roles for LLM usage, both backed by the same provider bean for now.
+ * Defines two semantic roles for LLM usage, each built from the active provider's factory.
  *
  * Roles:
  *   fastChatModel  — low-latency tasks: classification, PII redaction.
- *                    Suitable for small/local models (e.g. Ollama llama3.2).
  *   smartChatModel — quality-sensitive tasks: structured field extraction, RAG, agent reasoning.
- *                    Suitable for capable cloud models (e.g. Claude Sonnet, GPT-4o).
  *
- * In dev both roles resolve to the same configured provider. To route them to different
- * models in production, replace these aliases with provider-specific beans using separate
- * llm.role.fast.* and llm.role.smart.* properties (see PLAN.md — Milestone 1 note).
+ * Each role is built with its own model name, llm.role.{fast,smart}.model, which defaults to the
+ * active provider's llm.{provider}.model — so leaving both unset reproduces the previous
+ * single-model behaviour exactly. That fallback lives in application.properties, next to the
+ * provider models it points at. Routing the roles to different *providers* is a separate step
+ * (see PLAN.md), since the provider beans are still selected by a single llm.provider.
  *
- * Both beans are wrapped with TimedChatLanguageModel, which logs per-call latency,
- * role, provider, model, and operation context (set via MDC by each caller).
+ * Both beans are wrapped with TimedChatLanguageModel, which logs per-call latency, role,
+ * provider, model, and operation context (set via MDC by each caller). The model tag is
+ * resolved per role, so telemetry attributes cost to the model that actually served the call.
  */
 @Configuration
 public class ChatModelRolesConfig {
@@ -31,25 +31,29 @@ public class ChatModelRolesConfig {
     @Value("${llm.provider}")
     private String provider;
 
-    private final Environment env;
+    @Value("${llm.role.fast.model}")
+    private String fastModel;
+
+    @Value("${llm.role.smart.model}")
+    private String smartModel;
+
     private final LlmTelemetry telemetry;
 
-    public ChatModelRolesConfig(Environment env, ObjectProvider<LlmTelemetry> telemetrySinks) {
-        this.env = env;
+    public ChatModelRolesConfig(ObjectProvider<LlmTelemetry> telemetrySinks) {
         this.telemetry = LlmTelemetry.composite(telemetrySinks.orderedStream().toList());
     }
 
     @Bean("fastChatModel")
-    public ChatModel fastChatModel(ChatModel chatLanguageModel) {
-        return new TimedChatLanguageModel(chatLanguageModel, "fast", provider, resolveModel(), telemetry);
+    public ChatModel fastChatModel(ChatModelFactory chatModelFactory) {
+        return roleModel(chatModelFactory, "fast", fastModel);
     }
 
     @Bean("smartChatModel")
-    public ChatModel smartChatModel(ChatModel chatLanguageModel) {
-        return new TimedChatLanguageModel(chatLanguageModel, "smart", provider, resolveModel(), telemetry);
+    public ChatModel smartChatModel(ChatModelFactory chatModelFactory) {
+        return roleModel(chatModelFactory, "smart", smartModel);
     }
 
-    private String resolveModel() {
-        return env.getProperty("llm." + provider + ".model", "unknown");
+    private ChatModel roleModel(ChatModelFactory factory, String role, String model) {
+        return new TimedChatLanguageModel(factory.create(model), role, provider, model, telemetry);
     }
 }

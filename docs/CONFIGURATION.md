@@ -87,6 +87,23 @@ ollama pull llama3.2     # chat — required when LLM_PROVIDER=ollama
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | Model name |
 | `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Groq OpenAI-compatible endpoint |
 
+### Per-role models
+
+Every LLM call goes through one of two role beans: `fastChatModel` (classification, PII redaction — latency-sensitive) or `smartChatModel` (field extraction, RAG, agent reasoning — quality-sensitive). By default both run the active provider's model above. These two variables split them, on the same provider:
+
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_ROLE_FAST_MODEL` | the provider's model | Model serving `fastChatModel` |
+| `LLM_ROLE_SMART_MODEL` | the provider's model | Model serving `smartChatModel` |
+
+```bash
+LLM_PROVIDER=groq
+LLM_ROLE_FAST_MODEL=llama-3.1-8b-instant       # cheap, high TPM ceiling
+LLM_ROLE_SMART_MODEL=llama-3.3-70b-versatile   # tool-capable, needed by the agentic assistant
+```
+
+Worth doing on a metered provider: classification and PII redaction otherwise spend the same token budget the agentic loop needs. The `model` tag on the `llm.*` meters follows the role, so cost stays attributable per model. Routing the two roles to different *providers* (e.g. fast on local Ollama) is not supported yet — the provider beans are still selected by a single `LLM_PROVIDER`; see [`PLAN.md`](PLAN.md).
+
 ---
 
 ## Embedding Model

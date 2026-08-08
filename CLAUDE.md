@@ -152,8 +152,10 @@ Scopes: `invoice`, `assistant`, `comparison`, `market`, `shared`, `config`, `api
 **Role beans pattern** (`ChatModelRolesConfig`):
 - `fastChatModel` — low-latency tasks (classification, PII).
 - `smartChatModel` — quality-sensitive tasks (field extraction, RAG).
-- Both are `TimedChatLanguageModel` wrappers injected with `@Qualifier`.
-- The underlying provider bean is named `chatLanguageModel` — keep that name so Spring resolves it by parameter name when multiple `ChatModel` beans exist in context.
+- Both are `TimedChatLanguageModel` wrappers injected with `@Qualifier`. Consumers ask for a **role**, never a provider — which model serves a role is decided in one place.
+- Each per-provider config publishes a `ChatModelFactory` (`ChatModel create(String modelName)`), not a finished `ChatModel`. `ChatModelRolesConfig` calls it once per role, so the two roles can run different models on the same provider. Never bind a model name inside a provider config — it would collapse the roles back into one.
+- `llm.role.fast.model` / `llm.role.smart.model` are declared in **both** `application.properties` files (main and test), each defaulting to `${llm.${llm.provider}.model}`. The fallback is that nested default, not Java: the config reads the two keys with a plain `@Value`, like it reads `llm.provider`. A key declared in only one of the two files fails every `@SpringBootTest` at placeholder resolution.
+- The model name is resolved **per role** and handed to `TimedChatLanguageModel` as its telemetry tag; resolving it once for both would misattribute cost.
 
 **`TimedChatLanguageModel` wrapping pattern:** When wrapping a `ChatModel` for instrumentation, override `chat(ChatRequest)` (not `doChat(ChatRequest)`, not `chat(List<ChatMessage>)`) and call `delegate.chat(request)`. The call chain from callers is: `chat(String)` → default `ChatModel.chat(ChatRequest)` → our override → `delegate.chat(request)`. Provider models override `chat(ChatRequest)` internally to convert `DefaultChatRequestParameters` → provider-specific params (e.g. `OpenAiChatRequestParameters`) before calling `doChat()`. Bypassing that step by calling `delegate.doChat(request)` directly causes a `ClassCastException`. `chat(List<ChatMessage>)` is NOT reached from `chat(String)` — overriding it is dead code. `doChat()` must still be implemented as a passthrough since the interface declares it abstract.
 

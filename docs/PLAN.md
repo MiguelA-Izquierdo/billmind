@@ -145,7 +145,9 @@ knowledge_base (id, source, doc_type, title, url, valid_from, valid_to)
 
 **Engineering highlights:** typed extraction into the sealed `InvoiceFields` hierarchy with domain validation and a one-shot JSON-repair retry on a malformed response, GDPR-compliant PII redaction pipeline.
 
-**Architectural decision — multi-model role routing (resolved):** two named beans `fastChatModel` and `smartChatModel` are defined in `ChatModelRolesConfig`. In dev both alias the single configured provider. In production they can be independently routed to different providers by replacing the aliases with provider-specific beans (`llm.role.fast.*` / `llm.role.smart.*` properties). Role assignment: `fastChatModel` → classification, PII redaction; `smartChatModel` → structured extraction, RAG, agent reasoning.
+**Architectural decision — multi-model role routing (resolved):** two named beans `fastChatModel` and `smartChatModel` are defined in `ChatModelRolesConfig`. Role assignment: `fastChatModel` → classification, PII redaction; `smartChatModel` → structured extraction, RAG, agent reasoning. Consumers inject a role by `@Qualifier` and never name a provider, so the routing decision lives in exactly one class.
+
+Each per-provider config publishes a `ChatModelFactory` rather than a finished `ChatModel`; `ChatModelRolesConfig` invokes it once per role with a model name resolved from `llm.role.{fast,smart}.model`, falling back to `llm.{provider}.model`. **Different models per role on one provider is done.** Different *providers* per role — fast on a local Ollama while smart stays on a metered cloud API — is still pending: the provider beans are selected by a single `@ConditionalOnProperty("llm.provider")`, so it needs a factory dispatching on provider name plus `llm.role.{fast,smart}.provider`. That is what would take the classifier and the PII redactor off the token budget the agentic loop competes for.
 
 ### Milestone 2 — Knowledge Base Ingestion + Hybrid Search + Market Price Consumer ✓ COMPLETE
 

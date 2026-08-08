@@ -1,6 +1,5 @@
 package dev.izquierdo.billmind.invoice.infrastructure.config.chat;
 
-import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,17 +15,14 @@ public class OllamaChatModelConfig {
     @Value("${llm.ollama.base-url:http://localhost:11434}")
     private String baseUrl;
 
-    @Value("${llm.ollama.model:llama3.2}")
-    private String model;
-
     @Value("${llm.ollama.timeout-seconds:240}")
     private int timeoutSeconds;
 
     @Bean
-    public ChatModel chatLanguageModel() {
-        return OllamaChatModel.builder()
+    public ChatModelFactory chatModelFactory() {
+        return modelName -> OllamaChatModel.builder()
                 .baseUrl(baseUrl)
-                .modelName(model)
+                .modelName(modelName)
                 .timeout(Duration.ofSeconds(timeoutSeconds))
                 .build();
     }

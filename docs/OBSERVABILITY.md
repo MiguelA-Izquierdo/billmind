@@ -73,7 +73,7 @@ Every `ChatModel` bean is wrapped with `TimedChatLanguageModel` (Decorator patte
 | `fastChatModel` | `fast` | Low-latency tasks: classification, PII redaction |
 | `smartChatModel` | `smart` | Quality-sensitive tasks: field extraction, RAG, reasoning |
 
-Both beans are instances of `TimedChatLanguageModel(delegate, role, provider, model)`. On every `chat()` call the decorator:
+Both beans are instances of `TimedChatLanguageModel(delegate, role, provider, model)`. The `model` tag is resolved per role (`llm.role.{fast,smart}.model`, falling back to `llm.{provider}.model`), so when the two roles run different models the `llm.*` meters and the cost lookup attribute each call to the model that actually served it. On every `chat()` call the decorator:
 
 1. Resolves the **operation** name — reads `MDC.get("llm.operation")` if set by the caller; otherwise walks the stack trace and picks the first frame inside `dev.izquierdo.billmind` that is not the decorator itself (e.g. `LlmInvoiceFieldExtractor.extract`). Callers never need to manage MDC unless they want an explicit label.
 2. Delegates to the real model.
