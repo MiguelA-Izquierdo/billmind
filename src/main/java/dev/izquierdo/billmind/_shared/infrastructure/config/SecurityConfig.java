@@ -40,8 +40,11 @@ public class SecurityConfig {
     private final RouteAccessAuthorizationManager routeAccessAuthorizationManager;
     private final ApiSecurityErrorHandler apiSecurityErrorHandler;
 
-    @Value("${cors.allowed.origin}")
-    private String allowedOrigin;
+    // The property is a comma-separated list; Spring's conversion splits and trims it. Injecting it
+    // as a String and wrapping that in List.of() would register the whole line as one origin, which
+    // no browser can ever match.
+    @Value("${cors.allowed.origins}")
+    private List<String> allowedOrigins;
 
     public SecurityConfig(SessionFilter sessionFilter, JwtAuthFilter jwtAuthFilter,
                           RateLimitFilter rateLimitFilter, PostAuthRateLimitFilter postAuthRateLimitFilter,
@@ -80,7 +83,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(allowedOrigin));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         // Without this a cross-origin UI cannot read them, and the "wait N minutes" copy silently

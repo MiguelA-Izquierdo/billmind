@@ -84,8 +84,10 @@ ollama pull llama3.2     # chat — required when LLM_PROVIDER=ollama
 | Variable | Default / Example | Description |
 |---|---|---|
 | `GROQ_API_KEY` | `gsk_...` | Groq API key |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Model name |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Model name |
 | `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Groq OpenAI-compatible endpoint |
+
+GroqCloud shut down `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` on 2026-08-16, leaving `openai/gpt-oss-120b` and `openai/gpt-oss-20b` as its only production text models (`qwen/qwen3.6-27b` is preview and costs 4×/5× more; `groq/compound` does not support tool calling). Both gpt-oss models are reasoning models — see the PII caveat under [per-role models](#per-role-models).
 
 ### Per-role models
 
@@ -98,11 +100,13 @@ Every LLM call goes through one of two role beans: `fastChatModel` (classificati
 
 ```bash
 LLM_PROVIDER=groq
-LLM_ROLE_FAST_MODEL=llama-3.1-8b-instant       # cheap, high TPM ceiling
-LLM_ROLE_SMART_MODEL=llama-3.3-70b-versatile   # tool-capable, needed by the agentic assistant
+LLM_ROLE_FAST_MODEL=openai/gpt-oss-20b     # 1000 t/s, half the price
+LLM_ROLE_SMART_MODEL=openai/gpt-oss-120b   # tool-capable, needed by the agentic assistant
 ```
 
-Worth doing on a metered provider: classification and PII redaction otherwise spend the same token budget the agentic loop needs. The `model` tag on the `llm.*` meters follows the role, so cost stays attributable per model. Routing the two roles to different *providers* (e.g. fast on local Ollama) is not supported yet — the provider beans are still selected by a single `LLM_PROVIDER`; see [`PLAN.md`](PLAN.md).
+Worth doing on a metered provider: classification and PII redaction otherwise spend the same token budget the agentic loop needs. The `model` tag on the `llm.*` meters follows the role, so cost stays attributable per model. Splitting the roles also gives each its own rate-limit bucket, since Groq meters TPM per model.
+
+**Caveat on the fast role.** PII redaction asks the model to return ~2,000 characters verbatim with only names and addresses substituted. The gpt-oss models reason before answering and may reformulate instead of copying; `HybridPiiRedactor` rejects a response outside a 0.4–2.0 length ratio and silently falls back to regex-only redaction. Watch `pii.llm.fallbacks{reason=invalid_response}` after switching, and move the fast role to `openai/gpt-oss-120b` if it climbs — that role is a rounding error in the bill. Routing the two roles to different *providers* (e.g. fast on local Ollama) is not supported yet — the provider beans are still selected by a single `LLM_PROVIDER`; see [`PLAN.md`](PLAN.md).
 
 ---
 
@@ -185,7 +189,7 @@ ollama pull mxbai-embed-large  # 1024d
 
 | Variable | Default | Description |
 |---|---|---|
-| `ASSISTANT_TOOLS_ENABLED` | `false` | `true` → agentic adapter: the LLM pulls comparison / market rates / regulation on demand via tool calling. `false` → eager adapter: all context is loaded up front into the prompt. **Requires a tool-capable `smartChatModel`** when enabled (cloud models or Groq's `llama-3.3-70b-versatile`; small local Ollama models are unreliable). See [`ASSISTANT.md`](ASSISTANT.md). |
+| `ASSISTANT_TOOLS_ENABLED` | `false` | `true` → agentic adapter: the LLM pulls comparison / market rates / regulation on demand via tool calling. `false` → eager adapter: all context is loaded up front into the prompt. **Requires a tool-capable `smartChatModel`** when enabled (cloud models or Groq's `openai/gpt-oss-120b`; small local Ollama models are unreliable). See [`ASSISTANT.md`](ASSISTANT.md). |
 | `ASSISTANT_CONVERSATION_MAX_SIZE` | `1000` | Hard cap on stored in-memory conversations; least-recently-accessed are evicted first. |
 | `ASSISTANT_CONVERSATION_TTL` | `PT2H` | Sliding TTL (ISO-8601 duration) refreshed on each read/write; idle conversations expire. |
 
@@ -233,7 +237,7 @@ Uncomment and fill in your `.env` when connecting to a broker that requires SASL
 
 | Variable | Example | Description |
 |---|---|---|
-| `CORS_ALLOWED_ORIGIN` | `http://localhost:3000` | Comma-separated list of allowed origins. Never use `*` in production with authenticated endpoints. |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:8080,http://localhost:8082` | Comma-separated list of allowed origins; surrounding spaces are trimmed. Each entry is matched exactly, so list every scheme/port a browser will send. Never use `*` in production with authenticated endpoints. |
 
 ---
 

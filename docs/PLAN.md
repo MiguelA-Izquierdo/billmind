@@ -279,12 +279,12 @@ in [`docs/ASSISTANT.md`](ASSISTANT.md).
 - **Precise citations:** only regulatory snippets actually retrieved by `search_regulation` this turn
   are cited — comparison/market-only turns return zero citations.
 - **Flag OFF by default:** tool calling needs a tool-capable `smartChatModel` (cloud, or Groq
-  `llama-3.3-70b-versatile`); small local Ollama is unreliable. Verified live against Groq across the
+  `openai/gpt-oss-120b`); small local Ollama is unreliable. Verified live against Groq across the
   three routing scenarios.
 
 **Tool-loop hardening (done):** three safeguards in `AgenticAssistantLlmAdapter` against unreliable
-tool calling (Groq `llama-3.3-70b-versatile` intermittently emits a malformed tool call rejected
-with `400 tool_use_failed`):
+tool calling (Groq's now-retired `llama-3.3-70b-versatile` intermittently emitted a malformed tool
+call rejected with `400 tool_use_failed`):
 - **Short-circuit** — a within-turn `servedThisTurn` set; a round that only repeats already-seen
   `(name, arguments)` calls jumps straight to the final tool-less answer (fewer rounds, smaller
   surface for a malformed call).

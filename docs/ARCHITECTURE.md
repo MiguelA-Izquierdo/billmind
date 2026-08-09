@@ -82,7 +82,7 @@ The `ChatModel` bean is selected at startup via `LLM_PROVIDER`. All providers im
 | `openai` | OpenAI | `OPENAI_API_KEY` | `gpt-4o` |
 | `anthropic` | Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` |
 | `gemini` | Google AI Studio (OpenAI-compatible) | `GEMINI_API_KEY` | `gemini-2.5-flash` |
-| `groq` | Groq (OpenAI-compatible) | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
+| `groq` | Groq (OpenAI-compatible) | `GROQ_API_KEY` | `openai/gpt-oss-120b` |
 
 Gemini and Groq use Google's / Groq's OpenAI-compatible REST endpoints via `OpenAiChatModel` — no extra LangChain4j SDK dependency is required for either.
 

@@ -63,6 +63,28 @@ class LlmInvoiceClassifierTest {
         verify(chatModel, times(1)).chat(anyString());
     }
 
+    /** An explanation instead of a name used to reach invoices.provider and overflow varchar(255). */
+    @Test
+    void shouldTreatAnOversizedAnswerAsUnidentifiedAndRetry() {
+        when(chatModel.chat(anyString()))
+                .thenReturn("The company that issues this invoice is IBERDROLA, ".repeat(10))
+                .thenReturn("ENDESA");
+
+        String result = classifier.extractCompany("x".repeat(500));
+
+        assertThat(result).isEqualTo("ENDESA");
+        verify(chatModel, times(2)).chat(anyString());
+    }
+
+    @Test
+    void shouldNeverReturnACompanyLongerThanTheProviderColumnAllows() {
+        when(chatModel.chat(anyString())).thenReturn("y".repeat(300));
+
+        String result = classifier.extractCompany("x".repeat(750));
+
+        assertThat(result).isEqualTo("DESCONOCIDA");
+    }
+
     @Test
     void shouldRetryAndReturnCompanyOnSecondAttempt() {
         when(chatModel.chat(anyString()))

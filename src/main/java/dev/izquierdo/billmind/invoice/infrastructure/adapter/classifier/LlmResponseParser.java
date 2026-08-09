@@ -26,7 +26,7 @@ public class LlmResponseParser {
         try {
             JsonNode node      = objectMapper.readTree(jsonSanitizer.sanitize(response));
             SupplyDomain type  = parseType(node.path("tipo").asText("OTHER"));
-            String company     = node.path("compania").asText("").trim();
+            String company     = CompanyName.sanitize(node.path("compania").asText(""));
             return new InvoiceClassification(type, company);
         } catch (Exception e) {
             log.warn("Failed to parse LLM classification response, defaulting to OTHER. Response: {}", response);

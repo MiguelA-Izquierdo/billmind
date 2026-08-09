@@ -47,9 +47,9 @@ import java.util.stream.Collectors;
  * {@link LlmAssistantAdapter} handles the turn.
  *
  * <p>Four safeguards keep a turn robust against unreliable tool calling (observed with Groq's
- * {@code llama-3.3-70b-versatile}, which intermittently emits a malformed tool call that its own
- * server rejects with {@code 400 tool_use_failed}, or emits it as plain text instead of a
- * structured tool call):
+ * now-retired {@code llama-3.3-70b-versatile}, which intermittently emitted a malformed tool call
+ * that its own server rejected with {@code 400 tool_use_failed}, or emitted it as plain text
+ * instead of a structured tool call):
  * <ol>
  *   <li><b>Short-circuit:</b> when a round only repeats tool calls already served this turn, stop
  *       offering tools and force a textual answer — cutting both wasted rounds and the surface for

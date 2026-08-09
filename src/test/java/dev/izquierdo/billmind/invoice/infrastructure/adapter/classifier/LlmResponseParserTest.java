@@ -68,6 +68,17 @@ class LlmResponseParserTest {
         assertThat(result.getType()).isEqualTo(SupplyDomain.OTHER);
     }
 
+    /** The company field feeds invoices.provider, a varchar(255); an explanation must not reach it. */
+    @Test
+    void shouldRejectACompanyFieldThatIsAnExplanation() {
+        String verbose = "esta factura la emite IBERDROLA ".repeat(10);
+
+        InvoiceClassification result =
+                parser.parse("{\"tipo\":\"ELECTRICITY\",\"compania\":\"" + verbose + "\"}");
+
+        assertThat(result.getCompany()).isEqualTo("DESCONOCIDA");
+    }
+
     @Test
     void shouldReturnEmptyCompanyWhenFieldMissing() {
         InvoiceClassification result = parser.parse("{\"tipo\":\"ELECTRICITY\"}");

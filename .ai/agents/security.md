@@ -65,7 +65,7 @@ If semantic search is implemented with invoice context in the Ollama prompt:
 - **Risks:** trusting introspection responses without TLS, missing timeouts/failure handling on the auth call, leaking the forwarded token in logs.
 
 ### 4. CORS Misconfiguration
-`CORS_ALLOWED_ORIGIN` variable:
+`CORS_ALLOWED_ORIGINS` variable (comma-separated list):
 - **NEVER** use `*` in production with authenticated endpoints
 - Validate that only legitimate frontend origins are allowed
 

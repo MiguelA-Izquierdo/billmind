@@ -64,7 +64,7 @@ Selected at startup by `assistant.tools.enabled` (env `ASSISTANT_TOOLS_ENABLED`,
 ### Why a flag with a fallback (not a hard switch)
 
 Tool calling requires a **tool-capable** model. Cloud models (OpenAI, Anthropic, Groq's
-`llama-3.3-70b-versatile`, Gemini) support it; small local Ollama models are unreliable at it.
+`openai/gpt-oss-120b`, Gemini) support it; small local Ollama models are unreliable at it.
 Keeping the eager adapter as the default is a safety net: BillMind still works end-to-end on any
 model. Turn the flag on only when `smartChatModel` is known to be tool-capable.
 
@@ -252,8 +252,8 @@ arguments and the answer text during testing.
 
 ## Known behaviour & future work
 
-- **Redundant tool calls & invalid tool calls (mitigated).** Some models (observed with
-  `llama-3.3-70b-versatile`) occasionally request the *same* tool with the *same* arguments twice
+- **Redundant tool calls & invalid tool calls (mitigated).** Some models (observed with the
+  now-retired `llama-3.3-70b-versatile`) occasionally request the *same* tool with the *same* arguments twice
   before answering, and sometimes emit a malformed tool call that the provider rejects with
   `400 tool_use_failed`. `AgenticAssistantLlmAdapter` now defends on three fronts:
   - **Short-circuit** — a within-turn `servedThisTurn` set; when a round contains only already-seen

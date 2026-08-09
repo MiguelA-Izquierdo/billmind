@@ -49,12 +49,12 @@ class ChatModelRolesConfigTest {
 
     @Test
     void shouldUseProviderModelForBothRolesWhenNoRoleOverrideIsSet() {
-        runner.withPropertyValues("llm.provider=groq", "llm.groq.model=llama-3.3-70b-versatile")
+        runner.withPropertyValues("llm.provider=groq", "llm.groq.model=openai/gpt-oss-120b")
                 .run(ctx -> {
                     ctx.getBean("fastChatModel", ChatModel.class);
                     ctx.getBean("smartChatModel", ChatModel.class);
                     assertThat(requested).containsExactlyInAnyOrder(
-                            "llama-3.3-70b-versatile", "llama-3.3-70b-versatile");
+                            "openai/gpt-oss-120b", "openai/gpt-oss-120b");
                 });
     }
 
@@ -62,14 +62,14 @@ class ChatModelRolesConfigTest {
     void shouldGiveEachRoleItsOwnModelWhenBothOverridesAreSet() {
         runner.withPropertyValues(
                         "llm.provider=groq",
-                        "llm.groq.model=llama-3.3-70b-versatile",
-                        "llm.role.fast.model=llama-3.1-8b-instant",
-                        "llm.role.smart.model=llama-3.3-70b-versatile")
+                        "llm.groq.model=openai/gpt-oss-120b",
+                        "llm.role.fast.model=openai/gpt-oss-20b",
+                        "llm.role.smart.model=openai/gpt-oss-120b")
                 .run(ctx -> {
                     ctx.getBean("fastChatModel", ChatModel.class);
                     ctx.getBean("smartChatModel", ChatModel.class);
                     assertThat(requested).containsExactlyInAnyOrder(
-                            "llama-3.1-8b-instant", "llama-3.3-70b-versatile");
+                            "openai/gpt-oss-20b", "openai/gpt-oss-120b");
                 });
     }
 
@@ -77,13 +77,13 @@ class ChatModelRolesConfigTest {
     void shouldOverrideOnlyTheRoleThatDeclaresItsOwnModel() {
         runner.withPropertyValues(
                         "llm.provider=groq",
-                        "llm.groq.model=llama-3.3-70b-versatile",
-                        "llm.role.fast.model=llama-3.1-8b-instant")
+                        "llm.groq.model=openai/gpt-oss-120b",
+                        "llm.role.fast.model=openai/gpt-oss-20b")
                 .run(ctx -> {
                     ctx.getBean("fastChatModel", ChatModel.class);
                     ctx.getBean("smartChatModel", ChatModel.class);
                     assertThat(requested).containsExactlyInAnyOrder(
-                            "llama-3.1-8b-instant", "llama-3.3-70b-versatile");
+                            "openai/gpt-oss-20b", "openai/gpt-oss-120b");
                 });
     }
 

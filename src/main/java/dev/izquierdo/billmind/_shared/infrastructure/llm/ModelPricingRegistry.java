@@ -12,7 +12,7 @@ final class ModelPricingRegistry {
         }
     }
 
-    // USD per 1M tokens — approximate list prices as of 2025-05
+    // USD per 1M tokens — approximate list prices as of 2026-08
     private static final Map<String, Pricing> PRICES = Map.ofEntries(
         // OpenAI
         Map.entry("gpt-4o",               new Pricing(2.50,  10.00)),
@@ -23,11 +23,11 @@ final class ModelPricingRegistry {
         Map.entry("claude-opus-4-7",      new Pricing(15.00, 75.00)),
         Map.entry("claude-sonnet-4-6",    new Pricing( 3.00, 15.00)),
         Map.entry("claude-haiku-4-5-20251001", new Pricing(0.80, 4.00)),
-        // Groq
-        Map.entry("llama-3.3-70b-versatile",  new Pricing(0.59, 0.79)),
-        Map.entry("llama3-70b-8192",          new Pricing(0.59, 0.79)),
-        Map.entry("llama-3.1-8b-instant",     new Pricing(0.05, 0.08)),
-        Map.entry("mixtral-8x7b-32768",       new Pricing(0.27, 0.27)),
+        // Groq — the Llama entries are gone: GroqCloud shut them down on 2026-08-16, leaving
+        // the two gpt-oss models as its only production text models (qwen3.6-27b is preview).
+        Map.entry("openai/gpt-oss-120b",      new Pricing(0.15, 0.60)),
+        Map.entry("openai/gpt-oss-20b",       new Pricing(0.075, 0.30)),
+        Map.entry("qwen/qwen3.6-27b",         new Pricing(0.60, 3.00)),
         // Gemini
         Map.entry("gemini-2.5-flash",  new Pricing(0.15,  0.60)),
         Map.entry("gemini-2.0-flash",  new Pricing(0.10,  0.40)),

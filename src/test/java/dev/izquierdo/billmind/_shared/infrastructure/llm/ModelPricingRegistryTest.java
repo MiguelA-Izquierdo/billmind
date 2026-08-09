@@ -15,6 +15,13 @@ class ModelPricingRegistryTest {
         assertThat(pricing).isPresent();
     }
 
+    /** Both roles run on Groq; an unpriced model would silently report llm.cost = 0. */
+    @Test
+    void shouldPriceBothGroqRoleModels() {
+        assertThat(ModelPricingRegistry.lookup("openai/gpt-oss-120b")).isPresent();
+        assertThat(ModelPricingRegistry.lookup("openai/gpt-oss-20b")).isPresent();
+    }
+
     @Test
     void shouldReturnEmptyForUnknownModel() {
         assertThat(ModelPricingRegistry.lookup("llama3:local")).isEmpty();

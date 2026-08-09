@@ -15,7 +15,6 @@ public class LlmInvoiceClassifier {
     private static final int HEADER_CHARS          = 200;
     private static final int COMPANY_PREVIEW_CHARS = 250;
     private static final int COMPANY_MAX_ATTEMPTS  = 3;
-    private static final String UNKNOWN_COMPANY    = "DESCONOCIDA";
 
     private static final String COMPANY_PROMPT =
             "From the following invoice fragment, identify the company that ISSUES it (the biller, not the customer).\n" +
@@ -69,13 +68,13 @@ public class LlmInvoiceClassifier {
             if (from >= text.length()) break;
 
             String preview = collapseFragmented(text.substring(from, to));
-            String result  = chatModel.chat(COMPANY_PROMPT.formatted(preview)).strip();
+            String result  = CompanyName.sanitize(chatModel.chat(COMPANY_PROMPT.formatted(preview)));
             log.debug("extractCompany attempt {}/{} (chars {}-{}): {}", attempt + 1, COMPANY_MAX_ATTEMPTS, from, to, result);
 
-            if (!UNKNOWN_COMPANY.equals(result)) return result;
+            if (!CompanyName.UNKNOWN.equals(result) && !result.isEmpty()) return result;
         }
         log.debug("Company not identified after {} attempts", COMPANY_MAX_ATTEMPTS);
-        return UNKNOWN_COMPANY;
+        return CompanyName.UNKNOWN;
     }
 
     /**

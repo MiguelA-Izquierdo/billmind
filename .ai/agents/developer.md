@@ -105,7 +105,7 @@ All LLM calls go through `TimedChatLanguageModel` (decorator overriding `chat(Ch
 - **Never** log sensitive data (credentials, invoice content, JWT tokens)
 - **Always** validate `MultipartFile`: MIME type, max size, file name
 - Authentication delegated to an external microservice via `AUTH_EXTERNAL_URL` (Bearer token introspection)
-- CORS configured via `CORS_ALLOWED_ORIGIN` (never use `*` in production)
+- CORS configured via `CORS_ALLOWED_ORIGINS`, a comma-separated list (never use `*` in production)
 
 ---
 

@@ -112,7 +112,7 @@ services:
       DB_NAME: billmind
       DB_USERNAME: billmind
       DB_PASSWORD: billmind
-      CORS_ALLOWED_ORIGIN: "http://localhost:8082"
+      CORS_ALLOWED_ORIGINS: "http://localhost:8082"
       LLM_PROVIDER: ollama
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_CHAT_MODEL: llama3.2
