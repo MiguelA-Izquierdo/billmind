@@ -48,7 +48,13 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "FLAT RATE: the same price applies to ALL periods (or only one price appears). Set pricePerKwh, leave pricePerKwhP1/P2/P3 null.\n" +
             "  Labels: '€/kWh', 'precio energía', 'término de energía activa', 'coste de la energía'.\n" +
             "CRITICAL: if P1/P2/P3 prices are all equal (or one single price is multiplied across periods), treat as FLAT RATE — set pricePerKwh, leave P1/P2/P3 null.\n" +
-            "Never set both pricePerKwh and any pricePerKwhP1/P2/P3.\n\n" +
+            "Never set both pricePerKwh and any pricePerKwhP1/P2/P3.\n" +
+            "A price is a PERIOD price only when a punta/llano/valle (P1/P2/P3) label sits next to the price\n" +
+            "itself. A period label found in a consumption or meter-reading table is NOT a price label, and\n" +
+            "filling consumptionKwhP1/P2/P3 never on its own makes an invoice TOU.\n" +
+            "Two or more 'Consumo N kWh x P Eur/kWh' lines carrying NO period label, differing only by date\n" +
+            "range, are a price change mid-billing-period — not TOU. Never map them onto P1/P2/P3; derive\n" +
+            "the effective average below.\n\n" +
             "=== LAST RESORT: EFFECTIVE AVERAGE PRICE ===\n" +
             "Some tariffs split consumption by commercial period names that map to none of the labels above\n" +
             "('Horas Happy', 'Horas Gratis', 'Resto de horas', 'Horas Ahorro', 'Tempo'). Never force them into\n" +
@@ -62,7 +68,17 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "=== consumptionKwhP1/P2/P3 ===\n" +
             "Set to the kWh consumed in each period when shown, for both flat-rate and TOU invoices.\n" +
             "  P1=punta, P2=llano, P3=valle. Two-period: P1=día, P3=noche, P2=null.\n" +
-            "  Leave null when the invoice does not break down consumption by period.\n\n" +
+            "  Leave null when the invoice does not break down consumption by period.\n" +
+            "Independent of the price fields: an invoice priced as FLAT RATE or by effective average\n" +
+            "still reports consumption per period whenever the breakdown is there. Always look for it.\n" +
+            "It is usually NOT next to the prices. Look for a meter-reading table towards the end,\n" +
+            "under a heading such as 'A efectos de facturación de los peajes y cargos', one row per period:\n" +
+            "  PERIOD | initial reading | final reading | multiplier | adjustment | kWh\n" +
+            "  Take the LAST number of the row. The first two are meter readings and are much larger.\n" +
+            "  Row: 'Punta 43.250,395 43.390,212 1,00 0,000 139,818' → consumptionKwhP1 = 139.818\n" +
+            "Two-column PDFs interleave those rows with unrelated text: a row still counts when other\n" +
+            "words precede it on the same line. The periods should add up to consumptionKwh.\n" +
+            "Filling these fields says NOTHING about the price fields — decide those on the price rules alone.\n\n" +
             "Input: IBERDROLA Periodo 01/01/2024 al 31/01/2024 320 kWh 0,1823 €/kWh 3,3 kW Total 67,20 €\n" +
             "Output: {\"billingPeriodStart\":\"2024-01-01\",\"billingPeriodEnd\":\"2024-01-31\"," +
             "\"totalAmount\":67.20,\"consumptionKwh\":320.0," +
@@ -85,7 +101,21 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "\"totalAmount\":41.92,\"consumptionKwh\":64.257," +
             "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
             "\"pricePerKwh\":0.193909," +
-            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":6.928}";
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":6.928}\n\n" +
+            // The two decisions pull apart here: consumption IS per period (meter table), price is NOT
+            // (two unlabelled lines split by a mid-period price change → effective average 91,35/419,475).
+            "Input: ENDESA Tarifa One Luz | del 10/06/2026 a 12/07/2026 | Consumo Total 419,475 kWh | " +
+            "Energía 91,35 € | Consumo 239,571 kWh x 0,218101 Eur/kWh 52,25 € | " +
+            "Consumo 179,904 kWh x 0,217317 Eur/kWh 39,10 € | " +
+            "Potencias contratadas: punta-llano 3,450 kW; valle 3,450 kW | " +
+            "A efectos de facturación de los peajes y cargos: Punta 43.250,395 43.390,212 1,00 0,000 139,818 | " +
+            "Llano 5.751,634 5.870,574 1,00 0,000 118,943 | Valle 8.259,147 8.419,866 1,00 0,000 160,716 | " +
+            "TOTAL 135,64 €\n" +
+            "Output: {\"billingPeriodStart\":\"2026-06-10\",\"billingPeriodEnd\":\"2026-07-12\"," +
+            "\"totalAmount\":135.64,\"consumptionKwh\":419.475," +
+            "\"consumptionKwhP1\":139.818,\"consumptionKwhP2\":118.943,\"consumptionKwhP3\":160.716," +
+            "\"pricePerKwh\":0.217764," +
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.45}";
 
     private static final String GAS_INSTRUCTIONS =
             "Extract fields from the gas invoice delimited below.\n" +
@@ -125,6 +155,10 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
     private static final String REPAIR_LABEL = "MALFORMED_JSON";
 
     private static final int MAX_REPAIR_CHARS = 8_000;
+
+    // A markdown fence or an "Output:" label is a handful of characters and costs nothing worth
+    // reporting. Past that, whatever precedes the JSON is the model thinking out loud.
+    private static final int MAX_EXPECTED_PREAMBLE_CHARS = 16;
 
     // Registry: add a new SupplyDomain here without touching extract().
     private record ExtractionConfig(String instructions, Class<? extends InvoiceFields> fieldType) {}
@@ -171,6 +205,8 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             // 429 all the way to the caller instead of collapsing into "service unavailable".
             String rawResponse = chatModel.chat(prompt);
             log.debug("LLM response [type={}]: {}", config.fieldType().getSimpleName(), rawResponse);
+            rejectEmpty(rawResponse, config.fieldType());
+            warnIfPadded(rawResponse, config.fieldType());
 
             InvoiceFields parsed;
             try {
@@ -180,6 +216,7 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
                 parsed = repairAndParse(rawResponse, config.fieldType());
             }
 
+            if (parsed instanceof ElectricityFields e) parsed = e.withFlatRateIfUniform();
             validator.validate(parsed);
             log.info("Field extraction succeeded [type={}, latencyMs={}]",
                     config.fieldType().getSimpleName(), elapsedMs(startNs));
@@ -187,6 +224,31 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
         } finally {
             MDC.remove(TimedChatLanguageModel.MDC_OPERATION);
             MDC.remove(TimedChatLanguageModel.MDC_TYPE);
+        }
+    }
+
+    /**
+     * An empty answer is not a malformed one — there is nothing to repair. Letting it reach
+     * {@link #repairAndParse} spent a second call asking the model to correct a blank block, and
+     * on a throttled provider that call was the one that came back 429.
+     */
+    private static void rejectEmpty(String response, Class<? extends InvoiceFields> fieldType) {
+        if (response == null || response.isBlank()) {
+            log.error("Model returned an empty response [type={}]", fieldType.getSimpleName());
+            throw new InvoiceFieldExtractionException(
+                    new IllegalStateException("The model returned an empty response"));
+        }
+    }
+
+    /**
+     * The sanitizer drops whatever surrounds the JSON without a trace, so deliberation the trailer
+     * failed to suppress is invisible — it only shows up as output tokens on the bill.
+     */
+    private static void warnIfPadded(String response, Class<? extends InvoiceFields> fieldType) {
+        int preamble = response.indexOf('{');
+        if (preamble > MAX_EXPECTED_PREAMBLE_CHARS) {
+            log.warn("Model wrote {} chars before the JSON [type={}] — billed as output, then discarded",
+                    preamble, fieldType.getSimpleName());
         }
     }
 

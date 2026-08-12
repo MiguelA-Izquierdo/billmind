@@ -116,8 +116,8 @@ public class HybridKnowledgeSearchRepository implements KnowledgeSearchRepositor
         // Build sorted results
         return scores.entrySet().stream()
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
-                .limit(maxResults)
                 .filter(e -> entityByEmbId.containsKey(e.getKey()))
+                .limit(maxResults)
                 .map(e -> {
                     KnowledgeChunkEntity chunk = entityByEmbId.get(e.getKey());
                     KnowledgeDocumentEntity doc = docById.get(chunk.getDocumentId());

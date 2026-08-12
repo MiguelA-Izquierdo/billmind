@@ -20,9 +20,11 @@ public class OllamaChatModelConfig {
 
     @Bean
     public ChatModelFactory chatModelFactory() {
-        return modelName -> OllamaChatModel.builder()
+        // Ollama names the output cap numPredict; same ceiling, provider's spelling.
+        return (modelName, maxOutputTokens) -> OllamaChatModel.builder()
                 .baseUrl(baseUrl)
                 .modelName(modelName)
+                .numPredict(maxOutputTokens)
                 .timeout(Duration.ofSeconds(timeoutSeconds))
                 .build();
     }

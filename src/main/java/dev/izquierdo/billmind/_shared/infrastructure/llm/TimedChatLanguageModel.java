@@ -54,7 +54,7 @@ public class TimedChatLanguageModel implements ChatModel {
         String  type      = MDC.get(MDC_TYPE);
         Instant startedAt = Instant.now();
         long    start     = System.nanoTime();
-        log.debug("[LLM][REQUEST] operation={}  role={}  provider={}  model={}  messages={}{}",
+        log.debug("do[LLM][REQUEST] operation={}  role={}  provider={}  model={}  messages={}{}",
                 operation, role, provider, model, request.messages().size(), formatMessages(request));
         try {
             ChatResponse response = delegate.chat(request);

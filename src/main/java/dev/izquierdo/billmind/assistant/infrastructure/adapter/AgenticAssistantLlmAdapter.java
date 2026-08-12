@@ -70,7 +70,6 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
 
     private static final Logger log = LoggerFactory.getLogger(AgenticAssistantLlmAdapter.class);
 
-    private static final int MAX_OUTPUT_TOKENS = 400;
     private static final int MAX_TOOL_ROUNDS   = 5;
     private static final int MAX_INVOICE_CHARS = 2_000;
 
@@ -111,7 +110,9 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
             to the retailer — exist only in the invoice's own text. Before saying you do not have a \
             figure from the user's bill, search that text. A search returning nothing means those \
             words were not found, never that the charge is absent: try the wording as it would be \
-            printed.
+            printed. Search one concrete figure at a time; when the question is about the bill as a \
+            whole — a breakdown, every charge, where the money goes — retrieve the full invoice text \
+            in one call instead of chaining searches.
             11. If neither the invoice nor the tools can answer, say so clearly and stop.
             12. Keep answers concise: maximum 3 short paragraphs. Use bullet points for lists.
             13. Never repeat the full invoice data back to the user.
@@ -319,7 +320,6 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
         return ChatRequest.builder()
                 .messages(messages)
                 .parameters(ChatRequestParameters.builder()
-                        .maxOutputTokens(MAX_OUTPUT_TOKENS)
                         .toolSpecifications(tools.specifications())
                         .build())
                 .build();
@@ -328,9 +328,6 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
     private ChatRequest withoutTools(List<ChatMessage> messages) {
         return ChatRequest.builder()
                 .messages(messages)
-                .parameters(ChatRequestParameters.builder()
-                        .maxOutputTokens(MAX_OUTPUT_TOKENS)
-                        .build())
                 .build();
     }
 

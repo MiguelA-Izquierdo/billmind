@@ -76,11 +76,11 @@ class AssistantToolsTest {
     // --- catalogue ---
 
     @Test
-    void shouldExposeFourToolsWithExpectedNames() {
+    void shouldExposeFiveToolsWithExpectedNames() {
         List<String> names = tools.specifications().stream().map(ToolSpecification::name).toList();
         assertThat(names).containsExactlyInAnyOrder(
                 "get_invoice_comparison", "search_market_rates", "search_regulation",
-                "search_invoice_text");
+                "search_invoice_text", "get_invoice_detail");
     }
 
     @Test
@@ -271,6 +271,36 @@ class AssistantToolsTest {
                 request("search_invoice_text", "{\"query\":\"impuesto\"}"), CONTEXT, new ArrayList<>());
 
         assertThat(result).containsPattern("\\[UNTRUSTED:SEARCH_INVOICE_TEXT:[0-9a-f]{8}]");
+    }
+
+    // --- get_invoice_detail ---
+
+    /**
+     * "Break my bill down" cannot be answered by keyword search: the model has to guess every
+     * printed term and search them one by one, which burnt all five tool rounds on a single
+     * question. This returns the whole text in one call.
+     */
+    @Test
+    void shouldReturnTheWholeInvoiceTextInOneCall() {
+        String result = tools.dispatch(
+                request("get_invoice_detail", "{}"), CONTEXT, new ArrayList<>());
+
+        assertThat(result).contains("ALQUILER EQUIPOS DE MEDIDA").contains("Energia consumida");
+    }
+
+    @Test
+    void shouldReportNoInvoiceWhenDetailRequestedWithoutAnInvoice() {
+        String result = tools.dispatch(request("get_invoice_detail", "{}"), null, new ArrayList<>());
+
+        assertThat(result).contains("No se ha proporcionado factura");
+    }
+
+    @Test
+    void shouldFenceTheInvoiceDetailResult() {
+        String result = tools.dispatch(
+                request("get_invoice_detail", "{}"), CONTEXT, new ArrayList<>());
+
+        assertThat(result).containsPattern("\\[UNTRUSTED:GET_INVOICE_DETAIL:[0-9a-f]{8}]");
     }
 
     // --- robustness ---

@@ -47,6 +47,7 @@ public class AssistantTools {
     static final String GET_INVOICE_COMPARISON = "get_invoice_comparison";
     static final String SEARCH_MARKET_RATES    = "search_market_rates";
     static final String SEARCH_INVOICE_TEXT    = "search_invoice_text";
+    static final String GET_INVOICE_DETAIL     = "get_invoice_detail";
     /** Public so the agentic adapter can tell which tool is safe to cache (argument-deterministic). */
     public static final String SEARCH_REGULATION = "search_regulation";
 
@@ -110,8 +111,8 @@ public class AssistantTools {
 
         ToolSpecification invoiceText = ToolSpecification.builder()
                 .name(SEARCH_INVOICE_TEXT)
-                .description("Busca palabras dentro del texto literal de la factura del usuario y "
-                        + "devuelve las líneas que coinciden. Los datos de la factura que ves arriba "
+                .description("Busca UN dato concreto dentro del texto literal de la factura del usuario "
+                        + "y devuelve las líneas que coinciden. Los datos de la factura que ves arriba "
                         + "son solo un resumen: conceptos como el término de potencia, el impuesto "
                         + "eléctrico, el alquiler del contador, los descuentos o cualquier cargo "
                         + "propio de la compañía SOLO están aquí. Úsala siempre antes de decir que "
@@ -123,7 +124,16 @@ public class AssistantTools {
                         .build())
                 .build();
 
-        return List.of(comparison, marketRates, regulation, invoiceText);
+        ToolSpecification invoiceDetail = ToolSpecification.builder()
+                .name(GET_INVOICE_DETAIL)
+                .description("Devuelve de una vez el texto literal completo de la factura del usuario, "
+                        + "con todos sus conceptos e importes. Úsala cuando la pregunta abarque la "
+                        + "factura entera: un desglose, todos los cargos, en qué se va el importe. Una "
+                        + "sola llamada trae el detalle completo.")
+                .parameters(JsonObjectSchema.builder().build())
+                .build();
+
+        return List.of(comparison, marketRates, regulation, invoiceText, invoiceDetail);
     }
 
     /**
@@ -145,9 +155,22 @@ public class AssistantTools {
             case SEARCH_MARKET_RATES    -> marketRates(fields, request);
             case SEARCH_REGULATION      -> regulation(request, citationSink);
             case SEARCH_INVOICE_TEXT    -> invoiceText(context, request);
+            case GET_INVOICE_DETAIL     -> invoiceDetail(context);
             default -> "Herramienta desconocida: " + name;
         };
         return PromptFence.random().wrap(name, result, MAX_TOOL_RESULT_CHARS);
+    }
+
+    /**
+     * The whole invoice text in one call. Keyword search cannot answer "break my bill down": the
+     * model has to guess every printed term and search them one at a time, and each round re-sends
+     * the growing conversation — a single breakdown burnt all five tool rounds and cost more in
+     * accumulated tool results than the document itself would have. Fenced and capped by
+     * {@link #dispatch}, like every other result.
+     */
+    private String invoiceDetail(ChatContext context) {
+        if (context == null || context.invoiceText() == null) return NO_INVOICE;
+        return context.invoiceText();
     }
 
     /** Searches the invoice's own text; the result is fenced by {@link #dispatch} like any other. */

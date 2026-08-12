@@ -47,6 +47,38 @@ class AssistantContextFormatterTest {
         assertThat(result).contains("Tipo: Electricidad").contains("45,50").contains("300");
     }
 
+    /**
+     * The flat price used to be dropped: a flat-rate invoice reached the assistant announcing
+     * "Precio P1/P2/P3: — / — / —", so the chat believed it had no price for the bill it was
+     * meant to explain and went digging through the invoice text instead.
+     */
+    @Test
+    void shouldRenderTheFlatPriceWhenTheInvoiceHasOne() {
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("135.64"),
+                new BigDecimal("419.475"), null, null, null,
+                new BigDecimal("0.217764"), null, null, null, new BigDecimal("3.45"));
+
+        String result = AssistantContextFormatter.formatFields(fields);
+
+        assertThat(result)
+                .contains("Precio: 0,217764 €/kWh")
+                .doesNotContain("Precio P1/P2/P3");
+    }
+
+    @Test
+    void shouldRenderThePeriodPricesWhenTheInvoiceIsTimeOfUse() {
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("80.95"),
+                new BigDecimal("350"), null, null, null, null,
+                new BigDecimal("0.15234"), new BigDecimal("0.10123"), new BigDecimal("0.06891"),
+                new BigDecimal("3.45"));
+
+        String result = AssistantContextFormatter.formatFields(fields);
+
+        assertThat(result)
+                .contains("Precio P1/P2/P3: 0,15234 / 0,10123 / 0,06891 €/kWh")
+                .doesNotContain("Precio:");
+    }
+
     @Test
     void shouldFormatGasFieldsWithType() {
         GasFields fields = new GasFields(START, END, new BigDecimal("60.00"), null, null, null);

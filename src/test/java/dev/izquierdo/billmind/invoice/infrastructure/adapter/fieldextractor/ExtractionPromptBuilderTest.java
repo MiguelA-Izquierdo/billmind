@@ -33,6 +33,17 @@ class ExtractionPromptBuilderTest {
         assertThat(closeIdx).isLessThan(trailerIdx);
     }
 
+    /**
+     * The list of forbidden behaviours this replaced held on a clean 2-page OCR and leaked ~470
+     * tokens of deliberation back on a messy 7-page one. A boundary admits no partial compliance.
+     */
+    @Test
+    void shouldCloseThePromptByBoundingTheReplyToTheJsonObject() {
+        String result = builder.build("INSTRUCTIONS", "invoice text");
+
+        assertThat(result).contains("first character is '{'").contains("last is '}'");
+    }
+
     @Test
     void shouldContainBothInstructionsAndOcrText() {
         String result = builder.build("Extract fields.", "Consumo: 245 kWh");

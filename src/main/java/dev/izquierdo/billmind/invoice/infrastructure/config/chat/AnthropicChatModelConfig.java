@@ -15,9 +15,10 @@ public class AnthropicChatModelConfig {
 
     @Bean
     public ChatModelFactory chatModelFactory() {
-        return modelName -> AnthropicChatModel.builder()
+        return (modelName, maxOutputTokens) -> AnthropicChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)
+                .maxTokens(maxOutputTokens)
                 .build();
     }
 }

@@ -13,13 +13,13 @@ public class LlmInvoiceClassifier {
     private static final Logger log = LoggerFactory.getLogger(LlmInvoiceClassifier.class);
 
     private static final int HEADER_CHARS          = 200;
-    private static final int COMPANY_PREVIEW_CHARS = 250;
-    private static final int COMPANY_MAX_ATTEMPTS  = 3;
+    private static final int COMPANY_PREVIEW_CHARS = 750;
 
     private static final String COMPANY_PROMPT =
             "From the following invoice fragment, identify the company that ISSUES it (the biller, not the customer).\n" +
             "The text may contain merged or fragmented words due to PDF font encoding issues.\n" +
             "Reply with ONLY the commercial name in UPPERCASE, without legal suffixes (S.A./S.L./S.A.U./etc.).\n" +
+            "Do not explain your reasoning — the name alone is the whole answer.\n" +
             "If you cannot identify it with confidence: DESCONOCIDA\n\n" +
             "Fragment: AUDAX ENERGÍA S.A. CUPS ES0031 factura electricidad período 01/01/2024\n" +
             "Issuer: AUDAX\n\n" +
@@ -61,20 +61,18 @@ public class LlmInvoiceClassifier {
         return responseParser.parse(response);
     }
 
+    /**
+     * One call over the first {@value #COMPANY_PREVIEW_CHARS} characters. This used to walk three
+     * consecutive 250-char windows, one LLM round-trip each: the issuer is rarely in the first
+     * window — invoice number and dates are — so the common case paid two sequential calls to
+     * reach text a single wider window already covers.
+     */
     public String extractCompany(String text) {
-        for (int attempt = 0; attempt < COMPANY_MAX_ATTEMPTS; attempt++) {
-            int from   = attempt * COMPANY_PREVIEW_CHARS;
-            int to     = Math.min(from + COMPANY_PREVIEW_CHARS, text.length());
-            if (from >= text.length()) break;
-
-            String preview = collapseFragmented(text.substring(from, to));
-            String result  = CompanyName.sanitize(chatModel.chat(COMPANY_PROMPT.formatted(preview)));
-            log.debug("extractCompany attempt {}/{} (chars {}-{}): {}", attempt + 1, COMPANY_MAX_ATTEMPTS, from, to, result);
-
-            if (!CompanyName.UNKNOWN.equals(result) && !result.isEmpty()) return result;
-        }
-        log.debug("Company not identified after {} attempts", COMPANY_MAX_ATTEMPTS);
-        return CompanyName.UNKNOWN;
+        String preview = collapseFragmented(
+                text.length() > COMPANY_PREVIEW_CHARS ? text.substring(0, COMPANY_PREVIEW_CHARS) : text);
+        String result  = CompanyName.sanitize(chatModel.chat(COMPANY_PROMPT.formatted(preview)));
+        log.debug("extractCompany ({} chars): {}", preview.length(), result);
+        return result.isEmpty() ? CompanyName.UNKNOWN : result;
     }
 
     /**

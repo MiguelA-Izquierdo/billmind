@@ -201,6 +201,30 @@ class LlmInvoiceFieldExtractorTest {
         assertThat(repairPrompt).doesNotContain("<<<").doesNotContain(">>>");
     }
 
+    /**
+     * Repair rewrites text; an empty answer has none. The old path still paid for the round trip,
+     * and against a throttled provider that second call was the one that came back 429.
+     */
+    @Test
+    void shouldFailWithoutASecondCallWhenTheModelAnswersEmpty() {
+        doReturn("").when(chatModel).chat(anyString());
+
+        assertThatThrownBy(() -> extractor.extract("texto factura", SupplyDomain.ELECTRICITY))
+                .isInstanceOf(InvoiceFieldExtractionException.class);
+
+        verify(chatModel, times(1)).chat(anyString());
+    }
+
+    @Test
+    void shouldTreatAWhitespaceOnlyAnswerAsEmpty() {
+        doReturn("  \n \t ").when(chatModel).chat(anyString());
+
+        assertThatThrownBy(() -> extractor.extract("texto factura", SupplyDomain.ELECTRICITY))
+                .isInstanceOf(InvoiceFieldExtractionException.class);
+
+        verify(chatModel, times(1)).chat(anyString());
+    }
+
     @Test
     void shouldThrowAfterBothParseAttemptsFail() {
         doReturn("invalid json")
@@ -211,6 +235,43 @@ class LlmInvoiceFieldExtractorTest {
                 .isInstanceOf(InvoiceFieldExtractionException.class);
 
         verify(chatModel, times(2)).chat(anyString());
+    }
+
+    // ── Normalización de precios ──────────────────────────────────────────────
+
+    /**
+     * The prompt asks the model to collapse equal period prices and it does so on one invoice and
+     * not on the next. The validator must see the collapsed shape, not the one the model chose.
+     */
+    @Test
+    void shouldCollapseEqualPeriodPricesBeforeValidating() {
+        doReturn("{\"billingPeriodStart\":\"2026-06-21\",\"billingPeriodEnd\":\"2026-07-22\","
+                + "\"totalAmount\":56.83,\"consumptionKwh\":208.0,"
+                + "\"pricePerKwh\":null,\"pricePerKwhP1\":0.122,\"pricePerKwhP2\":0.122,"
+                + "\"pricePerKwhP3\":0.122,\"contractedPowerKw\":4.6}")
+                .when(chatModel).chat(anyString());
+
+        ElectricityFields result =
+                (ElectricityFields) extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
+
+        assertThat(result.pricePerKwh()).isEqualByComparingTo("0.122");
+        assertThat(result.pricePerKwhP1()).isNull();
+        verify(validator).validate(result);
+    }
+
+    @Test
+    void shouldKeepPeriodPricesWhenTheyGenuinelyDiffer() {
+        doReturn("{\"billingPeriodStart\":\"2026-06-21\",\"billingPeriodEnd\":\"2026-07-22\","
+                + "\"totalAmount\":80.95,\"consumptionKwh\":350.0,"
+                + "\"pricePerKwh\":null,\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,"
+                + "\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45}")
+                .when(chatModel).chat(anyString());
+
+        ElectricityFields result =
+                (ElectricityFields) extractor.extract("texto factura", SupplyDomain.ELECTRICITY);
+
+        assertThat(result.pricePerKwh()).isNull();
+        assertThat(result.pricePerKwhP1()).isEqualByComparingTo("0.15234");
     }
 
     // ── Integración con validador ─────────────────────────────────────────────

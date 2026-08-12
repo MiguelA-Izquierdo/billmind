@@ -18,10 +18,11 @@ public class GroqChatModelConfig {
 
     @Bean
     public ChatModelFactory chatModelFactory() {
-        return modelName -> OpenAiChatModel.builder()
+        return (modelName, maxOutputTokens) -> OpenAiChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(modelName)
+                .maxTokens(maxOutputTokens)
                 .build();
     }
 }

@@ -54,7 +54,7 @@ class LlmInvoiceClassifierTest {
     }
 
     @Test
-    void shouldReturnCompanyOnFirstAttempt() {
+    void shouldReturnTheCompanyInASingleCall() {
         when(chatModel.chat(anyString())).thenReturn("NATURGY");
 
         String result = classifier.extractCompany("NATURGY GAS consumo 234 m³");
@@ -65,15 +65,14 @@ class LlmInvoiceClassifierTest {
 
     /** An explanation instead of a name used to reach invoices.provider and overflow varchar(255). */
     @Test
-    void shouldTreatAnOversizedAnswerAsUnidentifiedAndRetry() {
+    void shouldTreatAnOversizedAnswerAsUnidentified() {
         when(chatModel.chat(anyString()))
-                .thenReturn("The company that issues this invoice is IBERDROLA, ".repeat(10))
-                .thenReturn("ENDESA");
+                .thenReturn("The company that issues this invoice is IBERDROLA, ".repeat(10));
 
         String result = classifier.extractCompany("x".repeat(500));
 
-        assertThat(result).isEqualTo("ENDESA");
-        verify(chatModel, times(2)).chat(anyString());
+        assertThat(result).isEqualTo("DESCONOCIDA");
+        verify(chatModel, times(1)).chat(anyString());
     }
 
     @Test
@@ -85,35 +84,38 @@ class LlmInvoiceClassifierTest {
         assertThat(result).isEqualTo("DESCONOCIDA");
     }
 
+    /**
+     * The issuer is rarely in the first few hundred characters — invoice number and dates are.
+     * A single wide window reaches it without paying a second sequential round-trip.
+     */
     @Test
-    void shouldRetryAndReturnCompanyOnSecondAttempt() {
-        when(chatModel.chat(anyString()))
-                .thenReturn("DESCONOCIDA")
-                .thenReturn("ENDESA");
-
-        // Need text long enough for 2 windows (each 250 chars)
-        String text = "x".repeat(500);
+    void shouldSeeTheIssuerBeyondTheFirstFewHundredCharsWithoutASecondCall() {
+        when(chatModel.chat(anyString())).thenReturn("ENDESA");
+        String text = "DATOS DE LA FACTURA Nº factura: P26CON099887766 fecha 16/07/2026 ".repeat(5)
+                + "Endesa Energía, S.A. Unipersonal.";
 
         String result = classifier.extractCompany(text);
 
+        assertThat(text.indexOf("Endesa Energía")).isGreaterThan(250);
         assertThat(result).isEqualTo("ENDESA");
-        verify(chatModel, times(2)).chat(anyString());
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(chatModel, times(1)).chat(captor.capture());
+        assertThat(captor.getValue()).contains("Endesa Energía");
     }
 
     @Test
-    void shouldReturnDesconocidaAfterAllAttemptsExhausted() {
+    void shouldCapThePreviewAtTheWindowSize() {
         when(chatModel.chat(anyString())).thenReturn("DESCONOCIDA");
 
-        String text = "x".repeat(750);
+        classifier.extractCompany("z".repeat(900));
 
-        String result = classifier.extractCompany(text);
-
-        assertThat(result).isEqualTo("DESCONOCIDA");
-        verify(chatModel, times(3)).chat(anyString());
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(chatModel).chat(captor.capture());
+        assertThat(captor.getValue()).contains("z".repeat(750)).doesNotContain("z".repeat(751));
     }
 
     @Test
-    void shouldStopExtractingWhenTextIsShorterThanOneWindow() {
+    void shouldReturnDesconocidaWhenTheModelCannotIdentifyTheIssuer() {
         when(chatModel.chat(anyString())).thenReturn("DESCONOCIDA");
 
         String result = classifier.extractCompany("short text");

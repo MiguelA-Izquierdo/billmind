@@ -19,10 +19,16 @@ final class ModelPricingRegistry {
         Map.entry("gpt-4o-mini",          new Pricing(0.15,   0.60)),
         Map.entry("gpt-4.1",              new Pricing(2.00,   8.00)),
         Map.entry("gpt-4.1-mini",         new Pricing(0.40,   1.60)),
-        // Anthropic
-        Map.entry("claude-opus-4-7",      new Pricing(15.00, 75.00)),
+        // Anthropic — keyed by the alias the config actually passes (llm.role.*.model), which is
+        // what reaches TimedChatLanguageModel as the telemetry tag. A dated id alone never matches.
+        Map.entry("claude-opus-5",        new Pricing( 5.00, 25.00)),
+        Map.entry("claude-opus-4-8",      new Pricing( 5.00, 25.00)),
+        Map.entry("claude-opus-4-7",      new Pricing( 5.00, 25.00)),
+        Map.entry("claude-opus-4-6",      new Pricing( 5.00, 25.00)),
+        Map.entry("claude-sonnet-5",      new Pricing( 3.00, 15.00)),
         Map.entry("claude-sonnet-4-6",    new Pricing( 3.00, 15.00)),
-        Map.entry("claude-haiku-4-5-20251001", new Pricing(0.80, 4.00)),
+        Map.entry("claude-haiku-4-5",     new Pricing( 1.00,  5.00)),
+        Map.entry("claude-haiku-4-5-20251001", new Pricing(1.00, 5.00)),
         // Groq — the Llama entries are gone: GroqCloud shut them down on 2026-08-16, leaving
         // the two gpt-oss models as its only production text models (qwen3.6-27b is preview).
         Map.entry("openai/gpt-oss-120b",      new Pricing(0.15, 0.60)),

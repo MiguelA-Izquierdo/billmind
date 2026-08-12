@@ -33,4 +33,18 @@ class PiiRedactingMessageConverterTest {
 
         assertThat(converter.convert(event)).isEqualTo("Consumo: 245 kWh");
     }
+
+    /**
+     * Five bare digits are a latency or a counter here, not a postal code. Scrubbing them turned
+     * {@code latencyMs=13040} into {@code latencyMs=[CP]} and ate the five-decimal prices out of
+     * a logged prompt — destroying exactly the numbers a log exists to carry.
+     */
+    @Test
+    void shouldKeepFiveDigitNumbersThatAreNotPostalCodes() {
+        LoggingEvent event = new LoggingEvent();
+        event.setMessage("Field extraction succeeded [latencyMs=13040, precio=0,15234]");
+
+        assertThat(converter.convert(event))
+                .contains("13040").contains("0,15234").doesNotContain("[CP]");
+    }
 }

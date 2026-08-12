@@ -32,6 +32,21 @@ public final class AssistantContextFormatter {
     private AssistantContextFormatter() {
     }
 
+    /**
+     * The two pricings are mutually exclusive by extraction contract: a flat or effective-average
+     * invoice carries {@code pricePerKwh}, a TOU one carries the three period prices. Only the one
+     * that applies is rendered — the summary used to print the period line alone, so every flat
+     * invoice reached the assistant reading "Precio P1/P2/P3: — / — / —", i.e. announcing that the
+     * single most relevant figure of the bill was missing when it had in fact been extracted.
+     */
+    private static String priceLine(ElectricityFields e) {
+        if (e.pricePerKwh() != null) {
+            return "Precio: " + num(e.pricePerKwh()) + " €/kWh";
+        }
+        return "Precio P1/P2/P3: %s / %s / %s €/kWh".formatted(
+                num(e.pricePerKwhP1()), num(e.pricePerKwhP2()), num(e.pricePerKwhP3()));
+    }
+
     public static String formatFields(InvoiceFields fields) {
         return switch (fields) {
             case ElectricityFields e -> """
@@ -40,14 +55,14 @@ public final class AssistantContextFormatter {
                     Importe total: %s €
                     Consumo total: %s kWh
                     Consumo P1/P2/P3: %s / %s / %s kWh
-                    Precio P1/P2/P3: %s / %s / %s €/kWh
+                    %s
                     Potencia contratada: %s kW
                     """.formatted(
                     e.billingPeriodStart(), e.billingPeriodEnd(),
                     eur(e.totalAmount()),
                     num(e.consumptionKwh()),
                     num(e.consumptionKwhP1()), num(e.consumptionKwhP2()), num(e.consumptionKwhP3()),
-                    num(e.pricePerKwhP1()), num(e.pricePerKwhP2()), num(e.pricePerKwhP3()),
+                    priceLine(e),
                     num(e.contractedPowerKw()));
             case GasFields g -> """
                     Tipo: Gas

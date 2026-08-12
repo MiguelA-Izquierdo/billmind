@@ -15,9 +15,12 @@ import org.springframework.core.io.support.ResourcePropertySource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 /**
  * The role beans are the single place where "which model serves this call" is decided, and the
@@ -30,11 +33,15 @@ class ChatModelRolesConfigTest {
     /** Model names the factory was asked for, in bean-creation order. */
     private static final List<String> requested = new ArrayList<>();
 
+    /** Output ceiling the factory was asked for, per model — so a swap between roles is visible. */
+    private static final Map<String, Integer> capsByModel = new HashMap<>();
+
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class))
             .withUserConfiguration(ChatModelRolesConfig.class, StubFactoryConfig.class)
             .withInitializer(ctx -> {
                 requested.clear();
+                capsByModel.clear();
                 ctx.getEnvironment().getPropertySources().addLast(applicationProperties());
             });
 
@@ -87,6 +94,30 @@ class ChatModelRolesConfigTest {
                 });
     }
 
+    /**
+     * The cap belongs to the model, not to the request: the Anthropic integration rejects a
+     * per-request maxOutputTokens, so a role built without it would silently take the
+     * provider default (1024 on Anthropic) and truncate the longest answers.
+     *
+     * <p>And it is per role: the two answer different things, and a cap that fits one truncates
+     * the other — a reasoning model cut mid-JSON degrades silently wherever the answer is parsed.
+     */
+    @Test
+    void shouldHandEachRoleItsOwnOutputCap() {
+        runner.withPropertyValues(
+                        "llm.provider=groq",
+                        "llm.groq.model=openai/gpt-oss-120b",
+                        "llm.role.fast.model=a-fast-model",
+                        "llm.role.smart.model=a-smart-model")
+                .run(ctx -> {
+                    ctx.getBean("fastChatModel", ChatModel.class);
+                    ctx.getBean("smartChatModel", ChatModel.class);
+                    assertThat(capsByModel).containsOnly(
+                            entry("a-fast-model",  ChatModelRolesConfig.FAST_MAX_OUTPUT_TOKENS),
+                            entry("a-smart-model", ChatModelRolesConfig.SMART_MAX_OUTPUT_TOKENS));
+                });
+    }
+
     @Test
     void shouldFailFastWhenTheProviderDeclaresNoModelToFallBackOn() {
         runner.withPropertyValues("llm.provider=unknown-provider")
@@ -101,8 +132,9 @@ class ChatModelRolesConfigTest {
 
         @Bean
         ChatModelFactory chatModelFactory() {
-            return modelName -> {
+            return (modelName, maxOutputTokens) -> {
                 requested.add(modelName);
+                capsByModel.put(modelName, maxOutputTokens);
                 return new ChatModel() {
                     @Override
                     public ChatResponse doChat(ChatRequest request) {

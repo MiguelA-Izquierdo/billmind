@@ -15,9 +15,10 @@ public class OpenAiChatModelConfig {
 
     @Bean
     public ChatModelFactory chatModelFactory() {
-        return modelName -> OpenAiChatModel.builder()
+        return (modelName, maxOutputTokens) -> OpenAiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)
+                .maxTokens(maxOutputTokens)
                 .build();
     }
 }

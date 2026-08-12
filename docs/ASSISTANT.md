@@ -92,7 +92,7 @@ LangChain4j offers a high-level `AiServices` + `@Tool` abstraction. We deliberat
 messages = [ System(rules + invoice inline), ...history..., User(question) ]
 citationSink = []
 for round in 0..MAX_TOOL_ROUNDS (5):
-    ai = smartChatModel.chat( messages + toolSpecifications )   # maxOutputTokens = 400
+    ai = smartChatModel.chat( messages + toolSpecifications )   # output cap: on the model bean
     messages.add(ai)
     if ai has NO tool requests:            → return answer(ai.text, citations)
     for each tool request:
@@ -110,9 +110,27 @@ for round in 0..MAX_TOOL_ROUNDS (5):
 
 ### LangChain4j 1.0.0 API note
 
-Tool specs and `maxOutputTokens` must be set **inside** `ChatRequestParameters.builder()`, not as
-top-level shortcuts on `ChatRequest.builder()`. Mixing `.parameters(...)` with the top-level
-shortcuts throws a validation exception. Confirmed against `langchain4j-core:1.0.0`.
+Tool specs must be set **inside** `ChatRequestParameters.builder()`, not as top-level shortcuts on
+`ChatRequest.builder()`. Mixing `.parameters(...)` with the top-level shortcuts throws a validation
+exception. Confirmed against `langchain4j-core:1.0.0`.
+
+**The output cap is not a request parameter.** `langchain4j-anthropic` resolves to `1.0.0-beta5`
+via the BOM, and that integration has not migrated to the per-request parameters API: its
+`doChat()` calls `ChatRequestValidationUtils.validateParameters(...)`, which throws
+`UnsupportedFeatureException: 'maxOutputTokens' parameter is not supported yet by this model
+provider` for *any* per-request parameter. So the ceiling lives on the model bean — a constant per
+role in `ChatModelRolesConfig`, mapped by each provider config onto its own builder field
+(`maxTokens` on Anthropic and the OpenAI-compatible providers, `numPredict` on Ollama). It must
+clear the longest single response that role asks for; Anthropic's own default is 1024 and would
+truncate the smart role.
+
+**One cap per role, not one for both.** The fast role answers with a company name or a list of PII
+spans (67 tokens on a real invoice); the smart role answers with an extraction JSON, a chat reply,
+or a JSON repair. OpenAI-compatible providers charge the *declared* cap against the per-minute
+token budget on every call, whatever the answer turns out to be — a shared 4096 reserved 4096 of
+Groq's 6000 TPM to return 67 tokens, leaving room for one call a minute and throwing 429 on the
+second step of every upload. It is a constant rather than a property because what sets it is the
+longest answer the code asks for, which does not change between environments.
 
 ---
 

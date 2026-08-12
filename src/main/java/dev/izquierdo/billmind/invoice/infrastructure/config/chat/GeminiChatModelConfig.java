@@ -20,10 +20,11 @@ public class GeminiChatModelConfig {
 
     @Bean
     public ChatModelFactory chatModelFactory() {
-        return modelName -> OpenAiChatModel.builder()
+        return (modelName, maxOutputTokens) -> OpenAiChatModel.builder()
                 .baseUrl(GEMINI_BASE_URL)
                 .apiKey(apiKey)
                 .modelName(modelName)
+                .maxTokens(maxOutputTokens)
                 .build();
     }
 }

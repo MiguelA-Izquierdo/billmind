@@ -14,7 +14,6 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
-import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -37,8 +36,6 @@ import java.util.List;
 @Component
 @ConditionalOnProperty(name = "assistant.tools.enabled", havingValue = "false", matchIfMissing = true)
 public class LlmAssistantAdapter implements AssistantLlmPort {
-
-    private static final int MAX_OUTPUT_TOKENS = 400;
 
     private static final int MAX_INVOICE_CHARS    = 2_000;
     private static final int MAX_MARKET_CHARS     = 6_000;
@@ -110,9 +107,6 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
 
         ChatRequest chatRequest = ChatRequest.builder()
                 .messages(messages)
-                .parameters(ChatRequestParameters.builder()
-                        .maxOutputTokens(MAX_OUTPUT_TOKENS)
-                        .build())
                 .build();
 
         String answer = smartChatModel.chat(chatRequest).aiMessage().text();

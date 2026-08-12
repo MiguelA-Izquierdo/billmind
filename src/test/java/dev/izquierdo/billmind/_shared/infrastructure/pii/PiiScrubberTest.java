@@ -167,4 +167,28 @@ class PiiScrubberTest {
     void shouldReturnEmptyWhenEmpty() {
         assertThat(PiiScrubber.redact("")).isEmpty();
     }
+
+    // ── redactForLogs ────────────────────────────────────────────────────────
+
+    /** Five bare digits on a log line are a latency or a counter, not an address. */
+    @Test
+    void shouldNotRedactPostalCodesWhenScrubbingALogLine() {
+        assertThat(PiiScrubber.redactForLogs("latencyMs=13040 precio=0,15234"))
+                .isEqualTo("latencyMs=13040 precio=0,15234");
+    }
+
+    /** Everything with a structural anchor is still scrubbed there. */
+    @Test
+    void shouldStillRedactAnchoredPatternsWhenScrubbingALogLine() {
+        String result = PiiScrubber.redactForLogs(
+                "DNI 12345678Z cuenta ES9121000418450200051332 correo ana@example.com");
+
+        assertThat(result).contains("[DNI]").contains("[IBAN]").contains("[EMAIL]")
+                .doesNotContain("12345678Z").doesNotContain("ana@example.com");
+    }
+
+    @Test
+    void shouldStillRedactPostalCodesWhenScrubbingInvoiceText() {
+        assertThat(PiiScrubber.redact("Calle Mayor 3, 28013 Madrid")).contains("[CP]");
+    }
 }

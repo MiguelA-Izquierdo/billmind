@@ -10,6 +10,9 @@ import dev.izquierdo.billmind._shared.infrastructure.pii.PiiScrubber;
  * leakage — the primary rule is still not to log invoice content in the first place.
  * Registered as the {@code %pii} conversion word in logback-spring.xml.
  * Fail-closed: never emits the raw message if scrubbing throws.
+ *
+ * <p>Uses {@link PiiScrubber#redactForLogs} rather than the full scrub: the postal-code pattern is
+ * five bare digits, which on a log line is a latency or a counter far more often than an address.</p>
  */
 public class PiiRedactingMessageConverter extends MessageConverter {
 
@@ -17,7 +20,7 @@ public class PiiRedactingMessageConverter extends MessageConverter {
     public String convert(ILoggingEvent event) {
         String message = super.convert(event);
         try {
-            return PiiScrubber.redact(message);
+            return PiiScrubber.redactForLogs(message);
         } catch (RuntimeException e) {
             return "[log-redaction-error]";
         }

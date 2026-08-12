@@ -39,6 +39,25 @@ public final class PiiScrubber {
 
     /** Redacts known PII tokens. Null-safe: returns the input unchanged when null or blank. */
     public static String redact(String text) {
+        return redact(text, true);
+    }
+
+    /**
+     * Same, minus the postal code. That pattern is the only one here with no structural anchor —
+     * the IBAN opens with {@code ES}, the DNI closes with a letter, the email carries an {@code @},
+     * the phone a leading 6/7/8/9 — so on a log line it matches latencies, token counts and
+     * identifiers far more often than an address: it rendered {@code latencyMs=13040} as
+     * {@code latencyMs=[CP]} and ate the five-decimal prices out of a logged prompt.
+     *
+     * <p>Little is given up. Five digits on their own identify nobody; what would — a name, a
+     * street — has no regex and was never caught here anyway. The rule against logging invoice
+     * content is what protects those, not this safety net.
+     */
+    public static String redactForLogs(String text) {
+        return redact(text, false);
+    }
+
+    private static String redact(String text, boolean includePostalCode) {
         if (text == null || text.isEmpty()) return text;
         text = IBAN.matcher(text).replaceAll("[IBAN]");
         text = DNI.matcher(text).replaceAll("[DNI]");
@@ -46,7 +65,9 @@ public final class PiiScrubber {
         text = CIF.matcher(text).replaceAll("[CIF]");
         text = PHONE.matcher(text).replaceAll("[TELÉFONO]");
         text = EMAIL.matcher(text).replaceAll("[EMAIL]");
-        text = POSTAL_CODE.matcher(text).replaceAll("[CP]");
+        if (includePostalCode) {
+            text = POSTAL_CODE.matcher(text).replaceAll("[CP]");
+        }
         return text;
     }
 }
