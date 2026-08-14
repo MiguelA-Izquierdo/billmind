@@ -14,7 +14,43 @@
 .cmp-bubble { padding: 14px 16px !important; }
 .cmp-intro  { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 
-/* Main row: savings summary (left) + metric grid (right) */
+/* ── Headline: what this invoice would have cost ────────────────────
+   The one figure on the card that extrapolates nothing, so it gets the size, the
+   colour and the counter. Everything below it is an estimate and must read as one. */
+.cmp-headline {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.cmp-bill {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The bill the user actually paid, struck through: the before half of the comparison. */
+.cmp-bill-was {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Deliberately smaller than .cmp-amount — the projection never outranks the measurement. */
+.cmp-proj-amount {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -.4px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.cmp-proj-amount.positive { color: var(--green); }
+.cmp-proj-amount.negative { color: var(--red); }
+
+/* Main row: annual projection (left) + metric grid (right) */
 .cmp-main {
   display: flex;
   gap: 12px;
@@ -226,12 +262,23 @@
   padding-top: 8px;
 }
 
-.cmp-tou-disclaimer {
+/* Footnote for what the figures rest on — days invoiced, power term, assumed profile. */
+.cmp-basis-note {
   font-size: 10px;
   color: var(--muted);
   font-style: italic;
   margin-top: 6px;
   line-height: 1.4;
+}
+
+/* The band the headline figure sits in. It is the honest half of the number above it,
+   so it reads a step up from the "/ año" line rather than as another footnote. */
+.cmp-range {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
 }
 
 /* ── Media queries — always AFTER base styles ──────────────────── */

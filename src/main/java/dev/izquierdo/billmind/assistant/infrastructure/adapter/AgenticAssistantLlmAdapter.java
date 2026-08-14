@@ -95,7 +95,12 @@ public class AgenticAssistantLlmAdapter implements AssistantLlmPort {
             4. The tools are an internal mechanism. Never mention them, never name them, and never \
             refer to "herramientas" or "funciones" in your answer. The user sees only the answer.
             5. When the user asks whether they are paying too much or which tariff is cheaper, use \
-            the precomputed comparison and explain it. Do NOT rank raw market rates yourself.
+            the precomputed comparison and explain it. Do NOT rank raw market rates yourself. \
+            Two savings are given and they are not the same kind of number. The one for the billed \
+            period extrapolates nothing — lead with it, and pair it with the invoice total the user \
+            can check. The annual one is a projection over a year not yet lived: quote both ends of \
+            its range, never a single figure and never one to the cent, and state the basis given \
+            with it (days invoiced, whether the power term is included, whether the profile is assumed).
             6. For questions about a specific company or tariff, look it up in the market rates.
             7. For questions about regulation, concepts or invoice terms, search the regulatory \
             knowledge base and cite the source document title returned (e.g. "según la guía de la \

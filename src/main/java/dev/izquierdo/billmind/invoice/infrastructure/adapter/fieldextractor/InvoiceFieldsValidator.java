@@ -33,6 +33,10 @@ public class InvoiceFieldsValidator {
                 requireNonNegative(e.consumptionKwhP2(),  "consumptionKwhP2");
                 requireNonNegative(e.consumptionKwhP3(),  "consumptionKwhP3");
                 requireNonNegative(e.contractedPowerKw(), "contractedPowerKw");
+                // Non-negative only, never required: a missing power term degrades the comparison
+                // to the energy term alone, which is worth far more than rejecting the invoice.
+                requireNonNegative(e.powerPriceP1PerKwDay(), "powerPriceP1PerKwDay");
+                requireNonNegative(e.powerPriceP2PerKwDay(), "powerPriceP2PerKwDay");
                 boolean hasFlat = e.pricePerKwh() != null;
                 boolean hasTou  = e.pricePerKwhP1() != null
                                || e.pricePerKwhP2() != null

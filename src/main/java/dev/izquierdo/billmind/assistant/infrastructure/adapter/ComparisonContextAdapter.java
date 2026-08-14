@@ -4,6 +4,7 @@ import dev.izquierdo.billmind._shared.domain.model.fields.InvoiceFields;
 import dev.izquierdo.billmind.assistant.domain.model.ComparisonSummary;
 import dev.izquierdo.billmind.assistant.domain.port.ComparisonContextPort;
 import dev.izquierdo.billmind.comparison.application.usecase.CompareInvoiceUseCase;
+import dev.izquierdo.billmind.comparison.domain.model.ComparisonBasis;
 import dev.izquierdo.billmind.comparison.domain.model.ComparisonResult;
 import dev.izquierdo.billmind.comparison.domain.model.ElectricityComparisonResult;
 import dev.izquierdo.billmind.comparison.domain.model.ElectricityOfferBlock;
@@ -36,9 +37,21 @@ public class ComparisonContextAdapter implements ComparisonContextPort {
                     e.userPricePerKwh(),
                     e.userIsTou(),
                     e.annualKwhEstimate(),
+                    e.invoiceTotalEuros(),
+                    toBasis(e.basis()),
                     toBlock(e.flatBlock()),
                     toBlock(e.touBlock()));
         };
+    }
+
+    private ComparisonSummary.Basis toBasis(ComparisonBasis basis) {
+        return new ComparisonSummary.Basis(
+                basis.observedDays(),
+                basis.annualised(),
+                basis.powerTerm() != ComparisonBasis.PowerTerm.UNAVAILABLE,
+                basis.powerTerm() == ComparisonBasis.PowerTerm.DERIVED,
+                basis.consumptionProfile() == ComparisonBasis.ConsumptionProfile.ASSUMED,
+                basis.taxesIncluded());
     }
 
     private ComparisonSummary.OfferBlock toBlock(ElectricityOfferBlock block) {
@@ -51,7 +64,9 @@ public class ComparisonContextAdapter implements ComparisonContextPort {
                 block.bestCompany(),
                 block.bestTariffName(),
                 block.bestPricePerKwh(),
-                block.annualSavingsEuros(),
+                block.periodSavingsEuros(),
+                block.annualSavingsLow(),
+                block.annualSavingsHigh(),
                 alternatives);
     }
 }

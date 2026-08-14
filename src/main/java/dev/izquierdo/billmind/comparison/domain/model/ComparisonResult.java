@@ -8,6 +8,12 @@ public sealed interface ComparisonResult
 
     String bestCompany();
     String bestTariffName();
-    BigDecimal annualSavingsEuros();
+
+    // A band, never a single figure: the saving is extrapolated from one billing period, so the
+    // two ends are what the engine actually knows. Callers that need one number take the midpoint.
+    BigDecimal annualSavingsLowEuros();
+    BigDecimal annualSavingsHighEuros();
+
+    ComparisonBasis basis();
     Instant comparedAt();
 }

@@ -257,7 +257,7 @@ class InvoiceFieldsValidatorTest {
             // Per-period consumption stays null: no test asserts on it beyond the negative case,
             // which the total already covers.
             return new ElectricityFields(start, end, total, consumptionKwh,
-                    null, null, null, price, priceP1, priceP2, priceP3, power);
+                    null, null, null, price, priceP1, priceP2, priceP3, power, null, null);
         }
 
         private static BigDecimal decimal(String value) {

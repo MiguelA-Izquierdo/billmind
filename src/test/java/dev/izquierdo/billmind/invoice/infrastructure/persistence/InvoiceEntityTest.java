@@ -85,7 +85,7 @@ class InvoiceEntityTest {
         ElectricityFields fields = new ElectricityFields(
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31),
                 new BigDecimal("45.50"), new BigDecimal("405.000"), null, null, null,
-                new BigDecimal("0.140000"), null, null, null, new BigDecimal("3.300"));
+                new BigDecimal("0.140000"), null, null, null, new BigDecimal("3.300"), null, null);
         Invoice invoice = Invoice.builder(UUID.randomUUID(), "factura_luz.pdf")
                 .supplyType(SupplyDomain.ELECTRICITY)
                 .fields(fields)

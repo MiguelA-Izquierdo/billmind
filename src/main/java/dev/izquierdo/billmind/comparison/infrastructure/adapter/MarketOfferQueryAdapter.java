@@ -67,7 +67,8 @@ public class MarketOfferQueryAdapter implements MarketOfferQueryPort {
                 rate.getPricePerKwhValle(),
                 rate.getPricePerKwhLlano(),
                 rate.getPricePerKwhPunta(),
-                rate.getContractedPowerPrice()
+                rate.getContractedPowerPrice(),
+                rate.getContractedPowerPriceP2()
         );
     }
 
@@ -94,11 +95,13 @@ public class MarketOfferQueryAdapter implements MarketOfferQueryPort {
             BigDecimal pricePerKwhValle,
             BigDecimal pricePerKwhLlano,
             BigDecimal pricePerKwhPunta,
-            BigDecimal contractedPowerPrice
+            BigDecimal contractedPowerPrice,
+            BigDecimal contractedPowerPriceP2
     ) {
         ElectricityMarketOffer toDomain() {
             return new ElectricityMarketOffer(company, tariffName, pricePerKwh,
-                    pricePerKwhValle, pricePerKwhLlano, pricePerKwhPunta, contractedPowerPrice);
+                    pricePerKwhValle, pricePerKwhLlano, pricePerKwhPunta,
+                    contractedPowerPrice, contractedPowerPriceP2);
         }
     }
 }

@@ -59,7 +59,12 @@ public class LlmAssistantAdapter implements AssistantLlmPort {
             5. When the user asks whether they are paying too much or which tariff is cheaper, \
             base your answer on the COMPARATIVA_CALCULADA block: the user's effective price, \
             the cheapest tariff and the annual savings are ALREADY computed there. \
-            Do NOT re-rank or recompute the raw market rates yourself; just explain that result.
+            Do NOT re-rank or recompute the raw market rates yourself; just explain that result. \
+            Two savings are given. The one for the billed period extrapolates nothing — lead with \
+            it, paired with the invoice total the user can check. The annual one is a projection \
+            over a year not yet lived: quote both ends of its range, never a single figure and \
+            never one to the cent, and state the basis printed with it (days invoiced, power \
+            term, consumption profile).
             6. Use the raw market rates list only for questions about a specific company or tariff.
             7. If the question cannot be answered from the provided context, say so clearly.
             8. Keep answers concise: maximum 3 short paragraphs. Use bullet points for lists.

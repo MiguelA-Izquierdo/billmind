@@ -133,8 +133,8 @@ export function showComparisonResult(data) {
   el.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
   // Only the visible panel counts up; the other one animates when its tab is opened.
-  if (c?.flatBlock)     animateCounter(c.flatBlock.annualSavingsEuros, id + '-counter');
-  else if (c?.touBlock) animateCounter(c.touBlock.annualSavingsEuros,  id + '-counter-tou');
+  if (c?.flatBlock)     animateCounter(c.flatBlock, c, id + '-counter');
+  else if (c?.touBlock) animateCounter(c.touBlock,  c, id + '-counter-tou');
 }
 
 /**
@@ -158,8 +158,8 @@ function buildCard(id, data, c) {
   const tabs = (flat && tou)
     ? `<div class="cmp-tabs-hint">Tienes dos formas de ahorrar · toca para comparar</div>
        <div class="cmp-tabs" role="tablist">
-         ${tabButton('flat', 'Tarifa plana', flat.annualSavingsEuros, true)}
-         ${tabButton('tou',  'Horas valle',  tou.annualSavingsEuros,  false)}
+         ${tabButton('flat', 'Tarifa plana', flat.periodSavingsEuros, true)}
+         ${tabButton('tou',  'Horas valle',  tou.periodSavingsEuros, false)}
        </div>`
     : '';
 
@@ -179,14 +179,14 @@ function tabButton(kind, label, savings, active) {
   return `<button class="cmp-tab${active ? ' active' : ''}" role="tab"
             aria-selected="${active}" data-panel="${kind}">
             <span class="cmp-tab-label">${label}</span>
-            <span class="cmp-tab-amount ${amount >= 0 ? 'positive' : 'negative'}">${sign}${fmtEurosShort(Math.abs(amount))}</span>
+            <span class="cmp-tab-amount ${amount >= 0 ? 'positive' : 'negative'}">${sign}${fmtEuros(Math.abs(amount))}</span>
             <span class="cmp-tab-cue">${active ? 'Viendo' : 'Ver'}</span>
           </button>`;
 }
 
 function buildPanel(id, c, block, kind, visible) {
   const isTou     = kind === 'tou';
-  const savings   = Number(block.annualSavingsEuros);
+  const savings   = Number(block.annualSavingsMid);
   const positive  = savings >= 0;
   const counterId = isTou ? `${id}-counter-tou` : `${id}-counter`;
 
@@ -203,11 +203,13 @@ function buildPanel(id, c, block, kind, visible) {
   // summary column it wrapped over three lines and pushed the badge loose.
   return `
     <div class="cmp-panel" data-panel="${kind}" ${visible ? '' : 'hidden'}>
+      ${buildHeadline(c, block, counterId)}
       <div class="cmp-main">
         <div class="cmp-summary">
-          <div class="cmp-savings-label">${positive ? 'Ahorro potencial' : 'Coste adicional'}</div>
-          <div class="cmp-amount ${positive ? 'positive' : 'negative'}" id="${counterId}">0,00 €</div>
-          <div class="cmp-year">/ año${isTou ? '' : ' sin cambios'}</div>
+          <div class="cmp-savings-label">A un año</div>
+          <div class="cmp-proj-amount ${positive ? 'positive' : 'negative'}">≈ ${fmtEurosShort(savings)}</div>
+          <div class="cmp-year">si tu consumo se mantiene</div>
+          <div class="cmp-range">entre ${fmtEurosShort(block.annualSavingsLow)} y ${fmtEurosShort(block.annualSavingsHigh)}</div>
         </div>
         <div class="cmp-grid">
           ${metrics.map(([cls, val, unit, key]) => `
@@ -219,8 +221,66 @@ function buildPanel(id, c, block, kind, visible) {
       </div>
       <div class="cmp-best">con <strong>${escHtml(block.bestTariffName)}</strong> de ${escHtml(block.bestCompany)}</div>
       ${buildAlternatives(block, isTou)}
-      ${isTou ? '<div class="cmp-tou-disclaimer">* Precio efectivo medio. El ahorro real depende de trasladar consumos a horas valle (23h–8h).</div>' : ''}
+      ${basisNote(c, isTou)}
     </div>`;
+}
+
+/**
+ * The figure the user can check against the paper in their hand: what this very invoice would
+ * have cost on the winning tariff. It extrapolates nothing, so it leads the card and takes the
+ * counter — which until now animated the *least* certain number on it. The annual projection
+ * below inherits its credibility from this one.
+ */
+function buildHeadline(c, block, counterId) {
+  const saving = Number(block.periodSavingsEuros);
+  if (!Number.isFinite(saving) || saving === 0) return '';
+
+  const total   = Number(c.invoiceTotalEuros);
+  const hasBill = Number.isFinite(total) && total > 0;
+  const cheaper = saving > 0;
+  const days    = c.basis?.observedDays;
+
+  // With the printed total we can show the bill itself shrinking; without it, only the delta.
+  const figure = hasBill ? total - saving : Math.abs(saving);
+  const aside  = hasBill
+    ? `<span class="cmp-bill-was">en vez de ${fmtEuros(total)}</span>`
+    : '';
+
+  return `
+    <div class="cmp-headline">
+      <div class="cmp-savings-label">En esta factura ${cheaper ? 'habrías pagado' : 'pagarías'}</div>
+      <div class="cmp-bill">
+        <span class="cmp-amount ${cheaper ? 'positive' : 'negative'}" id="${counterId}">${fmtEuros(figure)}</span>
+        ${aside}
+      </div>
+      <div class="cmp-year">
+        ${cheaper ? '−' : '+'}${fmtEuros(Math.abs(saving))}${days ? ` · ${days} días facturados` : ''}
+      </div>
+    </div>`;
+}
+
+/**
+ * The figure above is an extrapolation over a year the user has not lived yet. This is the one
+ * place that says so, and it says it from the payload rather than from a fixed sentence — a card
+ * that assumed a consumption profile and one that read it off the invoice do not deserve the
+ * same caveat.
+ */
+function basisNote(c, isTou) {
+  const b = c.basis;
+  const parts = [];
+  if (b) {
+    parts.push(`* Estimación sobre ${b.observedDays} días facturados${b.annualised ? ', extrapolados a un año' : ''}.`);
+    if (b.powerTerm === 'UNAVAILABLE') {
+      parts.push('Solo compara el término de energía: el de potencia no se pudo leer de la factura.');
+    } else if (b.powerTerm === 'DERIVED') {
+      parts.push('El término de potencia está estimado a partir del total de la factura.');
+    }
+    if (b.consumptionProfile === 'ASSUMED') {
+      parts.push('El reparto del consumo por periodos usa un perfil doméstico estándar.');
+    }
+  }
+  if (isTou) parts.push('El ahorro real depende de trasladar consumos a horas valle (23h–8h).');
+  return parts.length ? `<div class="cmp-basis-note">${parts.join(' ')}</div>` : '';
 }
 
 /** Alternatives are reference material, not the headline — they fold away. */
@@ -265,7 +325,7 @@ function wireTabs(root, id, c) {
     // Run the count-up the first time the panel is actually seen
     if (target === 'tou' && !touAnimated) {
       touAnimated = true;
-      animateCounter(c.touBlock.annualSavingsEuros, id + '-counter-tou');
+      animateCounter(c.touBlock, c, id + '-counter-tou');
     }
   }));
 }
@@ -274,21 +334,36 @@ function fmtEurosShort(v) {
   return Number(v).toLocaleString('es-ES', { maximumFractionDigits: 0 }) + ' €';
 }
 
-function animateCounter(target, elId) {
-  const el  = document.getElementById(elId);
+function fmtEuros(v) {
+  return Number(v).toLocaleString('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }) + ' €';
+}
+
+/**
+ * Runs the bill down from what the user actually paid to what they would have paid. Cents are
+ * warranted here and only here: this figure comes from the invoice's own consumption and days,
+ * so it is the one number on the card that is not an estimate.
+ */
+function animateCounter(block, c, elId) {
+  const el = document.getElementById(elId);
   if (!el) return;
-  const end    = Math.abs(Number(target));
-  const prefix = Number(target) >= 0 ? '' : '-';
-  const dur    = 1400;
-  const start  = performance.now();
+
+  const saving  = Number(block.periodSavingsEuros);
+  const total   = Number(c.invoiceTotalEuros);
+  const hasBill = Number.isFinite(total) && total > 0;
+  if (!Number.isFinite(saving) || saving === 0) return;
+
+  const from = hasBill ? total : 0;
+  const to   = hasBill ? total - saving : Math.abs(saving);
+  const dur   = 1400;
+  const start = performance.now();
 
   function step(now) {
     const t    = Math.min((now - start) / dur, 1);
     const ease = 1 - Math.pow(1 - t, 3);
-    el.textContent = prefix + (end * ease).toLocaleString('es-ES', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) + ' €';
+    el.textContent = fmtEuros(from + (to - from) * ease);
     if (t < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);

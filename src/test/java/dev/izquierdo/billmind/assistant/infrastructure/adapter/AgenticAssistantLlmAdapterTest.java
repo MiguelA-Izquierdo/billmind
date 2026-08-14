@@ -44,7 +44,7 @@ class AgenticAssistantLlmAdapterTest {
 
     private static final ElectricityFields FIELDS = new ElectricityFields(
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), new BigDecimal("45.50"),
-            null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null);
 
     private static final String INVOICE_TEXT = "ALQUILER EQUIPOS DE MEDIDA ... 12,45 €";
 

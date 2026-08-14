@@ -104,13 +104,27 @@ Content-Type: multipart/form-data
       "userPricePerKwh": 0.1542,
       "userIsTou": false,
       "annualKwhEstimate": 3600,
+      "userAnnualCostEuros": 748.30,
+      "invoiceTotalEuros": 135.64,
+      "basis": {
+        "observedDays": 32,
+        "annualised": true,
+        "powerTerm": "READ",
+        "consumptionProfile": "ACTUAL",
+        "taxesIncluded": true
+      },
       "flatBlock": {
         "bestCompany": "PODO",
         "bestTariffName": "Tarifa Estable",
         "bestPricePerKwh": 0.1190,
-        "annualSavingsEuros": 126.72,
+        "bestAnnualCostEuros": 621.58,
+        "periodSavingsEuros": 38.27,
+        "annualSavingsLow": 110.00,
+        "annualSavingsHigh": 210.00,
+        "annualSavingsMid": 160.00,
         "alternatives": [
-          { "company": "PODO", "tariffName": "Tarifa Estable", "effectivePricePerKwh": 0.1190, "touRate": false }
+          { "company": "PODO", "tariffName": "Tarifa Estable", "effectivePricePerKwh": 0.1190,
+            "annualCostEuros": 621.58, "touRate": false }
         ]
       },
       "touBlock": null
@@ -120,6 +134,24 @@ Content-Type: multipart/form-data
 ```
 
 The same comparison payload is available on demand at `GET /api/v1/invoices/{id}/comparison`.
+
+**Reading the savings.** Offers are ranked on **total annual cost** — energy plus the power term (`contractedPowerKw × €/kW/día × 365`) — not on `€/kWh`. The power term is a fixed cost that does not scale with consumption, so an offer with cheap energy and an expensive standing charge can and does lose. `bestAnnualCostEuros` and each alternative's `annualCostEuros` are the figures the ranking actually used.
+
+**Two savings, and they are not the same kind of number.** `periodSavingsEuros` is what the invoice in hand would have cost on the winning tariff: its own consumption, its own days, nothing extrapolated. It keeps its cents, carries no band, and pairs with `invoiceTotalEuros` so a client can show the bill the user is holding next to what it would have been. It is the only figure on the payload the user can verify, and clients should lead with it.
+
+The annual saving is a **band**, never a point: it projects that billing period over a year the user has not lived. `annualSavingsLow`/`High` are rounded outwards to whole tens; `annualSavingsMid` is offered only so a client has one figure to headline. Both ends already carry IEE and IVA, as does `periodSavingsEuros`.
+
+`basis` says what the band rests on, and a client that prints a figure must be able to print its caveats from the same payload:
+
+| Field | Meaning |
+|---|---|
+| `observedDays` | Days the invoice covers |
+| `annualised` | `true` when the year was extrapolated from a shorter period |
+| `powerTerm` | `READ` off the invoice · `DERIVED` from its printed total · `UNAVAILABLE`, energy compared alone |
+| `consumptionProfile` | `ACTUAL` per-period consumption, or an `ASSUMED` standard domestic profile |
+| `taxesIncluded` | `false` only when the extracted prices already carried tax |
+
+`comparison` is also `null` when the extracted fields **fail to reconcile** with the invoice's printed total: the parts not adding up means some extracted number is wrong, and no saving is quoted off it.
 
 `400 Bad Request` — file is not a PDF (validation fails in `UploadInvoiceCommand`):
 ```json

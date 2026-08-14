@@ -92,7 +92,84 @@ class ElectricityFieldsTest {
         assertThat(result.contractedPowerKw()).isEqualByComparingTo("4.6");
     }
 
+    // ── reconcileWithTotal ────────────────────────────────────────────────────
+
+    /**
+     * The arithmetic of a real Endesa 2.0TD bill: 32 days, 419,475 kWh at 0,217764 €/kWh and
+     * 3,45 kW at 0,102630 + 0,022452 €/kW/día add up to 105,16 €, which the printed 135,64 €
+     * exceeds by exactly what IEE and IVA take. Nothing here assumes a tax rate — the ratio is
+     * measured, so a bill issued under a temporary reduced rate reconciles just the same.
+     */
+    @Test
+    void shouldReadRealInvoiceAsPreTaxWhenPartsAndTotalDifferByTax() {
+        assertThat(realInvoice("0.217764", "0.102630", "0.022452").reconcileWithTotal())
+                .isEqualTo(ElectricityFields.TaxBasis.PRE_TAX);
+    }
+
+    /**
+     * The failure the reconciliation exists for. 0,118 instead of 0,218 is one wrong digit and is
+     * perfectly plausible in isolation — it only becomes visible against the printed total.
+     */
+    @Test
+    void shouldRejectAMisreadEnergyPriceThatCannotAddUpToTheTotal() {
+        assertThat(realInvoice("0.118000", "0.102630", "0.022452").reconcileWithTotal())
+                .isEqualTo(ElectricityFields.TaxBasis.INCOHERENT);
+    }
+
+    @Test
+    void shouldDetectPricesThatAlreadyCarryTax() {
+        assertThat(realInvoice("0.277000", "0.130000", "0.029000").reconcileWithTotal())
+                .isEqualTo(ElectricityFields.TaxBasis.POST_TAX);
+    }
+
+    /**
+     * Without the power term the denominator is short, so the verdict rests on energy alone. It
+     * can still separate taxed prices from untaxed ones; it cannot catch a subtler misread.
+     */
+    @Test
+    void shouldStillClassifyTaxBasisWhenThePowerTermIsMissing() {
+        assertThat(realInvoice("0.217764", null, null).reconcileWithTotal())
+                .isEqualTo(ElectricityFields.TaxBasis.PRE_TAX);
+    }
+
+    @Test
+    void shouldRejectEnergyThatAloneOverrunsTheInvoiceTotal() {
+        assertThat(realInvoice("0.400000", null, null).reconcileWithTotal())
+                .isEqualTo(ElectricityFields.TaxBasis.INCOHERENT);
+    }
+
+    @Test
+    void shouldReportInsufficientDataWhenNoTotalWasExtracted() {
+        ElectricityFields noTotal = new ElectricityFields(
+                LocalDate.of(2026, 6, 10), LocalDate.of(2026, 7, 12),
+                null, new BigDecimal("419.475"), null, null, null,
+                new BigDecimal("0.217764"), null, null, null, new BigDecimal("3.45"), null, null);
+
+        assertThat(noTotal.reconcileWithTotal()).isEqualTo(ElectricityFields.TaxBasis.INSUFFICIENT_DATA);
+    }
+
+    /** Solving the missing power term from the total recovers it to within the omitted fixed lines. */
+    @Test
+    void shouldDerivePowerCostCloseToTheInvoicesOwnPowerLine() {
+        BigDecimal derived = realInvoice("0.217764", null, null).derivePowerCostForPeriod();
+
+        // The bill charges 13,81 € of power. The residual also absorbs the bono social and meter
+        // rental (1,53 €) that nothing extracts, so it lands high by about that much.
+        assertThat(derived).isBetween(new BigDecimal("13.00"), new BigDecimal("16.00"));
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
+
+    /** A real Endesa 2.0TD invoice: 10/06/2026–12/07/2026, 419,475 kWh, 3,45 kW, 135,64 € total. */
+    private static ElectricityFields realInvoice(String pricePerKwh, String powerP1, String powerP2) {
+        return new ElectricityFields(
+                LocalDate.of(2026, 6, 10), LocalDate.of(2026, 7, 12),
+                new BigDecimal("135.64"), new BigDecimal("419.475"),
+                null, null, null,
+                new BigDecimal(pricePerKwh), null, null, null, new BigDecimal("3.45"),
+                decimal(powerP1), decimal(powerP2));
+    }
+
 
     private static ElectricityFields withPrices(String flat, String p1, String p2, String p3) {
         return new ElectricityFields(
@@ -100,7 +177,7 @@ class ElectricityFieldsTest {
                 new BigDecimal("56.83"), new BigDecimal("208.0"),
                 new BigDecimal("64.0"), new BigDecimal("69.0"), new BigDecimal("75.0"),
                 decimal(flat), decimal(p1), decimal(p2), decimal(p3),
-                new BigDecimal("4.6"));
+                new BigDecimal("4.6"), null, null);
     }
 
     private static BigDecimal decimal(String value) {

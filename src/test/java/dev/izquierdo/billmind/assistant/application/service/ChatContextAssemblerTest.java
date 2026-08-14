@@ -52,7 +52,7 @@ class ChatContextAssemblerTest {
 
     private static final ElectricityFields ELECTRICITY_FIELDS =
             new ElectricityFields(START, END, new BigDecimal("45.50"),
-                    null, null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null, null, null);
 
     @BeforeEach
     void setUp() {
@@ -204,7 +204,7 @@ class ChatContextAssemblerTest {
     void shouldLoadComparisonSummaryForInvoiceWithFields() {
         Invoice invoice = Invoice.builder(INVOICE_ID, "factura.pdf").fields(ELECTRICITY_FIELDS).build();
         ComparisonSummary summary = new ComparisonSummary(
-                new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null);
+                new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null, null, null);
         when(invoiceContextPort.loadInvoice(INVOICE_ID, SESSION_ID)).thenReturn(Optional.of(invoice));
         when(regulationSearchPort.search(any(), eq(MAX_RESULTS))).thenReturn(List.of());
         when(comparisonContextPort.summarize(ELECTRICITY_FIELDS)).thenReturn(Optional.of(summary));

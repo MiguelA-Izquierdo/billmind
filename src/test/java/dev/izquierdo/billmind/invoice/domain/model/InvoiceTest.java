@@ -99,7 +99,7 @@ class InvoiceTest {
         ElectricityFields fields = new ElectricityFields(
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31),
                 new BigDecimal("45.50"), new BigDecimal("405"), null, null, null,
-                new BigDecimal("0.14"), null, null, null, new BigDecimal("3.3"));
+                new BigDecimal("0.14"), null, null, null, new BigDecimal("3.3"), null, null);
 
         Invoice enriched = invoice.withExtractedData(fields, "texto redactado");
 
@@ -112,7 +112,7 @@ class InvoiceTest {
         Invoice original = Invoice.builder(UUID.randomUUID(), "factura.pdf").build();
         ElectricityFields fields = new ElectricityFields(
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31),
-                new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null);
+                new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null, null, null);
 
         original.withExtractedData(fields, "texto");
 

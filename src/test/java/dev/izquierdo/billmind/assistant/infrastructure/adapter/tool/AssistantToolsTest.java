@@ -45,7 +45,7 @@ class AssistantToolsTest {
 
     private static final ElectricityFields FIELDS = new ElectricityFields(
             LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), new BigDecimal("45.50"),
-            null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null);
 
     private static final String INVOICE_TEXT = """
             COMERCIALIZADORA EJEMPLO - FACTURA ELECTRICIDAD
@@ -102,7 +102,7 @@ class AssistantToolsTest {
     @Test
     void shouldSummarizeComparisonForInvoiceFields() {
         ComparisonSummary summary = new ComparisonSummary(
-                new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null);
+                new BigDecimal("0.123"), true, new BigDecimal("3869.00"), null, null, null, null);
         when(comparisonContextPort.summarize(FIELDS)).thenReturn(Optional.of(summary));
 
         String result = tools.dispatch(request("get_invoice_comparison", "{}"), CONTEXT, new ArrayList<>());

@@ -64,9 +64,9 @@ public class InvoiceController {
             Optional<ComparisonResult> comparisonResult = queryBus.dispatch(new CompareInvoiceQuery(invoice.getFields()));
             comparison = comparisonResult
                     .map(result -> {
-                        log.debug("Comparison completed for invoice={} savings={}€ bestRate={}/{}",
-                                invoiceId, result.annualSavingsEuros(),
-                                result.bestCompany(), result.bestTariffName());
+                        log.debug("Comparison completed for invoice={} savings={}-{}€ bestRate={}/{} basis={}",
+                                invoiceId, result.annualSavingsLowEuros(), result.annualSavingsHighEuros(),
+                                result.bestCompany(), result.bestTariffName(), result.basis());
                         return ComparisonResponseDTO.from(result);
                     })
                     .orElseGet(() -> {
@@ -105,7 +105,8 @@ public class InvoiceController {
         Optional<ComparisonResult> comparisonResult = queryBus.dispatch(new CompareInvoiceQuery(invoice.getFields()));
         ComparisonResponseDTO comparison = comparisonResult
                 .map(r -> {
-                    log.debug("Comparison on select invoice={} savings={}€", id, r.annualSavingsEuros());
+                    log.debug("Comparison on select invoice={} savings={}-{}€",
+                            id, r.annualSavingsLowEuros(), r.annualSavingsHighEuros());
                     return ComparisonResponseDTO.from(r);
                 })
                 .orElse(null);

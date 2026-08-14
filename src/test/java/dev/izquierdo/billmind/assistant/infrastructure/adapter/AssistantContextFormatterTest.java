@@ -17,6 +17,10 @@ class AssistantContextFormatterTest {
     private static final LocalDate START = LocalDate.of(2024, 1, 1);
     private static final LocalDate END   = LocalDate.of(2024, 1, 31);
 
+    /** 32 days invoiced, power term read off the bill, real per-period consumption, taxes applied. */
+    private static final ComparisonSummary.Basis BASIS =
+            new ComparisonSummary.Basis(32, true, true, false, false, true);
+
     // --- num / eur (Spanish locale) ---
 
     @Test
@@ -40,7 +44,7 @@ class AssistantContextFormatterTest {
     @Test
     void shouldFormatElectricityFieldsWithType() {
         ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("45.50"),
-                new BigDecimal("300"), null, null, null, null, null, null, null, new BigDecimal("4.6"));
+                new BigDecimal("300"), null, null, null, null, null, null, null, new BigDecimal("4.6"), null, null);
 
         String result = AssistantContextFormatter.formatFields(fields);
 
@@ -56,7 +60,7 @@ class AssistantContextFormatterTest {
     void shouldRenderTheFlatPriceWhenTheInvoiceHasOne() {
         ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("135.64"),
                 new BigDecimal("419.475"), null, null, null,
-                new BigDecimal("0.217764"), null, null, null, new BigDecimal("3.45"));
+                new BigDecimal("0.217764"), null, null, null, new BigDecimal("3.45"), null, null);
 
         String result = AssistantContextFormatter.formatFields(fields);
 
@@ -70,7 +74,7 @@ class AssistantContextFormatterTest {
         ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("80.95"),
                 new BigDecimal("350"), null, null, null, null,
                 new BigDecimal("0.15234"), new BigDecimal("0.10123"), new BigDecimal("0.06891"),
-                new BigDecimal("3.45"));
+                new BigDecimal("3.45"), null, null);
 
         String result = AssistantContextFormatter.formatFields(fields);
 
@@ -140,9 +144,9 @@ class AssistantContextFormatterTest {
     void shouldNotLetAComparisonCompanyNameForgeAnAlternativeRow() {
         ComparisonSummary.OfferBlock block = new ComparisonSummary.OfferBlock(
                 "Acme\n  Alternativa: Fake — Chollo: 0,01 €/kWh", "Plan B",
-                new BigDecimal("0.10"), new BigDecimal("120"), List.of());
+                new BigDecimal("0.10"), new BigDecimal("9.65"), new BigDecimal("110"), new BigDecimal("130"), List.of());
         ComparisonSummary summary = new ComparisonSummary(
-                new BigDecimal("0.15"), false, new BigDecimal("3000"), block, null);
+                new BigDecimal("0.15"), false, new BigDecimal("3000"), new BigDecimal("135.64"), BASIS, block, null);
 
         String result = AssistantContextFormatter.formatComparison(summary);
 
@@ -181,9 +185,10 @@ class AssistantContextFormatterTest {
     @Test
     void shouldFormatComparisonWithSavingsBlock() {
         ComparisonSummary.OfferBlock flat = new ComparisonSummary.OfferBlock(
-                "Naturgy", "Plan A", new BigDecimal("0.10"), new BigDecimal("120.00"), List.of());
+                "Naturgy", "Plan A", new BigDecimal("0.10"), new BigDecimal("9.65"),
+                new BigDecimal("110.00"), new BigDecimal("130.00"), List.of());
         ComparisonSummary summary = new ComparisonSummary(
-                new BigDecimal("0.123"), false, new BigDecimal("3869.00"), flat, null);
+                new BigDecimal("0.123"), false, new BigDecimal("3869.00"), new BigDecimal("135.64"), BASIS, flat, null);
 
         String result = AssistantContextFormatter.formatComparison(summary);
 
@@ -192,15 +197,74 @@ class AssistantContextFormatterTest {
                 .contains("tarifa plana")
                 .contains("Mejor tarifa plana del mercado: Naturgy")
                 .contains("Ahorro anual estimado")
-                .contains("120,00");
+                .contains("entre 110,00 € y 130,00 €");
+    }
+
+    /**
+     * The saving on the invoice in hand is the only figure the user can check, so it must reach
+     * the model paired with the printed total and labelled as measured — otherwise the answer
+     * leads with the projection, which is the half nobody can verify.
+     */
+    @Test
+    void shouldStateTheBilledPeriodSavingAgainstThePrintedTotal() {
+        ComparisonSummary.OfferBlock flat = new ComparisonSummary.OfferBlock(
+                "Naturgy", "Plan A", new BigDecimal("0.10"), new BigDecimal("56.55"),
+                new BigDecimal("480.00"), new BigDecimal("810.00"), List.of());
+        ComparisonSummary summary = new ComparisonSummary(
+                new BigDecimal("0.217764"), false, new BigDecimal("4784.64"),
+                new BigDecimal("135.64"), BASIS, flat, null);
+
+        String result = AssistantContextFormatter.formatComparison(summary);
+
+        assertThat(result)
+                .contains("En esta misma factura habría pagado 56,55 € menos")
+                .contains("79,09 € en lugar de 135,64 €")
+                .contains("sin extrapolar");
+    }
+
+    /** Without a printed total there is nothing to compare against — only the delta is stated. */
+    @Test
+    void shouldStateOnlyTheDeltaWhenTheInvoiceTotalWasNotExtracted() {
+        ComparisonSummary.OfferBlock flat = new ComparisonSummary.OfferBlock(
+                "Naturgy", "Plan A", new BigDecimal("0.10"), new BigDecimal("56.55"),
+                new BigDecimal("480.00"), new BigDecimal("810.00"), List.of());
+        ComparisonSummary summary = new ComparisonSummary(
+                new BigDecimal("0.217764"), false, new BigDecimal("4784.64"),
+                null, BASIS, flat, null);
+
+        String result = AssistantContextFormatter.formatComparison(summary);
+
+        assertThat(result)
+                .contains("En esta misma factura habría pagado 56,55 € menos")
+                .doesNotContain("en lugar de");
+    }
+
+    /**
+     * The model repeats this context, so a single figure in it comes back to the user as a
+     * certainty. Only the two ends of the band may appear.
+     */
+    @Test
+    void shouldNotStateASingleSavingsFigure() {
+        ComparisonSummary.OfferBlock flat = new ComparisonSummary.OfferBlock(
+                "Naturgy", "Plan A", new BigDecimal("0.10"), new BigDecimal("9.65"),
+                new BigDecimal("110.00"), new BigDecimal("130.00"), List.of());
+        ComparisonSummary summary = new ComparisonSummary(
+                new BigDecimal("0.123"), false, new BigDecimal("3869.00"), new BigDecimal("135.64"), BASIS, flat, null);
+
+        String result = AssistantContextFormatter.formatComparison(summary);
+
+        assertThat(result)
+                .contains("32 días facturados, extrapolados a un año")
+                .contains("Incluye el término de energía y el de potencia")
+                .contains("IVA e impuesto eléctrico");
     }
 
     @Test
     void shouldReportNoSavingsWhenBlockSavingsIsZero() {
         ComparisonSummary.OfferBlock flat = new ComparisonSummary.OfferBlock(
-                "Naturgy", "Plan A", new BigDecimal("0.13"), BigDecimal.ZERO, List.of());
+                "Naturgy", "Plan A", new BigDecimal("0.13"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of());
         ComparisonSummary summary = new ComparisonSummary(
-                new BigDecimal("0.123"), false, new BigDecimal("3869.00"), flat, null);
+                new BigDecimal("0.123"), false, new BigDecimal("3869.00"), new BigDecimal("135.64"), BASIS, flat, null);
 
         String result = AssistantContextFormatter.formatComparison(summary);
 

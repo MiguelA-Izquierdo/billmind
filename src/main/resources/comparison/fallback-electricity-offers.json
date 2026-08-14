@@ -1,23 +1,26 @@
 {
-  "note": "Fallback 2.0TD offers used ONLY when electricity_rates holds no rates, so a freshly cloned repo can exercise the savings comparison without a Kafka producer. These are never persisted. Prices are plausible Spanish retail-market figures but are NOT real published tariffs — the company names are deliberately generic so no offer is ever attributed to a real retailer. Three flat-price offers + three time-of-use offers, so both comparison blocks get a winner and two alternatives.",
+  "note": "Fallback 2.0TD offers used ONLY when electricity_rates holds no rates, so a freshly cloned repo can exercise the savings comparison without a Kafka producer. These are never persisted. Prices are plausible Spanish retail-market figures but are NOT real published tariffs — the company names are deliberately generic so no offer is ever attributed to a real retailer. Three flat-price offers + three time-of-use offers, so both comparison blocks get a winner and two alternatives. Every offer carries both power periods (contractedPowerPrice = P1 punta-llano, contractedPowerPriceP2 = P2 valle, both €/kW/día): the engine ranks on total annual cost, and an offer missing them would be compared on half its price.",
   "offers": [
     {
       "company": "Comercializadora Ejemplo Uno",
       "tariffName": "Plan Fijo 12 Meses",
       "pricePerKwh": 0.149000,
-      "contractedPowerPrice": 0.115000
+      "contractedPowerPrice": 0.115000,
+      "contractedPowerPriceP2": 0.024000
     },
     {
       "company": "Comercializadora Ejemplo Dos",
       "tariffName": "Tarifa Plana Hogar",
       "pricePerKwh": 0.142000,
-      "contractedPowerPrice": 0.121000
+      "contractedPowerPrice": 0.121000,
+      "contractedPowerPriceP2": 0.018000
     },
     {
       "company": "Comercializadora Ejemplo Tres",
       "tariffName": "Precio Único Sin Tramos",
       "pricePerKwh": 0.139000,
-      "contractedPowerPrice": 0.118000
+      "contractedPowerPrice": 0.118000,
+      "contractedPowerPriceP2": 0.027000
     },
     {
       "company": "Comercializadora Ejemplo Cuatro",
@@ -25,7 +28,8 @@
       "pricePerKwhPunta": 0.185000,
       "pricePerKwhLlano": 0.135000,
       "pricePerKwhValle": 0.089000,
-      "contractedPowerPrice": 0.113000
+      "contractedPowerPrice": 0.113000,
+      "contractedPowerPriceP2": 0.029000
     },
     {
       "company": "Comercializadora Ejemplo Cinco",
@@ -33,7 +37,8 @@
       "pricePerKwhPunta": 0.178000,
       "pricePerKwhLlano": 0.128000,
       "pricePerKwhValle": 0.082000,
-      "contractedPowerPrice": 0.119000
+      "contractedPowerPrice": 0.119000,
+      "contractedPowerPriceP2": 0.021000
     },
     {
       "company": "Comercializadora Ejemplo Seis",
@@ -41,7 +46,8 @@
       "pricePerKwhPunta": 0.169000,
       "pricePerKwhLlano": 0.124000,
       "pricePerKwhValle": 0.079000,
-      "contractedPowerPrice": 0.122000
+      "contractedPowerPrice": 0.122000,
+      "contractedPowerPriceP2": 0.019000
     }
   ]
 }

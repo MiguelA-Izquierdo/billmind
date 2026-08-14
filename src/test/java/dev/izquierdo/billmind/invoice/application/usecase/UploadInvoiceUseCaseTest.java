@@ -66,7 +66,7 @@ class UploadInvoiceUseCaseTest {
                 .thenReturn(new InvoiceClassification(SupplyDomain.ELECTRICITY, "IBERDROLA"));
         when(piiRedactor.redact(anyString())).thenReturn("texto redactado");
         when(fieldExtractor.extract(anyString(), any()))
-                .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null));
+                .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null, null, null));
 
         uploadInvoiceUseCase.upload(invoice, pdfContent);
 
@@ -152,7 +152,7 @@ class UploadInvoiceUseCaseTest {
                 .thenReturn(new InvoiceClassification(SupplyDomain.ELECTRICITY, "IBERDROLA"));
         when(piiRedactor.redact(anyString())).thenReturn("texto redactado");
         when(fieldExtractor.extract(anyString(), any()))
-                .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null));
+                .thenReturn(new ElectricityFields(START, END, new BigDecimal("45.50"), null, null, null, null, null, null, null, null, null, null, null));
 
         uploadInvoiceUseCase.upload(invoice, pdfContent);
 

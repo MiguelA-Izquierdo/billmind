@@ -113,18 +113,45 @@ public final class AssistantContextFormatter {
         sb.append("Precio efectivo actual del usuario: ").append(num(c.userEffectivePricePerKwh()))
           .append(" €/kWh (").append(c.userIsTou() ? "tarifa por periodos" : "tarifa plana").append(").\n");
         sb.append("Consumo anual estimado: ").append(num(c.annualKwhEstimate())).append(" kWh.\n");
-        appendOfferBlock(sb, "Mejor tarifa plana del mercado", c.flatBlock());
-        appendOfferBlock(sb, "Mejor tarifa por periodos del mercado", c.touBlock());
+        appendBasis(sb, c.basis());
+        appendOfferBlock(sb, "Mejor tarifa plana del mercado", c.flatBlock(), c.invoiceTotalEuros());
+        appendOfferBlock(sb, "Mejor tarifa por periodos del mercado", c.touBlock(), c.invoiceTotalEuros());
         return sb.toString().stripTrailing();
     }
 
-    private static void appendOfferBlock(StringBuilder sb, String label, ComparisonSummary.OfferBlock block) {
+    /**
+     * States what the figures rest on. The model repeats this context almost verbatim, so anything
+     * left unsaid here comes back to the user as a certainty the engine never claimed.
+     */
+    private static void appendBasis(StringBuilder sb, ComparisonSummary.Basis basis) {
+        if (basis == null) return;
+        sb.append("Base del cálculo: ").append(basis.observedDays()).append(" días facturados");
+        sb.append(basis.annualised() ? ", extrapolados a un año.\n" : ".\n");
+        if (!basis.powerTermIncluded()) {
+            sb.append("  Solo compara el término de energía: el de potencia no se pudo leer de la factura.\n");
+        } else if (basis.powerTermEstimated()) {
+            sb.append("  Incluye el término de potencia, estimado a partir del total de la factura.\n");
+        } else {
+            sb.append("  Incluye el término de energía y el de potencia.\n");
+        }
+        if (basis.consumptionProfileAssumed()) {
+            sb.append("  El reparto del consumo por periodos es un perfil doméstico estándar, no el de la factura.\n");
+        }
+        sb.append(basis.taxesIncluded() ? "  Las cifras llevan IVA e impuesto eléctrico.\n"
+                                        : "  Los precios de la factura ya incluían impuestos.\n");
+    }
+
+    private static void appendOfferBlock(StringBuilder sb, String label,
+                                         ComparisonSummary.OfferBlock block, BigDecimal invoiceTotal) {
         if (block == null) return;
         sb.append(label).append(": ").append(name(block.bestCompany())).append(" — ")
           .append(name(block.bestTariffName())).append(" a ").append(num(block.bestPricePerKwh())).append(" €/kWh.\n");
-        if (block.annualSavingsEuros().signum() > 0) {
-            sb.append("  Ahorro anual estimado frente a la tarifa actual: ")
-              .append(eur(block.annualSavingsEuros())).append(" €.\n");
+        appendPeriodSavings(sb, block, invoiceTotal);
+        if (block.annualSavingsHigh().signum() > 0) {
+            // A range, never a figure: the engine knows the two ends, not the point between them.
+            sb.append("  Ahorro anual estimado frente a la tarifa actual: entre ")
+              .append(eur(block.annualSavingsLow())).append(" € y ")
+              .append(eur(block.annualSavingsHigh())).append(" €.\n");
         } else {
             sb.append("  El usuario ya paga igual o menos que esta tarifa (sin ahorro).\n");
         }
@@ -132,6 +159,23 @@ public final class AssistantContextFormatter {
             sb.append("  Alternativa: ").append(name(a.company())).append(" — ").append(name(a.tariffName()))
               .append(": ").append(num(a.pricePerKwh())).append(" €/kWh\n");
         }
+    }
+
+    /**
+     * The saving on the invoice the user is holding. Unlike the annual figure it extrapolates
+     * nothing, so it is stated as a fact and paired with the printed total the user can check.
+     * It is the number that earns the projection its credibility — state it first.
+     */
+    private static void appendPeriodSavings(StringBuilder sb, ComparisonSummary.OfferBlock block,
+                                            BigDecimal invoiceTotal) {
+        BigDecimal saving = block.periodSavingsEuros();
+        if (saving == null || saving.signum() <= 0) return;
+        sb.append("  En esta misma factura habría pagado ").append(eur(saving)).append(" € menos");
+        if (invoiceTotal != null) {
+            sb.append(": ").append(eur(invoiceTotal.subtract(saving)))
+              .append(" € en lugar de ").append(eur(invoiceTotal)).append(" €");
+        }
+        sb.append(" (dato del periodo facturado, sin extrapolar).\n");
     }
 
     /**

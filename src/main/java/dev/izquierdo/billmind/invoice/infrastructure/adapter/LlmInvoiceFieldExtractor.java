@@ -37,7 +37,8 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "\"totalAmount\":0.00,\"consumptionKwh\":0.0," +
             "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
             "\"pricePerKwh\":0.000,\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null," +
-            "\"contractedPowerKw\":0.0}\n" +
+            "\"contractedPowerKw\":0.0," +
+            "\"powerPriceP1PerKwDay\":null,\"powerPriceP2PerKwDay\":null}\n" +
             "ISO-8601 dates. Dot decimal separator. Null for any missing field.\n\n" +
             "=== pricePerKwh / TOU RULES ===\n" +
             "TOU (discriminación horaria) means the PRICE PER kWh DIFFERS by period. If prices vary: set pricePerKwhP1/P2/P3, leave pricePerKwh null.\n" +
@@ -79,18 +80,34 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "Two-column PDFs interleave those rows with unrelated text: a row still counts when other\n" +
             "words precede it on the same line. The periods should add up to consumptionKwh.\n" +
             "Filling these fields says NOTHING about the price fields — decide those on the price rules alone.\n\n" +
-            "Input: IBERDROLA Periodo 01/01/2024 al 31/01/2024 320 kWh 0,1823 €/kWh 3,3 kW Total 67,20 €\n" +
+            "=== powerPriceP1PerKwDay / powerPriceP2PerKwDay ===\n" +
+            "The POWER term (término de potencia): euros per contracted kW per DAY. It is not a €/kWh price\n" +
+            "and not a kW figure. It sits in its own 'Potencia' block, printed above the 'Energía' block:\n" +
+            "  'Pot. Punta-Llano 3,450 kW x 0,102630 Eur/kW x 32 días ... 11,33 €' → powerPriceP1PerKwDay = 0.102630\n" +
+            "  'Pot. Valle 3,450 kW x 0,022452 Eur/kW x 32 días ... 2,48 €'        → powerPriceP2PerKwDay = 0.022452\n" +
+            "Labels: 'Potencia', 'Término de potencia', 'Pot. Punta', 'Pot. Valle', 'Peaje de potencia', '€/kW día'.\n" +
+            "  P1 = punta, punta-llano, or a single undivided power price. P2 = valle. One price only → P1, P2 null.\n" +
+            "ALWAYS NORMALISE TO €/kW/DAY. A price in 'Eur/kW' multiplied by a day count IS already daily —\n" +
+            "take it unchanged. Monthly ('€/kW/mes'): divide by 30. Yearly ('€/kW/año'): divide by 365.\n" +
+            "  Sanity check: a domestic 2.0TD daily power price falls between 0.01 and 0.20. A larger number\n" +
+            "  was not normalised. Round to 6 decimals.\n" +
+            "Leave BOTH null when the invoice states the contracted kW but prints no price for it. Never copy\n" +
+            "contractedPowerKw here, and never reuse an energy price.\n\n" +
+            "Input: IBERDROLA Periodo 01/01/2024 al 31/01/2024 320 kWh 0,1823 €/kWh | " +
+            "Término de potencia 3,3 kW x 0,104229 €/kW día x 31 días | Total 67,20 €\n" +
             "Output: {\"billingPeriodStart\":\"2024-01-01\",\"billingPeriodEnd\":\"2024-01-31\"," +
             "\"totalAmount\":67.20,\"consumptionKwh\":320.0," +
             "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
             "\"pricePerKwh\":0.1823," +
-            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.3}\n\n" +
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.3," +
+            "\"powerPriceP1PerKwDay\":0.104229,\"powerPriceP2PerKwDay\":null}\n\n" +
             "Input: ENDESA 08/05/2018 10/06/2018 | P1 (punta) 120 kWh 0,15234 €/kWh | P2 (llano) 130 kWh 0,10123 €/kWh | P3 (valle) 100 kWh 0,06891 €/kWh | Potencia 3,45 kW | Total 80,95 €\n" +
             "Output: {\"billingPeriodStart\":\"2018-05-08\",\"billingPeriodEnd\":\"2018-06-10\"," +
             "\"totalAmount\":80.95,\"consumptionKwh\":350.0," +
             "\"consumptionKwhP1\":120.0,\"consumptionKwhP2\":130.0,\"consumptionKwhP3\":100.0," +
             "\"pricePerKwh\":null," +
-            "\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45}\n\n" +
+            "\"pricePerKwhP1\":0.15234,\"pricePerKwhP2\":0.10123,\"pricePerKwhP3\":0.06891,\"contractedPowerKw\":3.45," +
+            "\"powerPriceP1PerKwDay\":null,\"powerPriceP2PerKwDay\":null}\n\n" +
             // Commercial period names ("Horas Happy" / "Resto de horas") map to no P1/P2/P3 label:
             // 12,46 € of energy over 64,257 kWh → 0.193909 €/kWh, free hours already priced in.
             "Input: ENDESA Tempo Happy | Periodo de facturación: del 31/12/2023 a 31/01/2024 | Consumo total 64,257 kWh | " +
@@ -101,13 +118,16 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "\"totalAmount\":41.92,\"consumptionKwh\":64.257," +
             "\"consumptionKwhP1\":null,\"consumptionKwhP2\":null,\"consumptionKwhP3\":null," +
             "\"pricePerKwh\":0.193909," +
-            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":6.928}\n\n" +
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":6.928," +
+            "\"powerPriceP1PerKwDay\":null,\"powerPriceP2PerKwDay\":null}\n\n" +
             // The two decisions pull apart here: consumption IS per period (meter table), price is NOT
             // (two unlabelled lines split by a mid-period price change → effective average 91,35/419,475).
             "Input: ENDESA Tarifa One Luz | del 10/06/2026 a 12/07/2026 | Consumo Total 419,475 kWh | " +
             "Energía 91,35 € | Consumo 239,571 kWh x 0,218101 Eur/kWh 52,25 € | " +
             "Consumo 179,904 kWh x 0,217317 Eur/kWh 39,10 € | " +
             "Potencias contratadas: punta-llano 3,450 kW; valle 3,450 kW | " +
+            "Potencia 13,81 € | Pot. Punta-Llano 3,450 kW x 0,102630 Eur/kW x 32 días 11,33 € | " +
+            "Pot. Valle 3,450 kW x 0,022452 Eur/kW x 32 días 2,48 € | " +
             "A efectos de facturación de los peajes y cargos: Punta 43.250,395 43.390,212 1,00 0,000 139,818 | " +
             "Llano 5.751,634 5.870,574 1,00 0,000 118,943 | Valle 8.259,147 8.419,866 1,00 0,000 160,716 | " +
             "TOTAL 135,64 €\n" +
@@ -115,7 +135,8 @@ public class LlmInvoiceFieldExtractor implements InvoiceFieldExtractor {
             "\"totalAmount\":135.64,\"consumptionKwh\":419.475," +
             "\"consumptionKwhP1\":139.818,\"consumptionKwhP2\":118.943,\"consumptionKwhP3\":160.716," +
             "\"pricePerKwh\":0.217764," +
-            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.45}";
+            "\"pricePerKwhP1\":null,\"pricePerKwhP2\":null,\"pricePerKwhP3\":null,\"contractedPowerKw\":3.45," +
+            "\"powerPriceP1PerKwDay\":0.102630,\"powerPriceP2PerKwDay\":0.022452}";
 
     private static final String GAS_INSTRUCTIONS =
             "Extract fields from the gas invoice delimited below.\n" +

@@ -176,7 +176,7 @@ class LlmAssistantAdapterTest {
                 new BigDecimal("85.40"), new BigDecimal("245"),
                 null, null, null,
                 new BigDecimal("0.18"), null, null, null,
-                new BigDecimal("4.6"));
+                new BigDecimal("4.6"), null, null);
     }
 
     private List<ChatRequest> capturedRequests() {
