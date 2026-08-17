@@ -162,10 +162,15 @@ treated as "argument absent" rather than failing the turn.
 
 ### `search_invoice_text` — reaching the lines the field set leaves out
 
-`ElectricityFields` keeps a fixed subset of the bill, so the power term in €/kW/day, the electricity
-tax, the meter rental, discounts and any retailer-specific charge exist **only** in
-`rawTextRedacted`. Those are ordinary questions a user asks in front of their bill, and before this
-tool the assistant answered that it did not have the figure.
+`ElectricityFields` keeps a fixed subset of the bill, so the electricity tax, the meter rental,
+discounts and any retailer-specific charge exist **only** in `rawTextRedacted`. Those are ordinary
+questions a user asks in front of their bill, and before this tool the assistant answered that it
+did not have the figure.
+
+The power term in €/kW/day is no longer among them: it is extracted for the comparison engine, and
+`AssistantContextFormatter` now prints it alongside the contracted kW, so the most common of those
+questions is answered from the context block and works with tools off too. The tool remains the way
+to the rest.
 
 The text is not inlined. `ChatContextAssembler` already loads the whole `Invoice`, so it now carries
 `rawTextRedacted` on `ChatContext` unformatted, and only a *searched fragment* ever reaches a prompt.

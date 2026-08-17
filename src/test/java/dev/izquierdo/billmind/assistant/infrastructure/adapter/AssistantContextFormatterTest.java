@@ -83,6 +83,50 @@ class AssistantContextFormatterTest {
                 .doesNotContain("Precio:");
     }
 
+    /**
+     * The power term is extracted and persisted, but only the contracted kW used to reach the
+     * assistant — so "¿cuánto me cobran por la potencia?" was answerable only through the invoice
+     * text search, and not at all with tools off.
+     */
+    @Test
+    void shouldRenderBothPowerPeriodPricesWhenTheInvoiceCarriesThem() {
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("135.64"),
+                new BigDecimal("419.475"), null, null, null,
+                new BigDecimal("0.217764"), null, null, null, new BigDecimal("3.45"),
+                new BigDecimal("0.084"), new BigDecimal("0.005"));
+
+        String result = AssistantContextFormatter.formatFields(fields);
+
+        assertThat(result).contains("Término de potencia P1/P2: 0,084 / 0,005 €/kW/día");
+    }
+
+    @Test
+    void shouldRenderASinglePowerPriceWhenOnlyOnePeriodWasExtracted() {
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("135.64"),
+                new BigDecimal("419.475"), null, null, null,
+                new BigDecimal("0.217764"), null, null, null, new BigDecimal("3.45"),
+                new BigDecimal("0.084"), null);
+
+        String result = AssistantContextFormatter.formatFields(fields);
+
+        assertThat(result)
+                .contains("Término de potencia: 0,084 €/kW/día")
+                .doesNotContain("Término de potencia P1/P2");
+    }
+
+    @Test
+    void shouldOmitThePowerLineWhenNeitherPeriodWasExtracted() {
+        ElectricityFields fields = new ElectricityFields(START, END, new BigDecimal("45.50"),
+                new BigDecimal("300"), null, null, null, null, null, null, null,
+                new BigDecimal("4.6"), null, null);
+
+        String result = AssistantContextFormatter.formatFields(fields);
+
+        assertThat(result)
+                .contains("Potencia contratada: 4,6 kW")
+                .doesNotContain("Término de potencia");
+    }
+
     @Test
     void shouldFormatGasFieldsWithType() {
         GasFields fields = new GasFields(START, END, new BigDecimal("60.00"), null, null, null);

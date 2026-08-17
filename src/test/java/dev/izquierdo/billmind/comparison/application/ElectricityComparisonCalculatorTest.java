@@ -125,15 +125,23 @@ class ElectricityComparisonCalculatorTest {
                 flatFields(new BigDecimal("200"), "0.18"), List.of(noValle))).isEmpty();
     }
 
+    /**
+     * A corpus of period tariffs and a user already on one used to produce no comparison at all:
+     * the flat block had no offers to build from and the period block was suppressed by the user's
+     * own tariff shape. The result is a comparison, and it is a period one.
+     */
     @Test
-    void shouldReturnEmptyWhenTouUserHasOnlyTouOffers() {
-        // TOU user → touBlock suppressed; only TOU offers → flatBlock null → both null
+    void shouldStillCompareWhenTouUserHasOnlyTouOffers() {
         ElectricityFields fields = touPriceFields(
                 new BigDecimal("200"), "0.22", "0.15", "0.10");
         List<ElectricityMarketOffer> offers = List.of(
                 touOffer("A", "T", "0.20", "0.14", "0.09"));
 
-        assertThat(calculator.calculate(fields, offers)).isEmpty();
+        ElectricityComparisonResult result = calculator.calculate(fields, offers).orElseThrow();
+
+        assertThat(result.flatBlock()).isNull();
+        assertThat(result.touBlock()).isNotNull();
+        assertThat(result.touBlock().bestCompany()).isEqualTo("A");
     }
 
     // ================================================================ flat-rate user path
@@ -285,8 +293,13 @@ class ElectricityComparisonCalculatorTest {
                 fields, List.of(flatOffer("A", "T", "0.15"))).orElseThrow().userIsTou()).isFalse();
     }
 
+    /**
+     * A user already billed by periods gets the period block too. Moving from one period tariff to
+     * a cheaper period tariff asks for no change of habits, so withholding that block withheld a
+     * saving the engine had already computed.
+     */
     @Test
-    void shouldSuppressTouBlockForTouUser() {
+    void shouldBuildBothBlocksForTouUser() {
         ElectricityFields fields = touPriceFields(
                 new BigDecimal("200"), "0.22", "0.15", "0.10");
         List<ElectricityMarketOffer> offers = List.of(
@@ -296,8 +309,27 @@ class ElectricityComparisonCalculatorTest {
         ElectricityComparisonResult result = calculator.calculate(fields, offers).orElseThrow();
 
         assertThat(result.userIsTou()).isTrue();
-        assertThat(result.touBlock()).isNull();
         assertThat(result.flatBlock()).isNotNull();
+        assertThat(result.touBlock()).isNotNull();
+        assertThat(result.touBlock().bestCompany()).isEqualTo("TOU_CO");
+    }
+
+    /**
+     * The reason the block is worth building: this user's invoice carries consumption period by
+     * period, so the offer is weighted by measured figures. The expected price is the one the real
+     * 25/50/25 split gives — the standard 30/40/30 profile would price the same offer at 0.136.
+     */
+    @Test
+    void shouldWeightTouOfferByActualConsumptionForTouUser() {
+        ElectricityFields fields = touFullFields(new BigDecimal("400"),
+                new BigDecimal("100"), new BigDecimal("200"), new BigDecimal("100"),
+                "0.22", "0.15", "0.10");
+
+        ElectricityComparisonResult result = calculator.calculate(
+                fields, List.of(touOffer("TOU_CO", "TOU-T", "0.20", "0.13", "0.08"))).orElseThrow();
+
+        assertThat(result.basis().consumptionProfile()).isEqualTo(ComparisonBasis.ConsumptionProfile.ACTUAL);
+        assertThat(result.touBlock().bestPricePerKwh()).isEqualByComparingTo("0.135000");
     }
 
     // ================================================================ TOU weight calculation

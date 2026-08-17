@@ -47,6 +47,23 @@ public final class AssistantContextFormatter {
                 num(e.pricePerKwhP1()), num(e.pricePerKwhP2()), num(e.pricePerKwhP3()));
     }
 
+    /**
+     * The power term, printed as the invoice bills it — 2.0TD charges punta and valle at different
+     * daily prices. It is extracted, validated and persisted, so leaving it out sent every "¿cuánto
+     * me cobran por la potencia?" through {@code search_invoice_text}, and with tools off nowhere.
+     * Renders nothing when neither period carries a price: announcing a gap the model cannot fill
+     * only adds a line it will repeat back.
+     */
+    private static String powerLine(ElectricityFields e) {
+        BigDecimal p1 = e.powerPriceP1PerKwDay();
+        BigDecimal p2 = e.powerPriceP2PerKwDay();
+        if (p1 == null && p2 == null) return "";
+        if (p1 == null || p2 == null) {
+            return "Término de potencia: %s €/kW/día\n".formatted(num(p1 != null ? p1 : p2));
+        }
+        return "Término de potencia P1/P2: %s / %s €/kW/día\n".formatted(num(p1), num(p2));
+    }
+
     public static String formatFields(InvoiceFields fields) {
         return switch (fields) {
             case ElectricityFields e -> """
@@ -57,13 +74,14 @@ public final class AssistantContextFormatter {
                     Consumo P1/P2/P3: %s / %s / %s kWh
                     %s
                     Potencia contratada: %s kW
-                    """.formatted(
+                    %s""".formatted(
                     e.billingPeriodStart(), e.billingPeriodEnd(),
                     eur(e.totalAmount()),
                     num(e.consumptionKwh()),
                     num(e.consumptionKwhP1()), num(e.consumptionKwhP2()), num(e.consumptionKwhP3()),
                     priceLine(e),
-                    num(e.contractedPowerKw()));
+                    num(e.contractedPowerKw()),
+                    powerLine(e));
             case GasFields g -> """
                     Tipo: Gas
                     Periodo: %s — %s

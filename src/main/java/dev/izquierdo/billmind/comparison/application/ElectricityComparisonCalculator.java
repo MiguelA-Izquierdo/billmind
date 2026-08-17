@@ -66,9 +66,14 @@ public class ElectricityComparisonCalculator {
         List<RankedOffer> ranked = rank(offers, profile);
         if (ranked.isEmpty()) return Optional.empty();
 
+        // Both blocks are built whatever shape the user's own tariff has. The period block used to
+        // be suppressed for a user already billed by periods, on the reading that it recommends a
+        // kind of tariff; it recommends a named one, and moving from one period tariff to a cheaper
+        // period tariff asks for no change of habits. That user is also the one whose invoice
+        // carries real per-period consumption, so the comparison hidden from them was the only one
+        // in the engine weighted by measured figures rather than an assumed profile.
         ElectricityOfferBlock flatBlock = buildBlock(filter(ranked, false), profile);
-        ElectricityOfferBlock touBlock  = profile.userIsTou() ? null : buildBlock(filter(ranked, true), profile);
-        if (flatBlock == null && touBlock == null) return Optional.empty();
+        ElectricityOfferBlock touBlock  = buildBlock(filter(ranked, true), profile);
 
         return Optional.of(new ElectricityComparisonResult(
                 profile.userPrice(),

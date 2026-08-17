@@ -133,8 +133,17 @@ export function showComparisonResult(data) {
   el.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
   // Only the visible panel counts up; the other one animates when its tab is opened.
-  if (c?.flatBlock)     animateCounter(c.flatBlock, c, id + '-counter');
-  else if (c?.touBlock) animateCounter(c.touBlock,  c, id + '-counter-tou');
+  if (touLeads(c))       animateCounter(c.touBlock,  c, id + '-counter-tou');
+  else if (c?.flatBlock) animateCounter(c.flatBlock, c, id + '-counter');
+}
+
+/**
+ * Which scenario opens the card. Flat leads by default because it asks for no change of habits —
+ * except for a user already billed by periods, who lives under them already: for them the period
+ * scenario is the one that matches their bill, so it is the one that should be on screen.
+ */
+function touLeads(c) {
+  return !!c?.touBlock && (!c.flatBlock || !!c.userIsTou);
 }
 
 /**
@@ -154,20 +163,19 @@ function buildCard(id, data, c) {
 
   const flat = c.flatBlock;
   const tou  = c.touBlock;
+  const lead = touLeads(c);
 
   const tabs = (flat && tou)
     ? `<div class="cmp-tabs-hint">Tienes dos formas de ahorrar · toca para comparar</div>
        <div class="cmp-tabs" role="tablist">
-         ${tabButton('flat', 'Tarifa plana', flat.periodSavingsEuros, true)}
-         ${tabButton('tou',  'Horas valle',  tou.periodSavingsEuros, false)}
+         ${tabButton('flat', 'Tarifa plana', flat.periodSavingsEuros, !lead)}
+         ${tabButton('tou',  'Horas valle',  tou.periodSavingsEuros,   lead)}
        </div>`
     : '';
 
-  // Flat is the default scenario — it needs no change of habits. TOU only leads
-  // when there is no flat block to show.
   const panels =
-      (flat ? buildPanel(id, c, flat, 'flat', true)  : '')
-    + (tou  ? buildPanel(id, c, tou,  'tou',  !flat) : '');
+      (flat ? buildPanel(id, c, flat, 'flat', !lead) : '')
+    + (tou  ? buildPanel(id, c, tou,  'tou',   lead) : '');
 
   return intro + tabs + panels
     + `<div class="cmp-footer">Puedes preguntarme cualquier cosa sobre esta factura.</div>`;
@@ -279,7 +287,12 @@ function basisNote(c, isTou) {
       parts.push('El reparto del consumo por periodos usa un perfil doméstico estándar.');
     }
   }
-  if (isTou) parts.push('El ahorro real depende de trasladar consumos a horas valle (23h–8h).');
+  // Only worth saying when the period split is a guess. A user whose invoice breaks consumption
+  // down period by period is already living the split this figure was computed from — telling
+  // them the saving depends on moving consumption would be describing someone else's bill.
+  if (isTou && b?.consumptionProfile === 'ASSUMED') {
+    parts.push('El ahorro real depende de trasladar consumos a horas valle (23h–8h).');
+  }
   return parts.length ? `<div class="cmp-basis-note">${parts.join(' ')}</div>` : '';
 }
 
@@ -307,7 +320,11 @@ function wireTabs(root, id, c) {
   const tabs = root.querySelectorAll('.cmp-tab');
   if (!tabs.length) return;
 
-  let touAnimated = false;
+  // Either panel can be the one that opens the card now, so both are tracked: the leading one
+  // already counted up on render, and re-running it on a click would reset a figure the user has
+  // been looking at.
+  const lead     = touLeads(c);
+  const animated = { flat: !lead, tou: lead };
 
   tabs.forEach(tab => tab.addEventListener('click', () => {
     const target = tab.dataset.panel;
@@ -323,9 +340,10 @@ function wireTabs(root, id, c) {
     });
 
     // Run the count-up the first time the panel is actually seen
-    if (target === 'tou' && !touAnimated) {
-      touAnimated = true;
-      animateCounter(c.touBlock, c, id + '-counter-tou');
+    if (!animated[target]) {
+      animated[target] = true;
+      animateCounter(target === 'tou' ? c.touBlock : c.flatBlock,
+                     c, id + (target === 'tou' ? '-counter-tou' : '-counter'));
     }
   }));
 }
